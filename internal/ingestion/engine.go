@@ -29,10 +29,11 @@ func (e *Engine) ProcessTokenEvent(ctx context.Context, event domain.TokenEvent)
 	if err != nil {
 		log.Printf("Warning: Could not find pricing for model %s. Cost will be 0.", event.ModelID)
 	} else {
-		// Calculate precise cost based on per-1k tokens
-		promptCost := float64(event.PromptTokens) * (price.PromptCostPer1k / 1000.0)
-		completionCost := float64(event.CompletionTokens) * (price.CompletionCostPer1k / 1000.0)
-		event.TotalCost = promptCost + completionCost
+		// Calculate precise cost based on per-1M tokens
+		promptCost := float64(event.PromptTokens) * (price.InputCostPerMillion / 1000000.0)
+		completionCost := float64(event.CompletionTokens) * (price.OutputCostPerMillion / 1000000.0)
+		totalCost := promptCost + completionCost
+		event.CostEstimateUSD = &totalCost
 	}
 
 	event.TotalTokens = event.PromptTokens + event.CompletionTokens

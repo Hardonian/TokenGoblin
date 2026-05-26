@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.

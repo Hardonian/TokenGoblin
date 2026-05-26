@@ -36,14 +36,14 @@ func (s *MemoryStore) SeedPricing() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pricing["gemini-1.5-pro"] = domain.PricePoint{
-		ModelID:             "gemini-1.5-pro",
-		PromptCostPer1k:     0.0035,
-		CompletionCostPer1k: 0.0105,
+		ModelID:              "gemini-1.5-pro",
+		InputCostPerMillion:  3.50,
+		OutputCostPerMillion: 10.50,
 	}
 	s.pricing["claude-3-opus"] = domain.PricePoint{
-		ModelID:             "claude-3-opus",
-		PromptCostPer1k:     0.015,
-		CompletionCostPer1k: 0.075,
+		ModelID:              "claude-3-opus",
+		InputCostPerMillion:  15.00,
+		OutputCostPerMillion: 75.00,
 	}
 }
 

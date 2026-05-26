@@ -68,9 +68,13 @@ func (h *SummaryHandler) HandleGetSummary(w http.ResponseWriter, r *http.Request
 	workerCosts := make(map[string]float64)
 
 	for _, ev := range events {
-		totalCost += ev.TotalCost
-		modelCosts[ev.ModelID] += ev.TotalCost
-		workerCosts[ev.WorkerID] += ev.TotalCost
+		var cost float64
+		if ev.CostEstimateUSD != nil {
+			cost = *ev.CostEstimateUSD
+		}
+		totalCost += cost
+		modelCosts[ev.ModelID] += cost
+		workerCosts[ev.WorkerID] += cost
 	}
 
 	// Build the response
@@ -140,7 +144,9 @@ func (h *SummaryHandler) HandleGetWorker(w http.ResponseWriter, r *http.Request)
 
 	for _, ev := range events {
 		if ev.WorkerID == workerID {
-			totalCost += ev.TotalCost
+			if ev.CostEstimateUSD != nil {
+				totalCost += *ev.CostEstimateUSD
+			}
 			if !jobsSeen[ev.JobID] && ev.JobID != "" {
 				jobsSeen[ev.JobID] = true
 				totalJobs++
