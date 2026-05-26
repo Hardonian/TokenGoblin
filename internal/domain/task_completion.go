@@ -22,8 +22,8 @@ type TaskCompletion struct {
 	Status             TaskStatus        `json:"status"`
 	DurationMs         int               `json:"duration_ms"`
 	TotalTokensUsed    int               `json:"total_tokens_used"`
-	TotalCost          float64           `json:"total_cost"`
-	OutputQualityScore float64           `json:"output_quality_score"`
+	TotalCost          *float64          `json:"total_cost,omitempty"`
+	OutputQualityScore *float64          `json:"output_quality_score,omitempty"`
 	ErrorCode          string            `json:"error_code"`
 	Tags               map[string]string `json:"tags"`
 }
