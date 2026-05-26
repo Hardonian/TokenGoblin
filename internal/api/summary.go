@@ -10,10 +10,10 @@ import (
 )
 
 type SummaryHandler struct {
-	Store storage.EventRepository
+	Store storage.Repository
 }
 
-func NewSummaryHandler(store storage.EventRepository) *SummaryHandler {
+func NewSummaryHandler(store storage.Repository) *SummaryHandler {
 	return &SummaryHandler{Store: store}
 }
 
@@ -57,7 +57,7 @@ func (h *SummaryHandler) HandleGetSummary(w http.ResponseWriter, r *http.Request
 	end := time.Now().UTC()
 	start := end.Add(-30 * 24 * time.Hour)
 
-	events, err := h.Store.GetTokenEvents(r.Context(), tenantID, start, end)
+	events, err := h.Store.ListTokenEvents(r.Context(), tenantID, 500)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -68,6 +68,10 @@ func (h *SummaryHandler) HandleGetSummary(w http.ResponseWriter, r *http.Request
 	workerCosts := make(map[string]float64)
 
 	for _, ev := range events {
+		// Filter by time range since ListTokenEvents just gives recent 500
+		if ev.Timestamp.Before(start) || ev.Timestamp.After(end) {
+			continue
+		}
 		var cost float64
 		if ev.CostEstimateUSD != nil {
 			cost = *ev.CostEstimateUSD
@@ -129,13 +133,13 @@ func (h *SummaryHandler) HandleGetWorker(w http.ResponseWriter, r *http.Request)
 	end := time.Now().UTC()
 	start := end.Add(-30 * 24 * time.Hour)
 
-	events, err := h.Store.GetTokenEvents(r.Context(), tenantID, start, end)
+	events, err := h.Store.ListTokenEvents(r.Context(), tenantID, 500)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Filter for worker
+	// Filter for worker and time range
 	var totalCost float64
 	var totalJobs int
 
@@ -143,6 +147,9 @@ func (h *SummaryHandler) HandleGetWorker(w http.ResponseWriter, r *http.Request)
 	jobsSeen := make(map[string]bool)
 
 	for _, ev := range events {
+		if ev.Timestamp.Before(start) || ev.Timestamp.After(end) {
+			continue
+		}
 		if ev.WorkerID == workerID {
 			if ev.CostEstimateUSD != nil {
 				totalCost += *ev.CostEstimateUSD

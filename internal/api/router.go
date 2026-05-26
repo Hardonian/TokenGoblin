@@ -8,7 +8,7 @@ import (
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.
-func NewRouter(service ingestion.Service, store storage.EventRepository) *http.ServeMux {
+func NewRouter(service ingestion.Service, store storage.Repository) *http.ServeMux {
 	mux := http.NewServeMux()
 	
 	ingestHandler := NewIngestionHandler(service)
