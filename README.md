@@ -1,2 +1,40 @@
 # TokenGoblin
-"Catch the little monsters eating your AI spend."
+
+Deterministic MVP execution layer for token usage ingestion, cost estimates,
+tenant-scoped dashboard data, productivity primitives, anomaly detection, and a
+demo seed.
+
+## Quick Start
+
+```bash
+npm install
+npm run db:seed
+npm run smoke
+npm run dev
+```
+
+All API requests require an `x-tenant-id` header. The demo seed uses
+`demo-tenant` by default.
+
+```bash
+curl -H "x-tenant-id: demo-tenant" http://localhost:3000/api/dashboard/overview
+```
+
+## Scripts
+
+- `npm run lint` checks TypeScript and app files with ESLint.
+- `npm run typecheck` runs `tsc --noEmit`.
+- `npm run test` runs deterministic unit and route coverage.
+- `npm run build` builds the Next app.
+- `npm run db:seed` creates deterministic demo data.
+- `npm run smoke` verifies the seeded execution layer.
+
+## Implementation Notes
+
+- Tenant scope is derived from `x-tenant-id`. A payload `tenantId` is accepted
+  only when it matches that header.
+- Client-supplied costs are ignored unless sent as `externalEstimate`; internal
+  cost estimates come from the pricing registry.
+- Unknown pricing, missing data, and database unavailability return structured
+  degraded responses instead of unhandled 500s.
+- Productivity scoring is deterministic in V1. No LLM quality scoring is used.
