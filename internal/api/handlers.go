@@ -2,14 +2,27 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 
 type IngestionHandler struct {
 	Service ingestion.Service
+}
+
+type Envelope struct {
+	OK       bool           `json:"ok"`
+	Status   string         `json:"status"`
+	Data     interface{}    `json:"data,omitempty"`
+	Warnings []domain.Issue `json:"warnings,omitempty"`
+	Degraded []domain.Issue `json:"degraded,omitempty"`
+	Error    *domain.Issue  `json:"error,omitempty"`
 }
 
 func NewIngestionHandler(service ingestion.Service) *IngestionHandler {
@@ -18,40 +31,261 @@ func NewIngestionHandler(service ingestion.Service) *IngestionHandler {
 
 func (h *IngestionHandler) HandleTokenEvent(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("method_not_allowed", "Use POST for token usage ingestion."),
+		})
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
 		return
 	}
 
 	var event domain.TokenEvent
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&event); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must be a valid token usage event JSON object."),
+			Degraded: []domain.Issue{{
+				Code:    "invalid_json",
+				Message: "JSON decoding failed.",
+				Field:   "body",
+			}},
+		})
 		return
 	}
 
-	if err := h.Service.ProcessTokenEvent(r.Context(), event); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	result, err := h.Service.IngestTokenEvent(r.Context(), tenantID, event)
+	if err != nil {
+		writeServiceError(w, err, false)
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
+	status := "success"
+	if len(result.Degraded) > 0 {
+		status = "degraded"
+	}
+	writeJSON(w, http.StatusAccepted, Envelope{
+		OK:       true,
+		Status:   status,
+		Data:     result,
+		Warnings: result.Warnings,
+		Degraded: result.Degraded,
+	})
 }
 
-func (h *IngestionHandler) HandleTaskCompletion(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+func (h *IngestionHandler) HandleTaskCompletion(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, Envelope{
+		OK:     false,
+		Status: "degraded",
+		Error:  issue("route_replaced", "Task completion ingestion is replaced by token usage event ingestion in this MVP."),
+		Degraded: []domain.Issue{{
+			Code:    "route_replaced",
+			Message: "Use /api/ingest/token-usage with output_status and review_score fields.",
+		}},
+	})
+}
+
+func (h *IngestionHandler) HandleOverview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	summary, err := h.Service.Overview(r.Context(), tenantID)
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	status := "success"
+	if len(summary.Degraded) > 0 {
+		status = "degraded"
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: summary, Degraded: summary.Degraded})
+}
+
+func (h *IngestionHandler) HandleWorkers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	workers, err := h.Service.Workers(r.Context(), tenantID)
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(workers) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No workers exist for this tenant."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: workers, Degraded: degraded})
+}
+
+func (h *IngestionHandler) HandleAnomalies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	signals, err := h.Service.Anomalies(r.Context(), tenantID, limitFromRequest(r))
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(signals) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No anomaly signals exist for this tenant."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: signals, Degraded: degraded})
+}
+
+func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	events, err := h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(events) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No usage events exist for this tenant."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: events, Degraded: degraded})
+}
+
+func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
+	if tenantID == "" {
+		writeJSON(w, http.StatusUnauthorized, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("tenant_missing", "Missing required x-tenant-id header."),
+		})
+		return "", false
+	}
+	return tenantID, true
+}
+
+func writeMethodError(w http.ResponseWriter) {
+	writeJSON(w, http.StatusMethodNotAllowed, Envelope{
+		OK:     false,
+		Status: "error",
+		Error:  issue("method_not_allowed", "Method is not allowed for this route."),
+	})
+}
+
+func writeServiceError(w http.ResponseWriter, err error, readRoute bool) {
+	var validationErr ingestion.ValidationError
+	if errors.As(err, &validationErr) {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:       false,
+			Status:   "error",
+			Error:    issue("validation_error", "Request validation failed."),
+			Degraded: validationErr.Issues,
+		})
+		return
+	}
+	var missingTenant ingestion.TenantMissingError
+	if errors.As(err, &missingTenant) {
+		writeJSON(w, http.StatusUnauthorized, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("tenant_missing", "Missing required x-tenant-id header."),
+		})
+		return
+	}
+	var tenantMismatch ingestion.TenantMismatchError
+	if errors.As(err, &tenantMismatch) {
+		writeJSON(w, http.StatusForbidden, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("tenant_mismatch", "Payload tenant_id does not match request tenant context."),
+		})
+		return
+	}
+	if errors.Is(err, storage.ErrUnavailable) {
+		degraded := []domain.Issue{{
+			Code:    "database_unavailable",
+			Message: "Storage is unavailable; returning a degraded response.",
+		}}
+		statusCode := http.StatusServiceUnavailable
+		if readRoute {
+			statusCode = http.StatusOK
+		}
+		writeJSON(w, statusCode, Envelope{
+			OK:       readRoute,
+			Status:   "degraded",
+			Data:     emptyReadData(readRoute),
+			Degraded: degraded,
+			Error:    issue("database_unavailable", "Storage is unavailable."),
+		})
 		return
 	}
 
-	var completion domain.TaskCompletion
-	if err := json.NewDecoder(r.Body).Decode(&completion); err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
-		return
-	}
+	writeJSON(w, http.StatusServiceUnavailable, Envelope{
+		OK:     false,
+		Status: "degraded",
+		Error:  issue("service_unavailable", "Request could not be completed."),
+	})
+}
 
-	if err := h.Service.ProcessTaskCompletion(r.Context(), completion); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+func emptyReadData(readRoute bool) interface{} {
+	if readRoute {
+		return []interface{}{}
 	}
+	return nil
+}
 
-	w.WriteHeader(http.StatusAccepted)
+func writeJSON(w http.ResponseWriter, statusCode int, body Envelope) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func issue(code string, message string) *domain.Issue {
+	return &domain.Issue{Code: code, Message: message}
+}
+
+func limitFromRequest(r *http.Request) int {
+	raw := r.URL.Query().Get("limit")
+	if raw == "" {
+		return 100
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit <= 0 {
+		return 100
+	}
+	if limit > 500 {
+		return 500
+	}
+	return limit
 }
