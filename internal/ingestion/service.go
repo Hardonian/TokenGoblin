@@ -32,6 +32,7 @@ type ExecutionService struct {
 	pricing    cost.Registry
 	thresholds anomaly.Thresholds
 	now        func() time.Time
+	eventQueue chan domain.TokenEvent
 }
 
 func NewService(repo storage.Repository, pricing cost.Registry) *ExecutionService {
@@ -40,28 +41,47 @@ func NewService(repo storage.Repository, pricing cost.Registry) *ExecutionServic
 		pricing:    pricing,
 		thresholds: anomaly.DefaultThresholds(),
 		now:        func() time.Time { return time.Now().UTC() },
+		eventQueue: make(chan domain.TokenEvent, 10000),
 	}
 }
 
-func (s *ExecutionService) WithClock(clock func() time.Time) *ExecutionService {
-	if clock != nil {
-		s.now = clock
-	}
-	return s
+// StartWorker starts a background goroutine to process ingested events.
+func (s *ExecutionService) StartWorker(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event := <-s.eventQueue:
+				s.processEvent(ctx, event)
+			}
+		}
+	}()
 }
 
-func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string, event domain.TokenEvent) (domain.IngestionResult, error) {
-	normalized, warnings, err := s.normalize(tenantID, event)
-	if err != nil {
-		return domain.IngestionResult{}, err
+func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.TokenEvent) {
+	// Retry loop for DB locks/unavailability
+	for retries := 0; retries < 3; retries++ {
+		err := s.tryProcessEvent(ctx, normalized)
+		if err == nil {
+			return // Success
+		}
+		if errors.Is(err, storage.ErrUnavailable) {
+			time.Sleep(time.Millisecond * 100 * time.Duration(retries+1))
+			continue
+		}
+		// Some other error, log or ignore
+		break
 	}
+}
 
+func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domain.TokenEvent) error {
 	prior, err := s.repo.ListTokenEventsBefore(ctx, normalized.TenantID, normalized.Timestamp, 100)
 	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
-		return domain.IngestionResult{}, err
+		return err
 	}
 	if errors.Is(err, storage.ErrUnavailable) {
-		return domain.IngestionResult{}, err
+		return err
 	}
 
 	costResult := s.pricing.Calculate(normalized)
@@ -69,17 +89,6 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 	normalized.CostCurrency = costResult.Currency
 	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
 	normalized.CostDegradedCode = costResult.DegradedCode
-
-	result := domain.IngestionResult{
-		Event:    normalized,
-		Warnings: append(warnings, s.pricing.Diagnostics()...),
-	}
-	if normalized.CostIsDegraded {
-		result.Degraded = append(result.Degraded, domain.Issue{
-			Code:    normalized.CostDegradedCode,
-			Message: "Internal cost estimate is unavailable for this provider/model.",
-		})
-	}
 
 	snapshot := domain.CostSnapshot{
 		SnapshotID:      normalized.EventID + ":cost",
@@ -96,21 +105,51 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 		DegradedCode:    normalized.CostDegradedCode,
 		CreatedAt:       normalized.CreatedAt,
 	}
-	result.CostSnapshot = snapshot
 
 	signals := anomaly.Detect(normalized, prior, s.now(), s.thresholds)
-	result.Anomalies = signals
 
 	if err := s.repo.SaveTokenEvent(ctx, normalized); err != nil {
-		return domain.IngestionResult{}, err
+		return err
 	}
 	if err := s.repo.SaveCostSnapshot(ctx, snapshot); err != nil {
-		return domain.IngestionResult{}, err
+		return err
 	}
 	for _, signal := range signals {
 		if err := s.repo.SaveAnomalySignal(ctx, signal); err != nil {
-			return domain.IngestionResult{}, err
+			return err
 		}
+	}
+	return nil
+}
+
+func (s *ExecutionService) WithClock(clock func() time.Time) *ExecutionService {
+	if clock != nil {
+		s.now = clock
+	}
+	return s
+}
+
+func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string, event domain.TokenEvent) (domain.IngestionResult, error) {
+	normalized, warnings, err := s.normalize(tenantID, event)
+	if err != nil {
+		return domain.IngestionResult{}, err
+	}
+
+	select {
+	case s.eventQueue <- normalized:
+		// Buffered successfully
+	default:
+		// Queue is full, return error
+		return domain.IngestionResult{}, errors.New("ingestion buffer full")
+	}
+
+	result := domain.IngestionResult{
+		Event:    normalized,
+		Warnings: warnings,
+		Degraded: []domain.Issue{{
+			Code:    "buffered",
+			Message: "Event buffered for asynchronous processing.",
+		}},
 	}
 
 	return result, nil

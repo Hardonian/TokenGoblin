@@ -22,6 +22,7 @@ func main() {
 	defer repo.Close()
 
 	service := ingestion.NewService(repo, cost.LoadRegistry(cost.ConfigFromEnv()))
+	service.StartWorker(ctx)
 	mux := api.NewRouter(service)
 
 	addr := os.Getenv("TG_ADDR")
