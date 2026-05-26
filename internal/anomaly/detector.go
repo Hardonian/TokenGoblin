@@ -16,6 +16,7 @@ type Thresholds struct {
 	LatencySpikeMultiplier     float64
 	LatencySpikeMinimumMs      float64
 	RepeatedFailureWindow      int
+	RepeatedFailureMinimum     int
 	HighCostAcceptedMultiplier float64
 	HighCostAcceptedMinimumUSD float64
 	VelocitySpikeTokens        int
@@ -30,6 +31,7 @@ func DefaultThresholds() Thresholds {
 		TokenSpikeMinimumTokens:    10_000,
 		LatencySpikeMultiplier:     3,
 		LatencySpikeMinimumMs:      10_000,
+		RepeatedFailureWindow:      10,
 		RepeatedFailureMinimum:     3,
 		HighCostAcceptedMultiplier: 4,
 		HighCostAcceptedMinimumUSD: 2,
