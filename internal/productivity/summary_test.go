@@ -71,3 +71,52 @@ func TestBuildSummaryGroupsCostAndDegradedUnknownPricing(t *testing.T) {
 		t.Fatalf("expected degraded unknown pricing summary, got %#v", summary.Degraded)
 	}
 }
+
+func TestWorkerMemoryTrend(t *testing.T) {
+	now := time.Date(2026, 1, 20, 0, 0, 0, 0, time.UTC)
+	tenDaysAgo := now.Add(-10 * 24 * time.Hour)
+	threeDaysAgo := now.Add(-3 * 24 * time.Hour)
+
+	costA := 1.0 // Prior cost
+	costB := 2.0 // Current cost (decaying)
+
+	events := []domain.TokenEvent{
+		{
+			TenantID:        "tenant-a",
+			EventID:         "evt-prior",
+			WorkerID:        "worker-decay",
+			Provider:        "demo",
+			ModelID:         "m1",
+			TaskCategory:    "test",
+			TotalTokens:     100,
+			CostEstimateUSD: &costA,
+			OutputStatus:    domain.OutputAccepted,
+			Timestamp:       tenDaysAgo,
+		},
+		{
+			TenantID:        "tenant-a",
+			EventID:         "evt-current",
+			WorkerID:        "worker-decay",
+			Provider:        "demo",
+			ModelID:         "m1",
+			TaskCategory:    "test",
+			TotalTokens:     200,
+			CostEstimateUSD: &costB,
+			OutputStatus:    domain.OutputAccepted,
+			Timestamp:       threeDaysAgo,
+		},
+	}
+
+	summary := BuildSummary("tenant-a", events, nil, now)
+	if len(summary.CostByWorker) != 1 {
+		t.Fatalf("expected 1 worker breakdown, got %d", len(summary.CostByWorker))
+	}
+
+	worker := summary.CostByWorker[0]
+	if worker.Trend != "decaying" {
+		t.Fatalf("expected trend 'decaying', got '%s'", worker.Trend)
+	}
+	if worker.EfficiencyRating != "degraded" {
+		t.Fatalf("expected efficiency rating 'degraded', got '%s'", worker.EfficiencyRating)
+	}
+}

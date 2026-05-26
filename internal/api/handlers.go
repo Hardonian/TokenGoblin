@@ -1,8 +1,11 @@
 package api
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -221,6 +224,49 @@ func (h *IngestionHandler) HandleRecommendations(w http.ResponseWriter, r *http.
 		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No routing recommendations available."})
 	}
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: recs, Degraded: degraded})
+}
+
+func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	events, err := h.Service.RecentEvents(r.Context(), tenantID, 10000)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=token_goblin_export.csv")
+	w.WriteHeader(http.StatusOK)
+
+	writer := csv.NewWriter(w)
+	writer.Write([]string{"event_id", "timestamp", "worker_id", "job_id", "provider", "model_id", "total_tokens", "cost_usd", "task_category", "output_status"})
+	
+	for _, event := range events {
+		costStr := ""
+		if event.CostEstimateUSD != nil {
+			costStr = fmt.Sprintf("%.6f", *event.CostEstimateUSD)
+		}
+		writer.Write([]string{
+			event.EventID,
+			event.Timestamp.Format(time.RFC3339),
+			event.WorkerID,
+			event.JobID,
+			event.Provider,
+			event.ModelID,
+			fmt.Sprintf("%d", event.TotalTokens),
+			costStr,
+			event.TaskCategory,
+			string(event.OutputStatus),
+		})
+	}
+	writer.Flush()
 }
 
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
