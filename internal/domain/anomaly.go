@@ -21,6 +21,7 @@ const (
 	AnomalyUnknownModelPricing       AnomalyType = "unknown_model_pricing"
 	AnomalyRepeatedFailedOutputs     AnomalyType = "repeated_failed_outputs"
 	AnomalyHighCostPerAcceptedOutput AnomalyType = "high_cost_per_accepted_output"
+	AnomalyVelocitySpike             AnomalyType = "velocity_spike"
 )
 
 // AnomalySignal represents a deterministic rule hit.

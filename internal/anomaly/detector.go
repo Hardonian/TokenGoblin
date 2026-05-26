@@ -16,9 +16,10 @@ type Thresholds struct {
 	LatencySpikeMultiplier     float64
 	LatencySpikeMinimumMs      float64
 	RepeatedFailureWindow      int
-	RepeatedFailureMinimum     int
 	HighCostAcceptedMultiplier float64
 	HighCostAcceptedMinimumUSD float64
+	VelocitySpikeTokens        int
+	VelocitySpikeSeconds       float64
 }
 
 func DefaultThresholds() Thresholds {
@@ -29,10 +30,11 @@ func DefaultThresholds() Thresholds {
 		TokenSpikeMinimumTokens:    10_000,
 		LatencySpikeMultiplier:     3,
 		LatencySpikeMinimumMs:      10_000,
-		RepeatedFailureWindow:      10,
 		RepeatedFailureMinimum:     3,
 		HighCostAcceptedMultiplier: 4,
 		HighCostAcceptedMinimumUSD: 2,
+		VelocitySpikeTokens:        50000,
+		VelocitySpikeSeconds:       60,
 	}
 }
 
@@ -70,6 +72,23 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 			signals = append(signals, signal(event, now, domain.AnomalyTokenSpike, domain.SeverityHigh,
 				"Event tokens exceeded the deterministic token spike threshold.", &observed, &threshold))
 		}
+	}
+
+	// Velocity Spike
+	var recentTokens int
+	for _, p := range prior {
+		if p.WorkerID == event.WorkerID {
+			if event.Timestamp.Sub(p.Timestamp).Seconds() <= thresholds.VelocitySpikeSeconds {
+				recentTokens += p.TotalTokens
+			}
+		}
+	}
+	recentTokens += event.TotalTokens
+	if recentTokens > thresholds.VelocitySpikeTokens {
+		observed := float64(recentTokens)
+		threshold := float64(thresholds.VelocitySpikeTokens)
+		signals = append(signals, signal(event, now, domain.AnomalyVelocitySpike, domain.SeverityHigh,
+			"Worker exceeded token velocity threshold (runaway loop).", &observed, &threshold))
 	}
 
 	latencies := numericPrior(prior, func(item domain.TokenEvent) (float64, bool) {
