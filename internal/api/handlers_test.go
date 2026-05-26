@@ -77,8 +77,18 @@ func TestTokenUsageRouteIngestsStructuredPayload(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if !envelope.OK || envelope.Status != "success" {
-		t.Fatalf("expected success envelope, got %#v", envelope)
+	if !envelope.OK || envelope.Status != "degraded" {
+		t.Fatalf("expected degraded envelope with buffered, got %#v", envelope)
+	}
+	hasBuffered := false
+	for _, issue := range envelope.Degraded {
+		if issue.Code == "buffered" {
+			hasBuffered = true
+			break
+		}
+	}
+	if !hasBuffered {
+		t.Fatalf("expected buffered degradation issue, got %#v", envelope.Degraded)
 	}
 }
 
@@ -91,5 +101,6 @@ func testRouter(t *testing.T) (*http.ServeMux, func()) {
 	service := ingestion.NewService(repo, cost.LoadRegistry(cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
+	service.StartWorker(context.Background())
 	return NewRouter(service), func() { _ = repo.Close() }
 }

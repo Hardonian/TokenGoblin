@@ -24,6 +24,8 @@ func Seed(ctx context.Context, repo storage.Repository, service ingestion.Servic
 			return fmt.Errorf("seed %s: %w", event.EventID, err)
 		}
 	}
+	// Wait for async ingestion to process
+	time.Sleep(300 * time.Millisecond)
 	return nil
 }
 

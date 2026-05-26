@@ -44,6 +44,7 @@ func TestIngestTokenEventComputesInternalCostAndStoresExternalEstimate(t *testin
 	if len(result.Warnings) == 0 || result.Warnings[0].Code != "ignored_client_cost" {
 		t.Fatalf("expected ignored client cost warning, got %#v", result.Warnings)
 	}
+	time.Sleep(100 * time.Millisecond) // Wait for worker
 	events, err := repo.ListTokenEvents(ctx, "tenant-a", 10)
 	if err != nil {
 		t.Fatalf("list events: %v", err)
@@ -95,8 +96,13 @@ func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 	if len(result.Degraded) == 0 || result.Degraded[0].Code != "unknown_model_pricing" {
 		t.Fatalf("expected unknown pricing degradation, got %#v", result.Degraded)
 	}
-	if len(result.Anomalies) != 1 || result.Anomalies[0].Type != domain.AnomalyUnknownModelPricing {
-		t.Fatalf("expected unknown pricing anomaly, got %#v", result.Anomalies)
+	time.Sleep(100 * time.Millisecond) // Wait for worker
+	anomalies, err := repo.ListAnomalySignals(ctx, "tenant-a", 10)
+	if err != nil {
+		t.Fatalf("list anomalies: %v", err)
+	}
+	if len(anomalies) != 1 || anomalies[0].Type != domain.AnomalyUnknownModelPricing {
+		t.Fatalf("expected unknown pricing anomaly, got %#v", anomalies)
 	}
 }
 
@@ -109,6 +115,7 @@ func testService(t *testing.T) (*ExecutionService, storage.Repository) {
 	service := NewService(repo, cost.LoadRegistry(cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
+	service.StartWorker(context.Background())
 	return service, repo
 }
 

@@ -76,6 +76,13 @@ func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.T
 }
 
 func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domain.TokenEvent) error {
+	// Calculate cost synchronously since it is purely in-memory
+	costResult := s.pricing.Calculate(normalized)
+	normalized.CostEstimateUSD = costResult.CostEstimateUSD
+	normalized.CostCurrency = costResult.Currency
+	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
+	normalized.CostDegradedCode = costResult.DegradedCode
+
 	prior, err := s.repo.ListTokenEventsBefore(ctx, normalized.TenantID, normalized.Timestamp, 100)
 	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
 		return err
@@ -83,12 +90,6 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 	if errors.Is(err, storage.ErrUnavailable) {
 		return err
 	}
-
-	costResult := s.pricing.Calculate(normalized)
-	normalized.CostEstimateUSD = costResult.CostEstimateUSD
-	normalized.CostCurrency = costResult.Currency
-	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
-	normalized.CostDegradedCode = costResult.DegradedCode
 
 	snapshot := domain.CostSnapshot{
 		SnapshotID:      normalized.EventID + ":cost",
@@ -135,6 +136,12 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 		return domain.IngestionResult{}, err
 	}
 
+	costResult := s.pricing.Calculate(normalized)
+	normalized.CostEstimateUSD = costResult.CostEstimateUSD
+	normalized.CostCurrency = costResult.Currency
+	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
+	normalized.CostDegradedCode = costResult.DegradedCode
+
 	select {
 	case s.eventQueue <- normalized:
 		// Buffered successfully
@@ -145,12 +152,18 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 
 	result := domain.IngestionResult{
 		Event:    normalized,
-		Warnings: warnings,
-		Degraded: []domain.Issue{{
-			Code:    "buffered",
-			Message: "Event buffered for asynchronous processing.",
-		}},
+		Warnings: append(warnings, s.pricing.Diagnostics()...),
 	}
+	if normalized.CostIsDegraded {
+		result.Degraded = append(result.Degraded, domain.Issue{
+			Code:    normalized.CostDegradedCode,
+			Message: "Internal cost estimate is unavailable for this provider/model.",
+		})
+	}
+	result.Degraded = append(result.Degraded, domain.Issue{
+		Code:    "buffered",
+		Message: "Event buffered for asynchronous processing.",
+	})
 
 	return result, nil
 }
