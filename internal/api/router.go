@@ -7,14 +7,18 @@ import (
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.
-func NewRouter(service ingestion.Service) *http.ServeMux {
+func NewRouter(service ingestion.Service, store storage.EventRepository) *http.ServeMux {
 	mux := http.NewServeMux()
 	
-	handler := NewIngestionHandler(service)
+	ingestHandler := NewIngestionHandler(service)
+	summaryHandler := NewSummaryHandler(store)
 
 	// Register routes
-	mux.HandleFunc("/v1/events", handler.HandleTokenEvent)
-	mux.HandleFunc("/v1/completions", handler.HandleTaskCompletion)
+	mux.HandleFunc("/api/v1/ingest", ingestHandler.HandleTokenEvent)
+	mux.HandleFunc("/api/v1/completions", ingestHandler.HandleTaskCompletion)
+	
+	mux.HandleFunc("/api/v1/summary", summaryHandler.HandleGetSummary)
+	mux.HandleFunc("/api/v1/workers/", summaryHandler.HandleGetWorker) // Trailing slash allows path matching
 
 	return mux
 }
