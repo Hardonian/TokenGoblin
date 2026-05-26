@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
@@ -103,7 +104,16 @@ func (h *IngestionHandler) HandleOverview(w http.ResponseWriter, r *http.Request
 	}
 	summary, err := h.Service.Overview(r.Context(), tenantID)
 	if err != nil {
-		writeServiceError(w, err, true)
+		fallback := domain.ProductivitySummary{
+			TenantID:       tenantID,
+			GeneratedAt:    time.Now().UTC(),
+			CostByWorker:   []domain.WorkerBreakdown{},
+			CostByCategory: []domain.CategoryBreakdown{},
+			TopCostDrivers: []domain.CostDriver{},
+		}
+		if writeDashboardError(w, err, fallback) {
+			return
+		}
 		return
 	}
 	status := "success"
@@ -124,7 +134,9 @@ func (h *IngestionHandler) HandleWorkers(w http.ResponseWriter, r *http.Request)
 	}
 	workers, err := h.Service.Workers(r.Context(), tenantID)
 	if err != nil {
-		writeServiceError(w, err, true)
+		if writeDashboardError(w, err, []domain.WorkerBreakdown{}) {
+			return
+		}
 		return
 	}
 	status := "success"
@@ -147,7 +159,9 @@ func (h *IngestionHandler) HandleAnomalies(w http.ResponseWriter, r *http.Reques
 	}
 	signals, err := h.Service.Anomalies(r.Context(), tenantID, limitFromRequest(r))
 	if err != nil {
-		writeServiceError(w, err, true)
+		if writeDashboardError(w, err, []domain.AnomalySignal{}) {
+			return
+		}
 		return
 	}
 	status := "success"
@@ -170,7 +184,9 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 	}
 	events, err := h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
 	if err != nil {
-		writeServiceError(w, err, true)
+		if writeDashboardError(w, err, []domain.TokenEvent{}) {
+			return
+		}
 		return
 	}
 	status := "success"
@@ -256,6 +272,25 @@ func writeServiceError(w http.ResponseWriter, err error, readRoute bool) {
 		Status: "degraded",
 		Error:  issue("service_unavailable", "Request could not be completed."),
 	})
+}
+
+func writeDashboardError(w http.ResponseWriter, err error, fallback interface{}) bool {
+	if errors.Is(err, storage.ErrUnavailable) {
+		degraded := []domain.Issue{{
+			Code:    "database_unavailable",
+			Message: "Storage is unavailable; returning a degraded response.",
+		}}
+		writeJSON(w, http.StatusOK, Envelope{
+			OK:       true,
+			Status:   "degraded",
+			Data:     fallback,
+			Degraded: degraded,
+			Error:    issue("database_unavailable", "Storage is unavailable."),
+		})
+		return true
+	}
+	writeServiceError(w, err, false)
+	return true
 }
 
 func emptyReadData(readRoute bool) interface{} {

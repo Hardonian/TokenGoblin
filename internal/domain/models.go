@@ -87,7 +87,7 @@ type CostDriver struct {
 	Key          string  `json:"key"`
 	Label        string  `json:"label"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
-	EventCount    int    `json:"event_count"`
+	EventCount   int     `json:"event_count"`
 }
 
 type ProductivitySummary struct {

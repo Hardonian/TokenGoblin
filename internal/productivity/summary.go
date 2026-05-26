@@ -261,8 +261,8 @@ func (a *categoryAccumulator) breakdown() domain.CategoryBreakdown {
 }
 
 type driverAccumulator struct {
-	key       string
-	label     string
+	key        string
+	label      string
 	eventCount int
 	totalCost  float64
 }

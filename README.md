@@ -17,23 +17,23 @@ All API requests require an `x-tenant-id` header. The demo seed uses
 `demo-tenant` by default.
 
 ```bash
-curl -H "x-tenant-id: demo-tenant" http://localhost:3000/api/dashboard/overview
+curl -H "x-tenant-id: demo-tenant" http://localhost:8080/api/dashboard/overview
 ```
 
 ## Scripts
 
-- `npm run lint` checks TypeScript and app files with ESLint.
-- `npm run typecheck` runs `tsc --noEmit`.
+- `npm run lint` runs `go vet ./...`.
+- `npm run typecheck` compiles packages with `go test ./... -run TestCompileOnly`.
 - `npm run test` runs deterministic unit and route coverage.
-- `npm run build` builds the Next app.
+- `npm run build` builds the Go server.
 - `npm run db:seed` creates deterministic demo data.
 - `npm run smoke` verifies the seeded execution layer.
 
 ## Implementation Notes
 
-- Tenant scope is derived from `x-tenant-id`. A payload `tenantId` is accepted
+- Tenant scope is derived from `x-tenant-id`. A payload `tenant_id` is accepted
   only when it matches that header.
-- Client-supplied costs are ignored unless sent as `externalEstimate`; internal
+- Client-supplied costs are ignored unless sent as `external_estimate`; internal
   cost estimates come from the pricing registry.
 - Unknown pricing, missing data, and database unavailability return structured
   degraded responses instead of unhandled 500s.

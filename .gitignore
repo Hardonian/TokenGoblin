@@ -14,6 +14,10 @@
 
 # production
 /build
+*.exe
+
+# local data
+/data
 
 # misc
 .DS_Store

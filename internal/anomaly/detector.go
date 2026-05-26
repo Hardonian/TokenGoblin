@@ -9,16 +9,16 @@ import (
 )
 
 type Thresholds struct {
-	SpendSpikeMultiplier            float64
-	SpendSpikeMinimumUSD            float64
-	TokenSpikeMultiplier            float64
-	TokenSpikeMinimumTokens         float64
-	LatencySpikeMultiplier          float64
-	LatencySpikeMinimumMs           float64
-	RepeatedFailureWindow           int
-	RepeatedFailureMinimum          int
-	HighCostAcceptedMultiplier      float64
-	HighCostAcceptedMinimumUSD      float64
+	SpendSpikeMultiplier       float64
+	SpendSpikeMinimumUSD       float64
+	TokenSpikeMultiplier       float64
+	TokenSpikeMinimumTokens    float64
+	LatencySpikeMultiplier     float64
+	LatencySpikeMinimumMs      float64
+	RepeatedFailureWindow      int
+	RepeatedFailureMinimum     int
+	HighCostAcceptedMultiplier float64
+	HighCostAcceptedMinimumUSD float64
 }
 
 func DefaultThresholds() Thresholds {

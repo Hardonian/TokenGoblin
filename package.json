@@ -5,7 +5,7 @@
   "description": "Token usage ingestion and deterministic AI spend observability MVP.",
   "scripts": {
     "dev": "go run ./cmd/server",
-    "build": "go build ./cmd/server",
+    "build": "go build -o ./build/tokengoblin-server ./cmd/server",
     "start": "go run ./cmd/server",
     "lint": "go vet ./...",
     "typecheck": "go test ./... -run TestCompileOnly",
