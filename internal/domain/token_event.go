@@ -13,6 +13,8 @@ type TokenEvent struct {
 	Provider         string            `json:"provider"`
 	PromptTokens     int               `json:"prompt_tokens"`
 	CompletionTokens int               `json:"completion_tokens"`
+	TotalTokens      int               `json:"total_tokens"`
+	TotalCost        float64           `json:"total_cost"`
 	LatencyMs        int               `json:"latency_ms"`
 	TaskType         string            `json:"task_type"`
 	Tags             map[string]string `json:"tags"`
