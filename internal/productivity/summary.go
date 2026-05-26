@@ -169,6 +169,12 @@ type workerAccumulator struct {
 	latencyCount         int
 	acceptedReviewedCost float64
 	acceptedReviewed     int
+
+	// For memory trend
+	currentPeriodCost  float64
+	currentPeriodCount int
+	priorPeriodCost    float64
+	priorPeriodCount   int
 }
 
 func (a *workerAccumulator) add(event domain.TokenEvent) {
@@ -196,6 +202,21 @@ func (a *workerAccumulator) add(event domain.TokenEvent) {
 		a.latencyTotal += float64(event.LatencyMs)
 		a.latencyCount++
 	}
+
+	// Memory Trend (7-day vs prior 7-day)
+	if isAccepted(event.OutputStatus) && event.CostEstimateUSD != nil {
+		now := time.Now()
+		sevenDaysAgo := now.Add(-7 * 24 * time.Hour)
+		fourteenDaysAgo := now.Add(-14 * 24 * time.Hour)
+		
+		if event.Timestamp.After(sevenDaysAgo) {
+			a.currentPeriodCost += *event.CostEstimateUSD
+			a.currentPeriodCount++
+		} else if event.Timestamp.After(fourteenDaysAgo) {
+			a.priorPeriodCost += *event.CostEstimateUSD
+			a.priorPeriodCount++
+		}
+	}
 }
 
 func (a *workerAccumulator) breakdown() domain.WorkerBreakdown {
@@ -220,6 +241,30 @@ func (a *workerAccumulator) breakdown() domain.WorkerBreakdown {
 		value := a.acceptedReviewedCost / float64(a.acceptedReviewed)
 		breakdown.CostPerAcceptedOutputWithReview = &value
 	}
+
+	// Compute trend
+	breakdown.Trend = "stable"
+	var currentCostPer, priorCostPer float64
+	if a.currentPeriodCount > 0 {
+		currentCostPer = a.currentPeriodCost / float64(a.currentPeriodCount)
+	}
+	if a.priorPeriodCount > 0 {
+		priorCostPer = a.priorPeriodCost / float64(a.priorPeriodCount)
+	}
+
+	if a.currentPeriodCount > 0 && a.priorPeriodCount > 0 {
+		if currentCostPer > priorCostPer*1.1 {
+			breakdown.Trend = "decaying"
+		} else if currentCostPer < priorCostPer*0.9 {
+			breakdown.Trend = "improving"
+		}
+	}
+
+	breakdown.EfficiencyRating = "optimal"
+	if breakdown.Trend == "decaying" {
+		breakdown.EfficiencyRating = "degraded"
+	}
+
 	return breakdown
 }
 
