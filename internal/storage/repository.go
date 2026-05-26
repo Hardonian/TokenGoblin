@@ -11,6 +11,8 @@ import (
 type EventRepository interface {
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveTaskCompletion(ctx context.Context, completion domain.TaskCompletion) error
+	GetTokenEvents(ctx context.Context, tenantID string, start, end time.Time) ([]domain.TokenEvent, error)
+	GetWorkerCompletions(ctx context.Context, tenantID, workerID string) ([]domain.TaskCompletion, error)
 }
 
 // PricingRepository handles versioned model pricing.
