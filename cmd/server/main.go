@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -10,12 +11,15 @@ import (
 )
 
 func main() {
-	// Initialize in-memory storage for MVP
-	store := storage.NewMemoryStore()
-	store.SeedPricing()
+	// Initialize SQLite storage for MVP
+	store, err := storage.OpenSQLite(context.Background(), ":memory:")
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer store.Close()
 
 	// Initialize the ingestion engine
-	engine := ingestion.NewEngine(store, store)
+	engine := ingestion.NewEngine(store)
 
 	// Initialize the HTTP router
 	mux := api.NewRouter(engine, store)

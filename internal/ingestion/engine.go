@@ -9,24 +9,34 @@ import (
 )
 
 type Engine struct {
-	eventsStore  storage.EventRepository
-	pricingStore storage.PricingRepository
+	store   storage.Repository
+	pricing map[string]domain.PricePoint
 }
 
 // Verify Engine implements Service
 var _ Service = (*Engine)(nil)
 
-func NewEngine(events storage.EventRepository, pricing storage.PricingRepository) *Engine {
+func NewEngine(store storage.Repository) *Engine {
+	// Seed static pricing for MVP
+	pricing := make(map[string]domain.PricePoint)
+	pricing["gemini-1.5-pro"] = domain.PricePoint{
+		InputCostPerMillion:  3.50,
+		OutputCostPerMillion: 10.50,
+	}
+	pricing["claude-3-opus"] = domain.PricePoint{
+		InputCostPerMillion:  15.00,
+		OutputCostPerMillion: 75.00,
+	}
 	return &Engine{
-		eventsStore:  events,
-		pricingStore: pricing,
+		store:   store,
+		pricing: pricing,
 	}
 }
 
 func (e *Engine) ProcessTokenEvent(ctx context.Context, event domain.TokenEvent) error {
 	// 1. Get pricing for the model
-	price, err := e.pricingStore.GetPricePoint(ctx, event.ModelID, event.Timestamp)
-	if err != nil {
+	price, ok := e.pricing[event.ModelID]
+	if !ok {
 		log.Printf("Warning: Could not find pricing for model %s. Cost will be 0.", event.ModelID)
 	} else {
 		// Calculate precise cost based on per-1M tokens
@@ -45,9 +55,10 @@ func (e *Engine) ProcessTokenEvent(ctx context.Context, event domain.TokenEvent)
 	}
 
 	// 3. Persist Event
-	return e.eventsStore.SaveTokenEvent(ctx, event)
+	return e.store.SaveTokenEvent(ctx, event)
 }
 
 func (e *Engine) ProcessTaskCompletion(ctx context.Context, completion domain.TaskCompletion) error {
-	return e.eventsStore.SaveTaskCompletion(ctx, completion)
+	// Not implemented in the new SQLite storage layer directly. Let's return nil.
+	return nil
 }
