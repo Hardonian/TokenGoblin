@@ -13,6 +13,9 @@ import (
 // mockService is a temporary stub so the server can build and run.
 type mockService struct{}
 
+// Verify mockService implements ingestion.Service
+var _ ingestion.Service = (*mockService)(nil)
+
 func (m *mockService) ProcessTokenEvent(ctx context.Context, event domain.TokenEvent) error { return nil }
 func (m *mockService) ProcessTaskCompletion(ctx context.Context, completion domain.TaskCompletion) error { return nil }
 
