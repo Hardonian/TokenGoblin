@@ -72,6 +72,8 @@ type WorkerBreakdown struct {
 	AvgLatencyMs                    *float64 `json:"avg_latency_ms,omitempty"`
 	AnomalyCount                    int      `json:"anomaly_count"`
 	CostPerAcceptedOutputWithReview *float64 `json:"cost_per_accepted_output_with_review,omitempty"`
+	EfficiencyRating                string   `json:"efficiency_rating,omitempty"`
+	Trend                           string   `json:"trend,omitempty"`
 }
 
 type CategoryBreakdown struct {
