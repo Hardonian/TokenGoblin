@@ -13,6 +13,7 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/anomaly"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
+	"github.com/Hardonian/TokenGoblin/internal/moat"
 	"github.com/Hardonian/TokenGoblin/internal/productivity"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
@@ -25,6 +26,7 @@ type Service interface {
 	Workers(ctx context.Context, tenantID string) ([]domain.WorkerBreakdown, error)
 	Anomalies(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	RecentEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
+	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
 }
 
 type ExecutionService struct {
@@ -207,6 +209,21 @@ func (s *ExecutionService) RecentEvents(ctx context.Context, tenantID string, li
 		return nil, err
 	}
 	return s.repo.ListTokenEvents(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	// Fetch up to 1000 recent events to base recommendations on
+	events, err := s.repo.ListTokenEvents(ctx, tenantID, 1000)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Import statement will be added automatically by goimports or we can add it later if needed.
+	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
+	return moat.RecommendRoutes(events), nil
 }
 
 func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (domain.TokenEvent, []domain.Issue, error) {

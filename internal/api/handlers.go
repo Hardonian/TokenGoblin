@@ -198,6 +198,31 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: events, Degraded: degraded})
 }
 
+func (h *IngestionHandler) HandleRecommendations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	recs, err := h.Service.Recommendations(r.Context(), tenantID)
+	if err != nil {
+		if writeDashboardError(w, err, []domain.RoutingRecommendation{}) {
+			return
+		}
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(recs) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No routing recommendations available."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: recs, Degraded: degraded})
+}
+
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
 	if tenantID == "" {

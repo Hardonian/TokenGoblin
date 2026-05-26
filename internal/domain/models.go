@@ -109,3 +109,11 @@ type ProductivitySummary struct {
 	TopCostDrivers                  []CostDriver        `json:"top_cost_drivers"`
 	Degraded                        []Issue             `json:"degraded,omitempty"`
 }
+
+type RoutingRecommendation struct {
+	TaskCategory        string  `json:"task_category"`
+	CurrentModel        string  `json:"current_model"`
+	RecommendedModel    string  `json:"recommended_model"`
+	EstimatedSavingsUSD float64 `json:"estimated_savings_usd"`
+	Reason              string  `json:"reason"`
+}

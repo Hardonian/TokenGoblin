@@ -17,12 +17,14 @@ func NewRouter(service ingestion.Service) *http.ServeMux {
 	mux.HandleFunc("/v1/dashboard/workers", handler.HandleWorkers)
 	mux.HandleFunc("/v1/dashboard/anomalies", handler.HandleAnomalies)
 	mux.HandleFunc("/v1/dashboard/events", handler.HandleRecentEvents)
+	mux.HandleFunc("/v1/dashboard/recommendations", handler.HandleRecommendations)
 
 	mux.HandleFunc("/api/ingest/token-usage", handler.HandleTokenEvent)
 	mux.HandleFunc("/api/dashboard/overview", handler.HandleOverview)
 	mux.HandleFunc("/api/dashboard/workers", handler.HandleWorkers)
 	mux.HandleFunc("/api/dashboard/anomalies", handler.HandleAnomalies)
 	mux.HandleFunc("/api/dashboard/events", handler.HandleRecentEvents)
+	mux.HandleFunc("/api/dashboard/recommendations", handler.HandleRecommendations)
 
 	return mux
 }
