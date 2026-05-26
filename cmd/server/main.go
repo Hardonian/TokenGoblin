@@ -21,13 +21,13 @@ func main() {
 	// For now, Codex will wire this up to the real database implementation.
 
 	// Temporary mock service just to satisfy the router interface
-	// service := &mockService{}
+	service := &mockService{}
 
 	// Initialize the HTTP router
-	// mux := api.NewRouter(service)
+	mux := api.NewRouter(service)
 
 	log.Println("TokenGoblin Ingestion Gateway starting on :8080...")
-	// if err := http.ListenAndServe(":8080", mux); err != nil {
-	// 	log.Fatalf("Server failed to start: %v", err)
-	// }
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
 }
