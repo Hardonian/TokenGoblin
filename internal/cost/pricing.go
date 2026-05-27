@@ -46,7 +46,7 @@ func LoadRegistry(ctx context.Context, config RegistryConfig) Registry {
 	}
 
 	if !config.DisableDefaults {
-		for _, point := range defaultPrices() {
+		for _, point := range DefaultPrices() {
 			registry.prices[key(point.Provider, point.ModelID)] = point
 		}
 	}
@@ -167,7 +167,7 @@ type priceJSON struct {
 	Currency              string  `json:"currency"`
 }
 
-func defaultPrices() []domain.PricePoint {
+func DefaultPrices() []domain.PricePoint {
 	epoch := time.Unix(0, 0).UTC()
 	return []domain.PricePoint{
 		{

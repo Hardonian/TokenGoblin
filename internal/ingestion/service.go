@@ -30,6 +30,7 @@ type Service interface {
 	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
 	DeleteTenantData(ctx context.Context, tenantID string) error
 }
 
@@ -293,6 +294,40 @@ func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID stri
 		return err
 	}
 	return s.repo.SetPricingOverride(ctx, tenantID, point)
+}
+
+func (s *ExecutionService) GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+
+	overrides, err := s.repo.ListPricingOverrides(ctx, tenantID)
+	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
+		return nil, err
+	}
+
+	overrideMap := make(map[string]domain.PricePoint)
+	for _, o := range overrides {
+		key := strings.ToLower(o.Provider) + ":" + strings.ToLower(o.ModelID)
+		overrideMap[key] = o
+	}
+
+	var active []domain.PricePoint
+	for _, dp := range cost.DefaultPrices() {
+		key := strings.ToLower(dp.Provider) + ":" + strings.ToLower(dp.ModelID)
+		if over, ok := overrideMap[key]; ok {
+			active = append(active, over)
+			delete(overrideMap, key)
+		} else {
+			active = append(active, dp)
+		}
+	}
+
+	for _, over := range overrideMap {
+		active = append(active, over)
+	}
+
+	return active, nil
 }
 
 func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string) error {

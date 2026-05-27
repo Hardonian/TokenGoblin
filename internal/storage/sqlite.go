@@ -768,7 +768,43 @@ func wrapDBErr(err error) error {
 }
 
 func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
-	return 0, nil
+	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
+	res, err := r.db.ExecContext(ctx, `DELETE FROM token_usage_events WHERE created_at < ?`, formatTime(cutoff))
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	return rows, nil
+}
+
+func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
+		FROM tenant_pricing_overrides
+		WHERE tenant_id = ?
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+
+	var points []domain.PricePoint
+	for rows.Next() {
+		var point domain.PricePoint
+		var created string
+		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		point.Currency = "USD"
+		point.Source = "override"
+		point.EffectiveFrom = parseTime(created)
+		point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
+		points = append(points, point)
+	}
+	return points, wrapDBErr(rows.Err())
 }
 
 func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {

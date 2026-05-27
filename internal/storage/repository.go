@@ -17,6 +17,7 @@ type Repository interface {
 	GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error)
 	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
 	DeleteTenantData(ctx context.Context, tenantID string) error
 	DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error)
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
@@ -65,6 +66,10 @@ func (r *UnavailableRepository) GetPricingOverride(ctx context.Context, tenantID
 
 func (r *UnavailableRepository) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {
 	return r.err()
+}
+
+func (r *UnavailableRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
