@@ -92,12 +92,9 @@ func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.T
 }
 
 func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domain.TokenEvent) error {
-	// Calculate cost synchronously since it is purely in-memory (or fetched from DB)
-	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
-	normalized.CostEstimateUSD = costResult.CostEstimateUSD
-	normalized.CostCurrency = costResult.Currency
-	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
-	normalized.CostDegradedCode = costResult.DegradedCode
+	if normalized.CostEstimateUSD == nil && !normalized.CostIsDegraded && normalized.CostDegradedCode == "" {
+		normalized = applyCostResult(normalized, s.pricing.Calculate(ctx, normalized, s.repo))
+	}
 
 	prior, err := s.repo.ListTokenEventsBefore(ctx, normalized.TenantID, normalized.Timestamp, 100)
 	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
@@ -123,12 +120,13 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 		CreatedAt:       normalized.CreatedAt,
 	}
 
-	signals := anomaly.Detect(normalized, prior, s.now(), s.thresholds)
+	now := s.now()
+	signals := anomaly.Detect(normalized, prior, now, s.thresholds)
 
 	if err := s.repo.SaveTokenEvent(ctx, normalized); err != nil {
 		return err
 	}
-	outputAnalysis := analysis.Analyze(normalized, s.now())
+	outputAnalysis := analysis.Analyze(normalized, now)
 	if err := s.repo.SaveOutputAnalysis(ctx, outputAnalysis); err != nil {
 		return err
 	}
@@ -178,10 +176,7 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 	}
 
 	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
-	normalized.CostEstimateUSD = costResult.CostEstimateUSD
-	normalized.CostCurrency = costResult.Currency
-	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
-	normalized.CostDegradedCode = costResult.DegradedCode
+	normalized = applyCostResult(normalized, costResult)
 
 	select {
 	case s.eventQueue <- normalized:
@@ -609,16 +604,17 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 
 func validateEvent(event domain.TokenEvent) []domain.Issue {
 	var issues []domain.Issue
-	required := map[string]string{
-		"event_id":  event.EventID,
-		"worker_id": event.WorkerID,
-		"provider":  event.Provider,
-		"model_id":  event.ModelID,
+	if strings.TrimSpace(event.EventID) == "" {
+		issues = append(issues, requiredIssue("event_id"))
 	}
-	for field, value := range required {
-		if strings.TrimSpace(value) == "" {
-			issues = append(issues, domain.Issue{Code: "required", Message: field + " is required.", Field: field})
-		}
+	if strings.TrimSpace(event.WorkerID) == "" {
+		issues = append(issues, requiredIssue("worker_id"))
+	}
+	if strings.TrimSpace(event.Provider) == "" {
+		issues = append(issues, requiredIssue("provider"))
+	}
+	if strings.TrimSpace(event.ModelID) == "" {
+		issues = append(issues, requiredIssue("model_id"))
 	}
 	if event.InputTokens < 0 || event.OutputTokens < 0 || event.PromptTokens < 0 || event.CompletionTokens < 0 || event.CachedTokens < 0 {
 		issues = append(issues, domain.Issue{Code: "invalid_tokens", Message: "Token counts must be non-negative.", Field: "tokens"})
@@ -639,6 +635,18 @@ func validateEvent(event domain.TokenEvent) []domain.Issue {
 		issues = append(issues, domain.Issue{Code: "invalid_output_status", Message: "output_status is not supported.", Field: "output_status"})
 	}
 	return issues
+}
+
+func applyCostResult(event domain.TokenEvent, result domain.CostResult) domain.TokenEvent {
+	event.CostEstimateUSD = result.CostEstimateUSD
+	event.CostCurrency = result.Currency
+	event.CostIsDegraded = result.Status == cost.StatusDegraded
+	event.CostDegradedCode = result.DegradedCode
+	return event
+}
+
+func requiredIssue(field string) domain.Issue {
+	return domain.Issue{Code: "required", Message: field + " is required.", Field: field}
 }
 
 func validOutputStatus(status domain.OutputStatus) bool {
