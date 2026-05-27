@@ -15,6 +15,7 @@ type Repository interface {
 	UpsertTenant(ctx context.Context, tenant domain.Tenant) error
 	GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error)
 	GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error)
+	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
 	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error

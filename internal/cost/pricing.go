@@ -105,8 +105,25 @@ func (r Registry) Diagnostics() []domain.Issue {
 	return append([]domain.Issue(nil), r.diagnostics...)
 }
 
-func (r Registry) Calculate(event domain.TokenEvent) domain.CostResult {
-	point, ok := r.prices[key(event.Provider, event.ModelID)]
+type OverrideFetcher interface {
+	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
+}
+
+func (r Registry) Calculate(ctx context.Context, event domain.TokenEvent, fetcher OverrideFetcher) domain.CostResult {
+	var point domain.PricePoint
+	var ok bool
+
+	if fetcher != nil {
+		if override, err := fetcher.GetPricingOverride(ctx, event.TenantID, event.Provider, event.ModelID); err == nil && override != nil {
+			point = *override
+			ok = true
+		}
+	}
+
+	if !ok {
+		point, ok = r.prices[key(event.Provider, event.ModelID)]
+	}
+	
 	if !ok {
 		return domain.CostResult{
 			Status:        StatusDegraded,
