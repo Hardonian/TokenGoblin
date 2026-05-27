@@ -115,6 +115,41 @@ func (r *PostgresRepository) GetTenantCurrentMonthCost(ctx context.Context, tena
 	return *total, nil
 }
 
+func (r *PostgresRepository) GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error) {
+	var point domain.PricePoint
+	var created time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
+		FROM tenant_pricing_overrides
+		WHERE tenant_id = $1 AND provider = $2 AND model_id = $3
+	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
+	
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	point.Currency = "USD"
+	point.Source = "override"
+	point.EffectiveFrom = created
+	point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0 // Simple default logic for overrides
+	return &point, nil
+}
+
+func (r *PostgresRepository) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {
+	overrideID := tenantID + ":" + point.Provider + ":" + point.ModelID
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO tenant_pricing_overrides (override_id, tenant_id, provider, model_id, prompt_price_per_million, completion_price_per_million, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(tenant_id, provider, model_id) DO UPDATE SET
+			prompt_price_per_million = EXCLUDED.prompt_price_per_million,
+			completion_price_per_million = EXCLUDED.completion_price_per_million,
+			created_at = EXCLUDED.created_at
+	`, overrideID, tenantID, point.Provider, point.ModelID, point.InputCostPerMillion, point.OutputCostPerMillion, time.Now().UTC())
+	return wrapDBErr(err)
+}
+
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)

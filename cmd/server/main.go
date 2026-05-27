@@ -87,11 +87,17 @@ func main() {
 			slog.Info("connected to redis")
 		}
 	}
-	limiter := moat.NewRateLimiter(redisClient)
 
-	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv()))
-	service.StartWorker(ctx)
-	mux := api.NewRouter(service, repo, limiter)
+	registry := cost.LoadRegistry(ctx, cost.ConfigFromEnv())
+	ingestionService := ingestion.NewService(repo, registry)
+	ingestionService.StartWorker(ctx)
+
+	// Start Billing Syncer
+	stripeSyncer := billing.NewStripeSyncer(repo, logger)
+	go stripeSyncer.Start(ctx)
+
+	rateLimiter := moat.NewRateLimiter(redisClient)
+	mux := api.NewRouter(ingestionService, repo, rateLimiter)
 
 	addr := os.Getenv("TG_ADDR")
 	if addr == "" {

@@ -29,6 +29,7 @@ type Service interface {
 	RecentEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
+	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
 }
 
 type ExecutionService struct {
@@ -80,8 +81,8 @@ func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.T
 }
 
 func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domain.TokenEvent) error {
-	// Calculate cost synchronously since it is purely in-memory
-	costResult := s.pricing.Calculate(normalized)
+	// Calculate cost synchronously since it is purely in-memory (or fetched from DB)
+	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
 	normalized.CostEstimateUSD = costResult.CostEstimateUSD
 	normalized.CostCurrency = costResult.Currency
 	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
@@ -151,7 +152,7 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 		return domain.IngestionResult{}, err
 	}
 
-	costResult := s.pricing.Calculate(normalized)
+	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
 	normalized.CostEstimateUSD = costResult.CostEstimateUSD
 	normalized.CostCurrency = costResult.Currency
 	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
@@ -272,6 +273,13 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 	// Import statement will be added automatically by goimports or we can add it later if needed.
 	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
 	return moat.RecommendRoutes(events), nil
+}
+
+func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {
+	if err := validateTenantID(tenantID); err != nil {
+		return err
+	}
+	return s.repo.SetPricingOverride(ctx, tenantID, point)
 }
 
 func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (domain.TokenEvent, []domain.Issue, error) {

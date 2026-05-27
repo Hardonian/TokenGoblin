@@ -281,6 +281,41 @@ func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenant
 	return total.Float64, nil
 }
 
+func (r *SQLiteRepository) GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error) {
+	var point domain.PricePoint
+	var created string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
+		FROM tenant_pricing_overrides
+		WHERE tenant_id = ? AND provider = ? AND model_id = ?
+	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
+	
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	point.Currency = "USD"
+	point.Source = "override"
+	point.EffectiveFrom = parseTime(created)
+	point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
+	return &point, nil
+}
+
+func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {
+	overrideID := tenantID + ":" + point.Provider + ":" + point.ModelID
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO tenant_pricing_overrides (override_id, tenant_id, provider, model_id, prompt_price_per_million, completion_price_per_million, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, provider, model_id) DO UPDATE SET
+			prompt_price_per_million = excluded.prompt_price_per_million,
+			completion_price_per_million = excluded.completion_price_per_million,
+			created_at = excluded.created_at
+	`, overrideID, tenantID, point.Provider, point.ModelID, point.InputCostPerMillion, point.OutputCostPerMillion, formatTime(time.Now().UTC()))
+	return wrapDBErr(err)
+}
+
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)

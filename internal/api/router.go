@@ -24,6 +24,9 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/events", ingestHandler)
 	mux.Handle("/v1/events/batch", batchIngestHandler)
 	
+	pricingHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleSetPricingOverride))
+	mux.Handle("/v1/pricing/overrides", pricingHandler)
+	
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
 	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
 

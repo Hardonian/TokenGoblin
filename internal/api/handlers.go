@@ -163,6 +163,55 @@ func (h *IngestionHandler) HandleBatchTokenEvent(w http.ResponseWriter, r *http.
 	})
 }
 
+func (h *IngestionHandler) HandleSetPricingOverride(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	var override domain.PricePoint
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&override); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must be a valid PricePoint JSON."),
+			Degraded: []domain.Issue{{
+				Code:    "invalid_json",
+				Message: "JSON decoding failed.",
+				Field:   "body",
+			}},
+		})
+		return
+	}
+	
+	if override.Provider == "" || override.ModelID == "" {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_request", "Provider and ModelID are required."),
+		})
+		return
+	}
+
+	if err := h.Service.SetPricingOverride(r.Context(), tenantID, override); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   override,
+	})
+}
+
 func (h *IngestionHandler) HandleTaskCompletion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusGone, Envelope{
 		OK:     false,
