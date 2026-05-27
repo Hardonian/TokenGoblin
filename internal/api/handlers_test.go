@@ -39,7 +39,7 @@ func TestTokenUsageRouteRejectsCrossTenantWrites(t *testing.T) {
 }
 
 func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
-	service := ingestion.NewService(storage.NewUnavailableRepository(storage.ErrUnavailable), cost.LoadRegistry(cost.RegistryConfig{}))
+	service := ingestion.NewService(storage.NewUnavailableRepository(storage.ErrUnavailable), cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service)
 	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/overview", nil)
 	req.Header.Set("x-tenant-id", "tenant-a")
@@ -121,7 +121,7 @@ func testRouter(t *testing.T) (*http.ServeMux, func()) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	service := ingestion.NewService(repo, cost.LoadRegistry(cost.RegistryConfig{})).WithClock(func() time.Time {
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
 	service.StartWorker(context.Background())
