@@ -9,7 +9,9 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/api"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/moat"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
+	"github.com/redis/go-redis/v9"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -75,9 +77,21 @@ func main() {
 	}
 	defer repo.Close()
 
+	var redisClient *redis.Client
+	if redisAddr := os.Getenv("TG_REDIS_ADDR"); redisAddr != "" {
+		redisClient = redis.NewClient(&redis.Options{Addr: redisAddr})
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			slog.Error("redis unavailable", "error", err)
+			redisClient = nil
+		} else {
+			slog.Info("connected to redis")
+		}
+	}
+	limiter := moat.NewRateLimiter(redisClient)
+
 	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv()))
 	service.StartWorker(ctx)
-	mux := api.NewRouter(service)
+	mux := api.NewRouter(service, repo, limiter)
 
 	addr := os.Getenv("TG_ADDR")
 	if addr == "" {

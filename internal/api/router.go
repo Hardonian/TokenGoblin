@@ -4,33 +4,43 @@ import (
 	"net/http"
 
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/moat"
+	"github.com/Hardonian/TokenGoblin/internal/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.
-func NewRouter(service ingestion.Service) *http.ServeMux {
+func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter) *http.ServeMux {
 	mux := http.NewServeMux()
 	handler := NewIngestionHandler(service)
 
 	// Prometheus Metrics
 	mux.Handle("/metrics", promhttp.Handler())
 
-	mux.HandleFunc("/v1/events", handler.HandleTokenEvent)
-	mux.HandleFunc("/v1/completions", handler.HandleTaskCompletion)
-	mux.HandleFunc("/v1/dashboard/overview", handler.HandleOverview)
-	mux.HandleFunc("/v1/dashboard/workers", handler.HandleWorkers)
-	mux.HandleFunc("/v1/dashboard/anomalies", handler.HandleAnomalies)
-	mux.HandleFunc("/v1/dashboard/events", handler.HandleRecentEvents)
-	mux.HandleFunc("/v1/dashboard/recommendations", handler.HandleRecommendations)
-	mux.HandleFunc("/v1/dashboard/export.csv", handler.HandleExportCSV)
+	// Wrap ingestion routes with auth and rate limit
+	ingestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent)))
+	mux.Handle("/v1/events", ingestHandler)
+	mux.Handle("/api/ingest/token-usage", ingestHandler)
 
-	mux.HandleFunc("/api/ingest/token-usage", handler.HandleTokenEvent)
-	mux.HandleFunc("/api/dashboard/overview", handler.HandleOverview)
-	mux.HandleFunc("/api/dashboard/workers", handler.HandleWorkers)
-	mux.HandleFunc("/api/dashboard/anomalies", handler.HandleAnomalies)
-	mux.HandleFunc("/api/dashboard/events", handler.HandleRecentEvents)
-	mux.HandleFunc("/api/dashboard/recommendations", handler.HandleRecommendations)
-	mux.HandleFunc("/api/dashboard/export.csv", handler.HandleExportCSV)
+	// Wrap other routes with auth only (or both, depending on requirements, but let's apply auth to all)
+	wrap := func(h http.HandlerFunc) http.Handler {
+		return AuthMiddleware(repo, h)
+	}
+
+	mux.Handle("/v1/completions", wrap(handler.HandleTaskCompletion))
+	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
+	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
+	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))
+	mux.Handle("/v1/dashboard/events", wrap(handler.HandleRecentEvents))
+	mux.Handle("/v1/dashboard/recommendations", wrap(handler.HandleRecommendations))
+	mux.Handle("/v1/dashboard/export.csv", wrap(handler.HandleExportCSV))
+
+	mux.Handle("/api/dashboard/overview", wrap(handler.HandleOverview))
+	mux.Handle("/api/dashboard/workers", wrap(handler.HandleWorkers))
+	mux.Handle("/api/dashboard/anomalies", wrap(handler.HandleAnomalies))
+	mux.Handle("/api/dashboard/events", wrap(handler.HandleRecentEvents))
+	mux.Handle("/api/dashboard/recommendations", wrap(handler.HandleRecommendations))
+	mux.Handle("/api/dashboard/export.csv", wrap(handler.HandleExportCSV))
 
 	return mux
 }

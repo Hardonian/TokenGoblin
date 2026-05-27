@@ -39,8 +39,9 @@ func TestTokenUsageRouteRejectsCrossTenantWrites(t *testing.T) {
 }
 
 func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
-	service := ingestion.NewService(storage.NewUnavailableRepository(storage.ErrUnavailable), cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
-	mux := NewRouter(service)
+	repo := storage.NewUnavailableRepository(storage.ErrUnavailable)
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
+	mux := NewRouter(service, repo, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/overview", nil)
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -125,5 +126,5 @@ func testRouter(t *testing.T) (*http.ServeMux, func()) {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
 	service.StartWorker(context.Background())
-	return NewRouter(service), func() { _ = repo.Close() }
+	return NewRouter(service, repo, nil), func() { _ = repo.Close() }
 }
