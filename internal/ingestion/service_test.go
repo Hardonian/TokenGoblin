@@ -112,7 +112,7 @@ func testService(t *testing.T) (*ExecutionService, storage.Repository) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	service := NewService(repo, cost.LoadRegistry(cost.RegistryConfig{})).WithClock(func() time.Time {
+	service := NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
 	service.StartWorker(context.Background())

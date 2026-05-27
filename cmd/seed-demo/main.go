@@ -21,7 +21,7 @@ func main() {
 	defer repo.Close()
 
 	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
-	service := ingestion.NewService(repo, cost.LoadRegistry(cost.ConfigFromEnv())).WithClock(func() time.Time {
+	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv())).WithClock(func() time.Time {
 		return base
 	})
 
