@@ -116,6 +116,12 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 			if isFailure(item.OutputStatus) {
 				failures++
 			}
+			if failures >= thresholds.RepeatedFailureMinimum {
+				break
+			}
+			if failures+(thresholds.RepeatedFailureWindow-checked) < thresholds.RepeatedFailureMinimum {
+				break
+			}
 			if checked >= thresholds.RepeatedFailureWindow {
 				break
 			}
