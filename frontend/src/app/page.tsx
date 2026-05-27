@@ -253,7 +253,7 @@ export default function Home() {
               className="flex h-10 items-center border border-[#c5cdbb] bg-white px-4 text-sm font-medium"
               href={`${apiBase}/api/dashboard/report.md`}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
               Report
             </a>

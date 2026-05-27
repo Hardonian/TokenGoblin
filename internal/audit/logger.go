@@ -2,6 +2,8 @@ package audit
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"time"
 
@@ -58,6 +60,9 @@ func domainAuditEvent(event Event) domain.AuditEvent {
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now().UTC()
 	}
+	if event.ID == "" {
+		event.ID = "aud_" + randomHex(12)
+	}
 	return domain.AuditEvent{
 		EventID:   event.ID,
 		TenantID:  event.TenantID,
@@ -66,4 +71,12 @@ func domainAuditEvent(event Event) domain.AuditEvent {
 		Metadata:  event.Metadata,
 		Timestamp: event.Timestamp,
 	}
+}
+
+func randomHex(bytes int) string {
+	buffer := make([]byte, bytes)
+	if _, err := rand.Read(buffer); err != nil {
+		return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
+	}
+	return hex.EncodeToString(buffer)
 }
