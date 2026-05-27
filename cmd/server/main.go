@@ -10,16 +10,50 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
+
+func initTracer() *sdktrace.TracerProvider {
+	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+	if err != nil {
+		slog.Error("failed to initialize stdouttrace exporter", "error", err)
+		return nil
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("token-goblin"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	return tp
+}
 
 func main() {
 	// 1. Structured JSON Logging
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	// 2. OpenTelemetry Tracing Setup
+	tp := initTracer()
+	if tp != nil {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				slog.Error("failed to shutdown tracer provider", "error", err)
+			}
+		}()
+	}
+
 	ctx := context.Background()
 
-	// 2. Storage Initialization (Postgres or SQLite fallback)
+	// 3. Storage Initialization (Postgres or SQLite fallback)
 	var repo storage.Repository
 	var err error
 	if dsn := os.Getenv("TG_DB_DSN"); dsn != "" {
@@ -41,7 +75,7 @@ func main() {
 	}
 	defer repo.Close()
 
-	service := ingestion.NewService(repo, cost.LoadRegistry(cost.ConfigFromEnv()))
+	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv()))
 	service.StartWorker(ctx)
 	mux := api.NewRouter(service)
 

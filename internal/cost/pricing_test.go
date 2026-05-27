@@ -1,13 +1,14 @@
 package cost
 
 import (
+	"context"
 	"testing"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 )
 
 func TestCalculateKnownModelUsesInternalPricing(t *testing.T) {
-	registry := LoadRegistry(RegistryConfig{})
+	registry := LoadRegistry(context.Background(), RegistryConfig{})
 	result := registry.Calculate(domain.TokenEvent{
 		Provider:     "demo",
 		ModelID:      "efficient-model",
@@ -28,7 +29,7 @@ func TestCalculateKnownModelUsesInternalPricing(t *testing.T) {
 }
 
 func TestCalculateUnknownModelDegrades(t *testing.T) {
-	registry := LoadRegistry(RegistryConfig{DisableDefaults: true})
+	registry := LoadRegistry(context.Background(), RegistryConfig{DisableDefaults: true})
 	result := registry.Calculate(domain.TokenEvent{
 		Provider:     "unknown",
 		ModelID:      "unknown-model",
@@ -48,7 +49,7 @@ func TestCalculateUnknownModelDegrades(t *testing.T) {
 }
 
 func TestPricingEnvOverride(t *testing.T) {
-	registry := LoadRegistry(RegistryConfig{
+	registry := LoadRegistry(context.Background(), RegistryConfig{
 		DisableDefaults: true,
 		PricingJSON:     `{"custom:model-a":{"inputPerMillion":2,"outputPerMillion":4,"currency":"USD"}}`,
 	})

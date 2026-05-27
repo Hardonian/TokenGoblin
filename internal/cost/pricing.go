@@ -1,6 +1,7 @@
 package cost
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -19,22 +21,39 @@ const (
 type Registry struct {
 	prices      map[string]domain.PricePoint
 	diagnostics []domain.Issue
+	redis       *redis.Client
 }
 
 type RegistryConfig struct {
 	DisableDefaults bool
 	PricingJSON     string
+	RedisAddr       string
 }
 
 func ConfigFromEnv() RegistryConfig {
 	return RegistryConfig{
 		DisableDefaults: os.Getenv("TG_DISABLE_DEFAULT_PRICING") == "1",
 		PricingJSON:     os.Getenv("TG_PRICING_TABLE_JSON"),
+		RedisAddr:       os.Getenv("TG_REDIS_ADDR"),
 	}
 }
 
-func LoadRegistry(config RegistryConfig) Registry {
+func LoadRegistry(ctx context.Context, config RegistryConfig) Registry {
 	registry := Registry{prices: map[string]domain.PricePoint{}}
+	
+	if config.RedisAddr != "" {
+		registry.redis = redis.NewClient(&redis.Options{
+			Addr: config.RedisAddr,
+		})
+		if err := registry.redis.Ping(ctx).Err(); err != nil {
+			registry.diagnostics = append(registry.diagnostics, domain.Issue{
+				Code:    "redis_unavailable",
+				Message: "Redis cache is unavailable; falling back to memory/defaults.",
+			})
+			registry.redis = nil
+		}
+	}
+
 	if !config.DisableDefaults {
 		for _, point := range defaultPrices() {
 			registry.prices[key(point.Provider, point.ModelID)] = point

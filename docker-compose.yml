@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tokengoblin_postgres
+    environment:
+      POSTGRES_USER: tokengoblin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tokengoblin
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tokengoblin -d tokengoblin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokengoblin_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    container_name: tokengoblin_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./data/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+volumes:
+  pgdata:
+  redisdata:
