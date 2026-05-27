@@ -6,123 +6,183 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 )
 
-func TestRecommendRoutes(t *testing.T) {
-	costPtr := func(v float64) *float64 { return &v }
+func floatPtr(f float64) *float64 {
+	return &f
+}
 
+func TestRecommendRoutes(t *testing.T) {
 	tests := []struct {
 		name     string
 		events   []domain.TokenEvent
-		wantRecs int
-		check    func(t *testing.T, recs []domain.RoutingRecommendation)
+		expected []domain.RoutingRecommendation
 	}{
 		{
 			name:     "empty events",
 			events:   []domain.TokenEvent{},
-			wantRecs: 0,
+			expected: []domain.RoutingRecommendation{},
 		},
 		{
-			name: "missing fields ignored",
+			name: "missing required fields ignored",
 			events: []domain.TokenEvent{
-				{OutputStatus: domain.OutputAccepted, ModelID: "m1", CostEstimateUSD: costPtr(1.0)}, // missing category
-				{TaskCategory: "c1", OutputStatus: domain.OutputAccepted, CostEstimateUSD: costPtr(1.0)}, // missing model
-				{TaskCategory: "c1", OutputStatus: domain.OutputAccepted, ModelID: "m1"}, // missing cost
+				{
+					ModelID:         "model-1",
+					CostEstimateUSD: floatPtr(1.0),
+					OutputStatus:    domain.OutputAccepted,
+					// missing TaskCategory
+				},
+				{
+					TaskCategory:    "cat-1",
+					CostEstimateUSD: floatPtr(1.0),
+					OutputStatus:    domain.OutputAccepted,
+					// missing ModelID
+				},
+				{
+					TaskCategory: "cat-1",
+					ModelID:      "model-1",
+					OutputStatus: domain.OutputAccepted,
+					// missing CostEstimateUSD
+				},
 			},
-			wantRecs: 0,
+			expected: []domain.RoutingRecommendation{},
 		},
 		{
-			name: "non-accepted status ignored",
+			name: "failed status ignored",
 			events: []domain.TokenEvent{
-				{TaskCategory: "c1", ModelID: "m1", CostEstimateUSD: costPtr(1.0), OutputStatus: domain.OutputFailed},
-				{TaskCategory: "c1", ModelID: "m2", CostEstimateUSD: costPtr(0.5), OutputStatus: domain.OutputRejected},
+				{
+					TaskCategory:    "cat-1",
+					ModelID:         "model-1",
+					CostEstimateUSD: floatPtr(1.0),
+					OutputStatus:    domain.OutputFailed,
+				},
 			},
-			wantRecs: 0,
+			expected: []domain.RoutingRecommendation{},
 		},
 		{
-			name: "single model no recommendation",
+			name: "single model per category yields no recommendation",
 			events: []domain.TokenEvent{
-				{TaskCategory: "c1", ModelID: "m1", CostEstimateUSD: costPtr(1.0), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c1", ModelID: "m1", CostEstimateUSD: costPtr(1.0), OutputStatus: domain.OutputSucceeded},
+				{
+					TaskCategory:    "cat-1",
+					ModelID:         "model-1",
+					CostEstimateUSD: floatPtr(1.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "cat-1",
+					ModelID:         "model-1",
+					CostEstimateUSD: floatPtr(2.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
 			},
-			wantRecs: 0,
+			expected: []domain.RoutingRecommendation{},
 		},
 		{
-			name: "savings under threshold",
+			name: "savings under 0.01 yields no recommendation",
 			events: []domain.TokenEvent{
-				{TaskCategory: "c1", ModelID: "cheap", CostEstimateUSD: costPtr(1.000), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c1", ModelID: "expensive", CostEstimateUSD: costPtr(1.005), OutputStatus: domain.OutputAccepted},
+				{
+					TaskCategory:    "cat-1",
+					ModelID:         "model-cheap",
+					CostEstimateUSD: floatPtr(0.100),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "cat-1",
+					ModelID:         "model-expensive",
+					CostEstimateUSD: floatPtr(0.105),
+					OutputStatus:    domain.OutputAccepted,
+				},
 			},
-			wantRecs: 0,
+			expected: []domain.RoutingRecommendation{},
 		},
 		{
-			name: "clear savings",
+			name: "savings over 0.01 yields recommendation",
 			events: []domain.TokenEvent{
-				// Cheap model: 2 accepted, total cost 1.0 (0.5 each)
-				{TaskCategory: "c1", ModelID: "cheap", CostEstimateUSD: costPtr(0.5), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c1", ModelID: "cheap", CostEstimateUSD: costPtr(0.5), OutputStatus: domain.OutputAccepted},
-				// Expensive model: 2 accepted, total cost 3.0 (1.5 each)
-				{TaskCategory: "c1", ModelID: "expensive", CostEstimateUSD: costPtr(1.5), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c1", ModelID: "expensive", CostEstimateUSD: costPtr(1.5), OutputStatus: domain.OutputAccepted},
+				{
+					TaskCategory:    "translation",
+					ModelID:         "model-cheap",
+					CostEstimateUSD: floatPtr(1.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "translation",
+					ModelID:         "model-expensive",
+					CostEstimateUSD: floatPtr(5.0),
+					OutputStatus:    domain.OutputSucceeded,
+				},
 			},
-			wantRecs: 1,
-			check: func(t *testing.T, recs []domain.RoutingRecommendation) {
-				rec := recs[0]
-				if rec.TaskCategory != "c1" {
-					t.Errorf("got category %q, want c1", rec.TaskCategory)
-				}
-				if rec.CurrentModel != "expensive" {
-					t.Errorf("got current model %q, want expensive", rec.CurrentModel)
-				}
-				if rec.RecommendedModel != "cheap" {
-					t.Errorf("got recommended model %q, want cheap", rec.RecommendedModel)
-				}
-				// worstTotalCost = 3.0
-				// projectedCost = 2 * 0.5 = 1.0
-				// savings = 2.0
-				if rec.EstimatedSavingsUSD != 2.0 {
-					t.Errorf("got savings %f, want 2.0", rec.EstimatedSavingsUSD)
-				}
+			expected: []domain.RoutingRecommendation{
+				{
+					TaskCategory:        "translation",
+					CurrentModel:        "model-expensive",
+					RecommendedModel:    "model-cheap",
+					EstimatedSavingsUSD: 4.0, // 5.0 - (1 * 1.0)
+					Reason:              "Routing this task to model-cheap instead of model-expensive will save $4.00 with zero latency penalty.",
+				},
 			},
 		},
 		{
-			name: "zero accepted count ignored for model stats",
+			name: "savings calculated correctly with multiple runs",
 			events: []domain.TokenEvent{
-				// Cheap model gets no accepted outputs, only failed
-				{TaskCategory: "c1", ModelID: "cheap", CostEstimateUSD: costPtr(0.5), OutputStatus: domain.OutputFailed},
-				// Expensive model gets accepted
-				{TaskCategory: "c1", ModelID: "expensive", CostEstimateUSD: costPtr(1.5), OutputStatus: domain.OutputAccepted},
+				{
+					TaskCategory:    "coding",
+					ModelID:         "model-A",
+					CostEstimateUSD: floatPtr(2.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "coding",
+					ModelID:         "model-A",
+					CostEstimateUSD: floatPtr(2.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "coding",
+					ModelID:         "model-B",
+					CostEstimateUSD: floatPtr(10.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
+				{
+					TaskCategory:    "coding",
+					ModelID:         "model-B",
+					CostEstimateUSD: floatPtr(10.0),
+					OutputStatus:    domain.OutputAccepted,
+				},
 			},
-			wantRecs: 0,
-		},
-		{
-			name: "multiple categories",
-			events: []domain.TokenEvent{
-				{TaskCategory: "c1", ModelID: "cheap1", CostEstimateUSD: costPtr(1.0), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c1", ModelID: "expensive1", CostEstimateUSD: costPtr(2.0), OutputStatus: domain.OutputAccepted},
-
-				{TaskCategory: "c2", ModelID: "cheap2", CostEstimateUSD: costPtr(1.0), OutputStatus: domain.OutputAccepted},
-				{TaskCategory: "c2", ModelID: "expensive2", CostEstimateUSD: costPtr(2.0), OutputStatus: domain.OutputAccepted},
+			expected: []domain.RoutingRecommendation{
+				{
+					TaskCategory:        "coding",
+					CurrentModel:        "model-B",
+					RecommendedModel:    "model-A",
+					EstimatedSavingsUSD: 16.0, // worst total = 20.0, worst count = 2, best per = 2.0. savings = 20.0 - 4.0 = 16.0
+					Reason:              "Routing this task to model-A instead of model-B will save $16.00 with zero latency penalty.",
+				},
 			},
-			wantRecs: 2,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recs := RecommendRoutes(tt.events)
-			if len(recs) != tt.wantRecs {
-				t.Fatalf("got %d recommendations, want %d", len(recs), tt.wantRecs)
+
+			if len(recs) != len(tt.expected) {
+				t.Fatalf("expected %d recommendations, got %d", len(tt.expected), len(recs))
 			}
-			// Note: The function guarantees an initialized slice `recs = []domain.RoutingRecommendation{}` if no recs,
-			// which means `recs != nil` should always hold true based on the final block of code in `routing.go`.
-			// See routing.go lines 90-93:
-			// if recs == nil {
-			// 	recs = []domain.RoutingRecommendation{}
-			// }
-			if tt.wantRecs == 0 && recs == nil {
-				t.Errorf("expected empty slice, got nil")
-			}
-			if tt.check != nil && len(recs) > 0 {
-				tt.check(t, recs)
+
+			for i := range recs {
+				if recs[i].TaskCategory != tt.expected[i].TaskCategory {
+					t.Errorf("expected category %q, got %q", tt.expected[i].TaskCategory, recs[i].TaskCategory)
+				}
+				if recs[i].CurrentModel != tt.expected[i].CurrentModel {
+					t.Errorf("expected current model %q, got %q", tt.expected[i].CurrentModel, recs[i].CurrentModel)
+				}
+				if recs[i].RecommendedModel != tt.expected[i].RecommendedModel {
+					t.Errorf("expected recommended model %q, got %q", tt.expected[i].RecommendedModel, recs[i].RecommendedModel)
+				}
+				if recs[i].EstimatedSavingsUSD != tt.expected[i].EstimatedSavingsUSD {
+					t.Errorf("expected savings %f, got %f", tt.expected[i].EstimatedSavingsUSD, recs[i].EstimatedSavingsUSD)
+				}
+				if recs[i].Reason != tt.expected[i].Reason {
+					t.Errorf("expected reason %q, got %q", tt.expected[i].Reason, recs[i].Reason)
+				}
 			}
 		})
 	}
