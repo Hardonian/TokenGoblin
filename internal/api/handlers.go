@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/demo"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
@@ -17,6 +18,7 @@ import (
 
 type IngestionHandler struct {
 	Service ingestion.Service
+	Repo    storage.Repository
 }
 
 type Envelope struct {
@@ -28,8 +30,8 @@ type Envelope struct {
 	Error    *domain.Issue  `json:"error,omitempty"`
 }
 
-func NewIngestionHandler(service ingestion.Service) *IngestionHandler {
-	return &IngestionHandler{Service: service}
+func NewIngestionHandler(service ingestion.Service, repo storage.Repository) *IngestionHandler {
+	return &IngestionHandler{Service: service, Repo: repo}
 }
 
 func (h *IngestionHandler) HandleTokenEvent(w http.ResponseWriter, r *http.Request) {
@@ -408,7 +410,75 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 	writer.Flush()
 }
 
+func (h *IngestionHandler) HandleGetPricing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	pricing, err := h.Service.GetActivePricing(r.Context(), tenantID)
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   pricing,
+	})
+}
+
+func (h *IngestionHandler) HandleResetTenantData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	if err := h.Service.DeleteTenantData(r.Context(), tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   "Tenant data cleared successfully.",
+	})
+}
+
+func (h *IngestionHandler) HandleSeedDemoData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	
+	if err := demo.Seed(r.Context(), h.Repo, h.Service, tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   "Demo data seeded successfully.",
+	})
+}
+
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if val := r.Context().Value(tenantIDKey); val != nil {
+		if tenantID, ok := val.(string); ok && tenantID != "" {
+			return tenantID, true
+		}
+	}
 	tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
 	if tenantID == "" {
 		writeJSON(w, http.StatusUnauthorized, Envelope{
