@@ -23,7 +23,7 @@ prompt/output excerpts, and persisted history.
 - Next dashboard that consumes real API responses and exposes empty/degraded states.
 - CSV and Markdown exports scoped to the requesting tenant.
 - Persisted recommendation states, tenant-member records, and audit events for review history.
-- Stripe webhook acknowledgement in the Next.js Node runtime with raw-body signature verification.
+- Stripe webhook verification in the Next.js Node runtime with raw-body signature verification and internal forwarding to Go billing lifecycle processing.
 
 ## Data Model
 
@@ -76,6 +76,7 @@ Important routes:
 - `GET /api/pricing`
 - `POST /api/pricing/overrides`
 - `POST /api/stripe/webhook` in the Next.js app, with `runtime = "nodejs"` and raw-body signature verification.
+- `POST /internal/billing/stripe-event` in the Go API, protected by `TG_INTERNAL_WEBHOOK_SECRET`; only the verified Next.js webhook route should call it.
 
 ## Deterministic Analysis
 
@@ -110,18 +111,20 @@ Implemented:
 - Graceful degraded states for storage unavailability, unknown pricing, no data, and missing evidence.
 - Demo seed and smoke verification.
 - Export-ready CSV and Markdown reports.
-- Verified Stripe webhook acknowledgement route in the Next.js Node runtime.
+- Verified Stripe webhook route in the Next.js Node runtime.
+- Stripe subscription lifecycle updates for tenant tier, quota, customer ID, and subscription ID.
+- Production startup checks that require Postgres DSN/internal webhook secret and disable demo tenant auth.
+- Supabase/Postgres RLS migration pack using `app.tenant_id` for tenant-scoped tables and deny-by-default API key access.
 
 Partially implemented:
 
 - Quota checks use tenant usage limits, but full plan gating/admin UI is not present.
-- Billing columns exist, and verified Stripe webhook acknowledgement exists, but subscription lifecycle writes are not connected to tenant billing state.
-- Postgres migrations exist, but RLS policy enforcement is not included.
+- Stripe checkout linking supports tenant metadata/client reference IDs, but hosted checkout and billing portal creation are not implemented.
+- RLS policies are present for Supabase/Postgres; direct client sessions must set `app.tenant_id` or use server-side/service-role access.
 - Tenant members are persisted, but external identity-provider sync and SSO login are not configured.
 
 Planned:
 
-- Stripe subscription lifecycle processing after verified webhook acknowledgement.
+- Stripe checkout and billing portal creation.
 - SSO admin surfaces and identity-provider group sync.
-- Supabase RLS policy pack.
 - Recurring review runs and scheduled report delivery.

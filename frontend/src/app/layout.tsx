@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     siteName: "TokenGoblin",
     type: "website",
   },
+};
+
+export const viewport = {
   themeColor: "#0e100d",
 };
 

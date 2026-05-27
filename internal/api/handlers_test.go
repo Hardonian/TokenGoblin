@@ -339,3 +339,53 @@ func TestStripeWebhookHandler(t *testing.T) {
 		t.Fatalf("Go webhook route should not mutate billing state: tier=%s subscription=%s", updated.Tier, updated.StripeSubscriptionID)
 	}
 }
+
+func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
+	t.Setenv("TG_INTERNAL_WEBHOOK_SECRET", "internal-secret")
+
+	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer repo.Close()
+
+	now := time.Now().UTC()
+	if err := repo.UpsertTenant(context.Background(), domain.Tenant{
+		TenantID:         "tenant-stripe-test",
+		Name:             "Stripe Test Tenant",
+		Tier:             "free",
+		UsageLimitUSD:    10,
+		StripeCustomerID: "cus_stripe_123",
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}); err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
+	mux := NewRouter(service, repo, nil)
+
+	payload := []byte(`{
+		"event_id": "evt_123",
+		"event_type": "customer.subscription.updated",
+		"customer_id": "cus_stripe_123",
+		"subscription_id": "sub_stripe_abc",
+		"subscription_status": "active"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/internal/billing/stripe-event", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer internal-secret")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
+	if err != nil {
+		t.Fatalf("get tenant: %v", err)
+	}
+	if updated.Tier != "premium" || updated.UsageLimitUSD != 100 || updated.StripeSubscriptionID != "sub_stripe_abc" {
+		t.Fatalf("billing lifecycle not applied: %+v", updated)
+	}
+}
