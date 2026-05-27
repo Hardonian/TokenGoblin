@@ -30,6 +30,7 @@ type Service interface {
 	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	DeleteTenantData(ctx context.Context, tenantID string) error
 }
 
 type ExecutionService struct {
@@ -280,6 +281,13 @@ func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID stri
 		return err
 	}
 	return s.repo.SetPricingOverride(ctx, tenantID, point)
+}
+
+func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string) error {
+	if err := validateTenantID(tenantID); err != nil {
+		return err
+	}
+	return s.repo.DeleteTenantData(ctx, tenantID)
 }
 
 func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (domain.TokenEvent, []domain.Issue, error) {

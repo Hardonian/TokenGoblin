@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Hardonian/TokenGoblin/internal/api"
+	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/moat"

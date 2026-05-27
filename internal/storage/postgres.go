@@ -150,6 +150,29 @@ func (r *PostgresRepository) SetPricingOverride(ctx context.Context, tenantID st
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM token_events WHERE tenant_id = $1`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM tenant_pricing_overrides WHERE tenant_id = $1`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM api_keys WHERE tenant_id = $1`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+
+	return wrapDBErr(tx.Commit(ctx))
+}
+
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)

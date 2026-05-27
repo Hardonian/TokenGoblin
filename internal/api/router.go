@@ -39,6 +39,10 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
 	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
 	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))
+	mux.Handle("/v1/tenants", wrap(handler.HandleDeleteTenant))
+	mux.Handle("/v1/tenants/export", wrap(handler.HandleExportTenant))
+
+	// Catch-all 404
 	mux.Handle("/v1/dashboard/events", wrap(handler.HandleRecentEvents))
 	mux.Handle("/v1/dashboard/recommendations", wrap(handler.HandleRecommendations))
 	mux.Handle("/v1/dashboard/export.csv", wrap(handler.HandleExportCSV))
