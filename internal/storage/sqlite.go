@@ -74,8 +74,6 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_customer ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_subscription ON tenants(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;`,
 		`CREATE TABLE IF NOT EXISTS tenant_pricing_overrides (
 			override_id TEXT PRIMARY KEY,
 			tenant_id TEXT NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
@@ -274,6 +272,12 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		return err
 	}
 	if _, err := r.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_idempotency ON token_usage_events(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`); err != nil {
+		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_customer ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;`); err != nil {
+		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_subscription ON tenants(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;`); err != nil {
 		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
 	}
 	return nil
