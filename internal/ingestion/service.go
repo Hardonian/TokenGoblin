@@ -36,18 +36,20 @@ type Service interface {
 type ExecutionService struct {
 	repo       storage.Repository
 	pricing    cost.Registry
-	thresholds anomaly.Thresholds
-	now        func() time.Time
 	eventQueue chan domain.TokenEvent
+	now        func() time.Time
+	thresholds anomaly.Thresholds
+	alerter    moat.Alerter
 }
 
-func NewService(repo storage.Repository, pricing cost.Registry) *ExecutionService {
+func NewService(repo storage.Repository, registry cost.Registry) *ExecutionService {
 	return &ExecutionService{
 		repo:       repo,
-		pricing:    pricing,
+		pricing:    registry,
+		eventQueue: make(chan domain.TokenEvent, 1000),
+		now:        time.Now,
 		thresholds: anomaly.DefaultThresholds(),
-		now:        func() time.Time { return time.Now().UTC() },
-		eventQueue: make(chan domain.TokenEvent, 10000),
+		alerter:    moat.NewWebhookAlerter(),
 	}
 }
 
@@ -121,11 +123,21 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 	if err := s.repo.SaveCostSnapshot(ctx, snapshot); err != nil {
 		return err
 	}
-	for _, signal := range signals {
-		if err := s.repo.SaveAnomalySignal(ctx, signal); err != nil {
-			return err
+	if len(signals) > 0 {
+		for _, signal := range signals {
+			if err := s.repo.SaveAnomalySignal(ctx, signal); err != nil {
+				return err
+			}
 		}
+		
+		// Run alerter asynchronously
+		go func() {
+			if err := s.alerter.Alert(context.Background(), normalized.TenantID, signals); err != nil {
+				// log error in a real app
+			}
+		}()
 	}
+
 	return nil
 }
 
