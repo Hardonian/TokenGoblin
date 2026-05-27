@@ -62,7 +62,7 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 
 		worker := workerStats[event.WorkerID]
 		if worker == nil {
-			worker = &workerAccumulator{workerID: event.WorkerID, workerName: event.WorkerName}
+			worker = &workerAccumulator{workerID: event.WorkerID, workerName: event.WorkerName, now: generatedAt}
 			workerStats[event.WorkerID] = worker
 		}
 		worker.add(event)
@@ -175,6 +175,7 @@ type workerAccumulator struct {
 	currentPeriodCount int
 	priorPeriodCost    float64
 	priorPeriodCount   int
+	now                time.Time
 }
 
 func (a *workerAccumulator) add(event domain.TokenEvent) {
@@ -205,14 +206,13 @@ func (a *workerAccumulator) add(event domain.TokenEvent) {
 
 	// Memory Trend (7-day vs prior 7-day)
 	if isAccepted(event.OutputStatus) && event.CostEstimateUSD != nil {
-		now := time.Now()
-		sevenDaysAgo := now.Add(-7 * 24 * time.Hour)
-		fourteenDaysAgo := now.Add(-14 * 24 * time.Hour)
+		sevenDaysAgo := a.now.Add(-7 * 24 * time.Hour)
+		fourteenDaysAgo := a.now.Add(-14 * 24 * time.Hour)
 		
-		if event.Timestamp.After(sevenDaysAgo) {
+		if event.Timestamp.After(sevenDaysAgo) && !event.Timestamp.After(a.now) {
 			a.currentPeriodCost += *event.CostEstimateUSD
 			a.currentPeriodCount++
-		} else if event.Timestamp.After(fourteenDaysAgo) {
+		} else if event.Timestamp.After(fourteenDaysAgo) && !event.Timestamp.After(sevenDaysAgo) {
 			a.priorPeriodCost += *event.CostEstimateUSD
 			a.priorPeriodCount++
 		}

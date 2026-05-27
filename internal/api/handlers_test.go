@@ -59,6 +59,29 @@ func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
 	}
 }
 
+func TestHandleExportCSV(t *testing.T) {
+	router, cleanup := testRouter(t)
+	defer cleanup()
+
+	req, _ := http.NewRequest(http.MethodGet, "/v1/dashboard/export.csv", nil)
+	req.Header.Set("x-tenant-id", "tenant-a")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if rec.Header().Get("Content-Type") != "text/csv" {
+		t.Fatalf("expected content type text/csv, got %s", rec.Header().Get("Content-Type"))
+	}
+	
+	body := rec.Body.String()
+	if len(body) == 0 {
+		t.Fatalf("expected non-empty CSV body")
+	}
+}
+
 func TestTokenUsageRouteIngestsStructuredPayload(t *testing.T) {
 	mux, closeRepo := testRouter(t)
 	defer closeRepo()
