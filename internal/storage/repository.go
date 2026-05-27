@@ -23,6 +23,12 @@ type Repository interface {
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
 	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error
+	UpsertTenantMember(ctx context.Context, member domain.TenantMember) error
+	ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
+	SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error
+	ListAuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error)
+	SetRecommendationState(ctx context.Context, state domain.RecommendationState) error
+	ListRecommendationStates(ctx context.Context, tenantID string) ([]domain.RecommendationState, error)
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
@@ -33,6 +39,10 @@ type Repository interface {
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
 	ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error)
+	SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error
+	GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error)
+	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
+	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
 	Close() error
 }
 
@@ -95,6 +105,30 @@ func (r *UnavailableRepository) UpdateAPIKeyLastUsed(context.Context, string) er
 	return r.err()
 }
 
+func (r *UnavailableRepository) UpsertTenantMember(context.Context, domain.TenantMember) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListTenantMembers(context.Context, string) ([]domain.TenantMember, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) SaveAuditEvent(context.Context, domain.AuditEvent) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListAuditEvents(context.Context, string, int) ([]domain.AuditEvent, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) SetRecommendationState(context.Context, domain.RecommendationState) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListRecommendationStates(context.Context, string) ([]domain.RecommendationState, error) {
+	return nil, r.err()
+}
+
 func (r *UnavailableRepository) SaveTokenEvent(context.Context, domain.TokenEvent) error {
 	return r.err()
 }
@@ -132,6 +166,22 @@ func (r *UnavailableRepository) ListOutputAnalyses(context.Context, string, int)
 }
 
 func (r *UnavailableRepository) ListOutputAnalysesByWorker(context.Context, string, string, int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
 	return nil, r.err()
 }
 

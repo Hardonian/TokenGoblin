@@ -81,7 +81,9 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 			savings := worstTotalCost - projectedCost
 
 			if savings > 0.01 { // Only recommend if savings are notable
+				recID := fmt.Sprintf("rec_%s_%s_%s", category, worstModel, bestModel)
 				recs = append(recs, domain.RoutingRecommendation{
+					RecommendationID:    recID,
 					TaskCategory:        category,
 					CurrentModel:        worstModel,
 					RecommendedModel:    bestModel,

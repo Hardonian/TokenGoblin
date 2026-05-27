@@ -14,6 +14,7 @@ type contextKey string
 const (
 	tenantIDKey contextKey = "tenant_id"
 	apiKeyIDKey contextKey = "api_key_id"
+	roleKey     contextKey = "role"
 )
 
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
@@ -44,6 +45,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), tenantIDKey, apiKey.TenantID)
 			ctx = context.WithValue(ctx, apiKeyIDKey, keyID)
+			ctx = context.WithValue(ctx, roleKey, apiKey.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -54,6 +56,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 			return
 		}
 		ctx := context.WithValue(r.Context(), tenantIDKey, tenantID)
+		ctx = context.WithValue(ctx, roleKey, "owner")
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -97,6 +100,46 @@ func writeAuthError(w http.ResponseWriter, code string, message string) {
 		Status: "error",
 		Error:  issue(code, message),
 	})
+}
+
+func RequireRole(allowed ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := getRole(r)
+			for _, item := range allowed {
+				if role == item || role == "owner" {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			writeJSON(w, http.StatusForbidden, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("forbidden", "This API key role cannot perform the requested action."),
+			})
+		})
+	}
+}
+
+func getActor(r *http.Request) string {
+	if val := r.Context().Value(apiKeyIDKey); val != nil {
+		if keyID, ok := val.(string); ok && keyID != "" {
+			return "api_key:" + keyID
+		}
+	}
+	if tenantID := getTenantID(r); tenantID != "" {
+		return "tenant:" + tenantID
+	}
+	return "unknown"
+}
+
+func getRole(r *http.Request) string {
+	if val := r.Context().Value(roleKey); val != nil {
+		if role, ok := val.(string); ok && role != "" {
+			return role
+		}
+	}
+	return "viewer"
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {

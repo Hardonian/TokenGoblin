@@ -66,6 +66,7 @@ type TokenEvent = {
 };
 
 type Recommendation = {
+  recommendation_id: string;
   task_category: string;
   current_model: string;
   recommended_model: string;
@@ -73,6 +74,7 @@ type Recommendation = {
   evidence_count: number;
   confidence: string;
   status: string;
+  status_note?: string;
   reason: string;
 };
 
@@ -85,6 +87,20 @@ type OutputAnalysis = {
   issues: { code: string; severity: string; message: string; evidence?: string }[];
   recommendations: string[];
   degraded?: Issue[];
+};
+
+type AuditEvent = {
+  event_id: string;
+  type: string;
+  actor: string;
+  resource?: string;
+  timestamp: string;
+};
+
+type TenantMember = {
+  subject_id: string;
+  email?: string;
+  role: string;
 };
 
 const apiBase =
@@ -101,17 +117,31 @@ export default function Home() {
   const [analyses, setAnalyses] = useState<Envelope<OutputAnalysis[]> | null>(
     null,
   );
+  const [auditEvents, setAuditEvents] = useState<Envelope<AuditEvent[]> | null>(
+    null,
+  );
+  const [members, setMembers] = useState<Envelope<TenantMember[]> | null>(null);
   const [busyAction, setBusyAction] = useState("");
 
   const load = useCallback(async () => {
     const headers = { "x-tenant-id": tenant };
-    const [overviewRes, workersRes, eventsRes, recsRes, analysesRes] =
+    const [
+      overviewRes,
+      workersRes,
+      eventsRes,
+      recsRes,
+      analysesRes,
+      auditRes,
+      membersRes,
+    ] =
       await Promise.all([
         fetch(`${apiBase}/api/dashboard/overview`, { headers }),
         fetch(`${apiBase}/api/dashboard/workers`, { headers }),
         fetch(`${apiBase}/api/dashboard/events?limit=12`, { headers }),
         fetch(`${apiBase}/api/dashboard/recommendations`, { headers }),
         fetch(`${apiBase}/api/dashboard/output-analysis?limit=8`, { headers }),
+        fetch(`${apiBase}/api/audit/events?limit=6`, { headers }),
+        fetch(`${apiBase}/api/tenant/members`, { headers }),
       ]);
 
     setSummary(await overviewRes.json());
@@ -119,6 +149,8 @@ export default function Home() {
     setEvents(await eventsRes.json());
     setRecommendations(await recsRes.json());
     setAnalyses(await analysesRes.json());
+    setAuditEvents(await auditRes.json());
+    setMembers(await membersRes.json());
   }, [tenant]);
 
   useEffect(() => {
@@ -154,6 +186,28 @@ export default function Home() {
     }
   }
 
+  async function setRecommendationStatus(recommendationID: string, status: string) {
+    setBusyAction(`${recommendationID}:${status}`);
+    try {
+      await fetch(
+        `${apiBase}/api/dashboard/recommendations/${encodeURIComponent(
+          recommendationID,
+        )}/status`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-tenant-id": tenant,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+      await load();
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   const empty = summary?.data?.total_events === 0;
   const degraded = [
     ...(summary?.degraded ?? []),
@@ -161,6 +215,8 @@ export default function Home() {
     ...(events?.degraded ?? []),
     ...(recommendations?.degraded ?? []),
     ...(analyses?.degraded ?? []),
+    ...(auditEvents?.degraded ?? []),
+    ...(members?.degraded ?? []),
   ];
 
   return (
@@ -310,12 +366,35 @@ export default function Home() {
           <Panel title="Efficiency Wins">
             <div className="space-y-3">
               {(recommendations?.data ?? []).map((rec) => (
-                <div key={`${rec.task_category}:${rec.current_model}`} className="border border-[#e0e4d8] p-3">
+                <div key={rec.recommendation_id} className="border border-[#e0e4d8] p-3">
                   <p className="text-sm font-medium">{rec.task_category}</p>
                   <p className="mt-1 text-sm text-[#52604e]">{rec.reason}</p>
                   <p className="mt-2 text-xs uppercase text-[#61705a]">
-                    {rec.confidence} confidence · {rec.evidence_count} events
+                    {rec.confidence} confidence · {rec.evidence_count} events · {rec.status}
                   </p>
+                  {rec.status_note && (
+                    <p className="mt-2 text-xs text-[#52604e]">{rec.status_note}</p>
+                  )}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      className="border border-[#426b51] px-3 py-1 text-xs font-medium text-[#426b51] disabled:opacity-50"
+                      disabled={busyAction !== ""}
+                      onClick={() =>
+                        setRecommendationStatus(rec.recommendation_id, "accepted")
+                      }
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className="border border-[#c5cdbb] px-3 py-1 text-xs font-medium text-[#52604e] disabled:opacity-50"
+                      disabled={busyAction !== ""}
+                      onClick={() =>
+                        setRecommendationStatus(rec.recommendation_id, "rejected")
+                      }
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -335,6 +414,41 @@ export default function Home() {
                   </p>
                 </div>
               ))}
+            </div>
+          </Panel>
+
+          <Panel title="Team Boundary">
+            <div className="space-y-2">
+              {(members?.data ?? []).map((member) => (
+                <div key={member.subject_id} className="border border-[#e0e4d8] p-3 text-sm">
+                  <p className="font-medium">{member.email || member.subject_id}</p>
+                  <p className="text-xs uppercase text-[#61705a]">{member.role}</p>
+                </div>
+              ))}
+              {(members?.data ?? []).length === 0 && (
+                <p className="text-sm text-[#52604e]">
+                  No explicit tenant members have been configured.
+                </p>
+              )}
+            </div>
+          </Panel>
+
+          <Panel title="Audit Trail">
+            <div className="space-y-2">
+              {(auditEvents?.data ?? []).map((event) => (
+                <div key={event.event_id} className="border border-[#e0e4d8] p-3 text-sm">
+                  <p className="font-medium">{event.type}</p>
+                  <p className="text-[#52604e]">
+                    {event.actor} · {event.resource || "tenant"} ·{" "}
+                    {new Date(event.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+              {(auditEvents?.data ?? []).length === 0 && (
+                <p className="text-sm text-[#52604e]">
+                  No persisted audit events yet.
+                </p>
+              )}
             </div>
           </Panel>
 

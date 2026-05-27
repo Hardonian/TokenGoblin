@@ -32,6 +32,10 @@ type Service interface {
 	OutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
 	WorkerReview(ctx context.Context, tenantID, workerID string) (domain.WorkerReview, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
+	SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error)
+	AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error)
+	TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
+	UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
 	GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
 	DeleteTenantData(ctx context.Context, tenantID string) error
@@ -362,13 +366,100 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 		return nil, err
 	}
 
-	// Import statement will be added automatically by goimports or we can add it later if needed.
-	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
-	return moat.RecommendRoutes(events), nil
+	recs := moat.RecommendRoutes(events)
+	states, err := s.repo.ListRecommendationStates(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	stateByID := map[string]domain.RecommendationState{}
+	for _, state := range states {
+		stateByID[state.RecommendationID] = state
+	}
+	for i := range recs {
+		if state, ok := stateByID[recs[i].RecommendationID]; ok {
+			recs[i].Status = state.Status
+			recs[i].AcceptedBy = state.Actor
+			recs[i].StatusNote = state.Note
+			if !state.UpdatedAt.IsZero() {
+				recs[i].StatusUpdatedAt = state.UpdatedAt.UTC().Format(time.RFC3339)
+			}
+		}
+	}
+	return recs, nil
+}
+
+func (s *ExecutionService) SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.RecommendationState{}, err
+	}
+	if err := s.ensureTenant(ctx, tenantID); err != nil {
+		return domain.RecommendationState{}, err
+	}
+	recommendationID = strings.TrimSpace(recommendationID)
+	status := strings.ToLower(strings.TrimSpace(update.Status))
+	if recommendationID == "" {
+		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "recommendation_id is required.", Field: "recommendation_id"}}}
+	}
+	if !validRecommendationStatus(status) {
+		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "invalid_status", Message: "status must be open, accepted, rejected, or implemented.", Field: "status"}}}
+	}
+	now := s.now().UTC()
+	state := domain.RecommendationState{
+		TenantID:         tenantID,
+		RecommendationID: recommendationID,
+		Status:           status,
+		Actor:            strings.TrimSpace(actor),
+		Note:             truncate(strings.TrimSpace(update.Note), 500),
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if state.Actor == "" {
+		state.Actor = "tenant:" + tenantID
+	}
+	return state, s.repo.SetRecommendationState(ctx, state)
+}
+
+func (s *ExecutionService) AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListAuditEvents(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListTenantMembers(ctx, tenantID)
+}
+
+func (s *ExecutionService) UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.TenantMember{}, err
+	}
+	if err := s.ensureTenant(ctx, tenantID); err != nil {
+		return domain.TenantMember{}, err
+	}
+	member.TenantID = tenantID
+	member.SubjectID = strings.TrimSpace(member.SubjectID)
+	member.Email = truncate(strings.TrimSpace(member.Email), 320)
+	member.Role = normalizeRole(member.Role)
+	if member.SubjectID == "" {
+		return domain.TenantMember{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "subject_id is required.", Field: "subject_id"}}}
+	}
+	now := s.now().UTC()
+	if member.CreatedAt.IsZero() {
+		member.CreatedAt = now
+	}
+	member.UpdatedAt = now
+	return member, s.repo.UpsertTenantMember(ctx, member)
 }
 
 func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {
 	if err := validateTenantID(tenantID); err != nil {
+		return err
+	}
+	if err := s.ensureTenant(ctx, tenantID); err != nil {
 		return err
 	}
 	return s.repo.SetPricingOverride(ctx, tenantID, point)
@@ -413,6 +504,18 @@ func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string
 		return err
 	}
 	return s.repo.DeleteTenantData(ctx, tenantID)
+}
+
+func (s *ExecutionService) ensureTenant(ctx context.Context, tenantID string) error {
+	now := s.now().UTC()
+	return s.repo.UpsertTenant(ctx, domain.Tenant{
+		TenantID:      tenantID,
+		Name:          tenantID,
+		Tier:          "free",
+		UsageLimitUSD: 10,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	})
 }
 
 func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (domain.TokenEvent, []domain.Issue, error) {
@@ -534,6 +637,32 @@ func validOutputStatus(status domain.OutputStatus) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func validRecommendationStatus(status string) bool {
+	switch status {
+	case "open", "accepted", "rejected", "implemented":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeRole(role string) string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case domain.RoleOwner:
+		return domain.RoleOwner
+	case domain.RoleAdmin:
+		return domain.RoleAdmin
+	case domain.RoleAnalyst:
+		return domain.RoleAnalyst
+	case domain.RoleIngest:
+		return domain.RoleIngest
+	case domain.RoleViewer:
+		return domain.RoleViewer
+	default:
+		return domain.RoleViewer
 	}
 }
 

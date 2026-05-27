@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 
@@ -19,12 +20,12 @@ const (
 )
 
 type Event struct {
-	ID        string    `json:"id"`
-	TenantID  string    `json:"tenant_id"`
-	Type      EventType `json:"type"`
-	Actor     string    `json:"actor"`
+	ID        string                 `json:"id"`
+	TenantID  string                 `json:"tenant_id"`
+	Type      EventType              `json:"type"`
+	Actor     string                 `json:"actor"`
 	Metadata  map[string]interface{} `json:"metadata"`
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 type Logger struct {
@@ -43,13 +44,26 @@ func NewLogger(repo storage.Repository, logger *slog.Logger) *Logger {
 }
 
 func (l *Logger) LogEvent(ctx context.Context, event Event) error {
-	// Stub implementation: log to stdout for now.
-	// In a real implementation, we would write this to an audit_logs table or a stream like Kafka/Kinesis.
-	l.logger.Info("AUDIT EVENT", 
-		"tenant_id", event.TenantID, 
-		"type", event.Type, 
-		"actor", event.Actor, 
+	l.logger.Info("AUDIT EVENT",
+		"tenant_id", event.TenantID,
+		"type", event.Type,
+		"actor", event.Actor,
 		"metadata", event.Metadata,
 	)
-	return nil
+
+	return l.repo.SaveAuditEvent(ctx, domainAuditEvent(event))
+}
+
+func domainAuditEvent(event Event) domain.AuditEvent {
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now().UTC()
+	}
+	return domain.AuditEvent{
+		EventID:   event.ID,
+		TenantID:  event.TenantID,
+		Type:      string(event.Type),
+		Actor:     event.Actor,
+		Metadata:  event.Metadata,
+		Timestamp: event.Timestamp,
+	}
 }

@@ -118,13 +118,17 @@ type ProductivitySummary struct {
 }
 
 type RoutingRecommendation struct {
+	RecommendationID    string  `json:"recommendation_id"`
 	TaskCategory        string  `json:"task_category"`
 	CurrentModel        string  `json:"current_model"`
 	RecommendedModel    string  `json:"recommended_model"`
 	EstimatedSavingsUSD float64 `json:"estimated_savings_usd"`
+	Reason              string  `json:"reason"`
+	Status              string  `json:"status"`
+	AcceptedBy          string  `json:"accepted_by,omitempty"`
+	StatusNote          string  `json:"status_note,omitempty"`
+	StatusUpdatedAt     string  `json:"status_updated_at,omitempty"`
 	EvidenceCount       int     `json:"evidence_count"`
 	Basis               string  `json:"basis"`
 	Confidence          string  `json:"confidence"`
-	Status              string  `json:"status"`
-	Reason              string  `json:"reason"`
 }

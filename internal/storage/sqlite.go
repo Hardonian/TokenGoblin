@@ -148,12 +148,46 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			tenant_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			key_hash TEXT NOT NULL,
+			role TEXT NOT NULL DEFAULT 'admin',
 			created_at TEXT NOT NULL,
 			last_used_at TEXT,
 			is_revoked INTEGER NOT NULL DEFAULT 0,
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);`,
+		`CREATE TABLE IF NOT EXISTS tenant_members (
+			tenant_id TEXT NOT NULL,
+			subject_id TEXT NOT NULL,
+			email TEXT,
+			role TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (tenant_id, subject_id),
+			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_tenant_members_tenant_role ON tenant_members(tenant_id, role);`,
+		`CREATE TABLE IF NOT EXISTS audit_events (
+			tenant_id TEXT NOT NULL,
+			event_id TEXT NOT NULL,
+			type TEXT NOT NULL,
+			actor TEXT NOT NULL,
+			resource TEXT,
+			metadata_json TEXT,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY (tenant_id, event_id)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_events_tenant_created ON audit_events(tenant_id, created_at DESC);`,
+		`CREATE TABLE IF NOT EXISTS recommendation_states (
+			tenant_id TEXT NOT NULL,
+			recommendation_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			actor TEXT,
+			note TEXT,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (tenant_id, recommendation_id),
+			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+		);`,
 		`CREATE TABLE IF NOT EXISTS cost_snapshots (
 			tenant_id TEXT NOT NULL,
 			snapshot_id TEXT NOT NULL,
@@ -252,6 +286,9 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 			"output_excerpt":   "TEXT",
 			"prompt_reference": "TEXT",
 			"output_reference": "TEXT",
+		},
+		"api_keys": {
+			"role": "TEXT NOT NULL DEFAULT 'admin'",
 		},
 	}
 	for table, columns := range tables {
@@ -399,10 +436,11 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 }
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
+	role := normalizeRole(key.Role)
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, formatTime(key.CreatedAt), timePtrString(key.LastUsedAt), boolInt(key.IsRevoked))
+		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, role, formatTime(key.CreatedAt), timePtrString(key.LastUsedAt), boolInt(key.IsRevoked))
 	return wrapDBErr(err)
 }
 
@@ -412,10 +450,10 @@ func (r *SQLiteRepository) GetAPIKey(ctx context.Context, keyID string) (*domain
 	var lastUsedAt sql.NullString
 	var isRevoked int
 	err := r.db.QueryRowContext(ctx, `
-		SELECT key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked
+		SELECT key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked
 		FROM api_keys
 		WHERE key_id = ?
-	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &createdAt, &lastUsedAt, &isRevoked)
+	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.Role, &createdAt, &lastUsedAt, &isRevoked)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -423,12 +461,156 @@ func (r *SQLiteRepository) GetAPIKey(ctx context.Context, keyID string) (*domain
 		return nil, wrapDBErr(err)
 	}
 	key.CreatedAt = parseTime(createdAt)
+	key.Role = normalizeRole(key.Role)
 	if lastUsedAt.Valid {
 		parsed := parseTime(lastUsedAt.String)
 		key.LastUsedAt = &parsed
 	}
 	key.IsRevoked = isRevoked == 1
 	return &key, nil
+}
+
+func (r *SQLiteRepository) UpsertTenantMember(ctx context.Context, member domain.TenantMember) error {
+	now := member.UpdatedAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	createdAt := member.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO tenant_members (tenant_id, subject_id, email, role, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, subject_id) DO UPDATE SET
+			email = excluded.email,
+			role = excluded.role,
+			updated_at = excluded.updated_at
+	`, member.TenantID, member.SubjectID, nullString(member.Email), normalizeRole(member.Role), formatTime(createdAt), formatTime(now))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT tenant_id, subject_id, email, role, created_at, updated_at
+		FROM tenant_members
+		WHERE tenant_id = ?
+		ORDER BY role, subject_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var members []domain.TenantMember
+	for rows.Next() {
+		var member domain.TenantMember
+		var email sql.NullString
+		var createdAt, updatedAt string
+		if err := rows.Scan(&member.TenantID, &member.SubjectID, &email, &member.Role, &createdAt, &updatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		member.Email = email.String
+		member.Role = normalizeRole(member.Role)
+		member.CreatedAt = parseTime(createdAt)
+		member.UpdatedAt = parseTime(updatedAt)
+		members = append(members, member)
+	}
+	return members, wrapDBErr(rows.Err())
+}
+
+func (r *SQLiteRepository) SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error {
+	metadataJSON, err := marshalNullable(event.Metadata)
+	if err != nil {
+		return err
+	}
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now().UTC()
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO audit_events (tenant_id, event_id, type, actor, resource, metadata_json, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, event.TenantID, event.EventID, event.Type, event.Actor, nullString(event.Resource), metadataJSON, formatTime(event.Timestamp))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) ListAuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT tenant_id, event_id, type, actor, resource, metadata_json, created_at
+		FROM audit_events
+		WHERE tenant_id = ?
+		ORDER BY created_at DESC, event_id DESC
+		LIMIT ?
+	`, tenantID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var events []domain.AuditEvent
+	for rows.Next() {
+		var event domain.AuditEvent
+		var resource, metadata, createdAt sql.NullString
+		if err := rows.Scan(&event.TenantID, &event.EventID, &event.Type, &event.Actor, &resource, &metadata, &createdAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		event.Resource = resource.String
+		event.Timestamp = parseTime(createdAt.String)
+		if metadata.Valid && metadata.String != "" {
+			_ = json.Unmarshal([]byte(metadata.String), &event.Metadata)
+		}
+		events = append(events, event)
+	}
+	return events, wrapDBErr(rows.Err())
+}
+
+func (r *SQLiteRepository) SetRecommendationState(ctx context.Context, state domain.RecommendationState) error {
+	now := state.UpdatedAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	createdAt := state.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO recommendation_states (tenant_id, recommendation_id, status, actor, note, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, recommendation_id) DO UPDATE SET
+			status = excluded.status,
+			actor = excluded.actor,
+			note = excluded.note,
+			updated_at = excluded.updated_at
+	`, state.TenantID, state.RecommendationID, state.Status, nullString(state.Actor), nullString(state.Note), formatTime(createdAt), formatTime(now))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) ListRecommendationStates(ctx context.Context, tenantID string) ([]domain.RecommendationState, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT tenant_id, recommendation_id, status, actor, note, created_at, updated_at
+		FROM recommendation_states
+		WHERE tenant_id = ?
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var states []domain.RecommendationState
+	for rows.Next() {
+		var state domain.RecommendationState
+		var actor, note sql.NullString
+		var createdAt, updatedAt string
+		if err := rows.Scan(&state.TenantID, &state.RecommendationID, &state.Status, &actor, &note, &createdAt, &updatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		state.Actor = actor.String
+		state.Note = note.String
+		state.CreatedAt = parseTime(createdAt)
+		state.UpdatedAt = parseTime(updatedAt)
+		states = append(states, state)
+	}
+	return states, wrapDBErr(rows.Err())
 }
 
 func (r *SQLiteRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error {
@@ -932,6 +1114,15 @@ func nullString(value string) interface{} {
 	return value
 }
 
+func normalizeRole(role string) string {
+	switch role {
+	case domain.RoleOwner, domain.RoleAdmin, domain.RoleAnalyst, domain.RoleIngest, domain.RoleViewer:
+		return role
+	default:
+		return domain.RoleAdmin
+	}
+}
+
 func formatTime(value time.Time) string {
 	if value.IsZero() {
 		return ""
@@ -1014,4 +1205,81 @@ func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID st
 func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
 	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error {
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO recommendation_states (tenant_id, recommendation_id, status, actor, note, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, recommendation_id) DO UPDATE SET
+			status = excluded.status,
+			updated_at = excluded.updated_at
+	`, tenantID, recID, status, nil, nil, formatTime(now), formatTime(now))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT recommendation_id, status
+		FROM recommendation_states
+		WHERE tenant_id = ?
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	decisions := make(map[string]string)
+	for rows.Next() {
+		var recID, status string
+		if err := rows.Scan(&recID, &status); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		decisions[recID] = status
+	}
+	return decisions, wrapDBErr(rows.Err())
+}
+
+func (r *SQLiteRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	var stripeCustID, stripeSubID sql.NullString
+	var createdAt, updatedAt string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_customer_id = ?
+	`, stripeCustomerID).Scan(&tenant.TenantID, &tenant.Name, &tenant.Tier, &tenant.UsageLimitUSD, &stripeCustID, &stripeSubID, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	tenant.StripeCustomerID = stripeCustID.String
+	tenant.StripeSubscriptionID = stripeSubID.String
+	tenant.CreatedAt = parseTime(createdAt)
+	tenant.UpdatedAt = parseTime(updatedAt)
+	return &tenant, nil
+}
+
+func (r *SQLiteRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	var stripeCustID, stripeSubID sql.NullString
+	var createdAt, updatedAt string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_subscription_id = ?
+	`, stripeSubscriptionID).Scan(&tenant.TenantID, &tenant.Name, &tenant.Tier, &tenant.UsageLimitUSD, &stripeCustID, &stripeSubID, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	tenant.StripeCustomerID = stripeCustID.String
+	tenant.StripeSubscriptionID = stripeSubID.String
+	tenant.CreatedAt = parseTime(createdAt)
+	tenant.UpdatedAt = parseTime(updatedAt)
+	return &tenant, nil
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -193,25 +194,26 @@ func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID stri
 
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, key.CreatedAt, key.LastUsedAt, key.IsRevoked)
+		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, normalizeRole(key.Role), key.CreatedAt, key.LastUsedAt, key.IsRevoked)
 	return wrapDBErr(err)
 }
 
 func (r *PostgresRepository) GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error) {
 	var key domain.APIKey
 	err := r.pool.QueryRow(ctx, `
-		SELECT key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked
+		SELECT key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked
 		FROM api_keys
 		WHERE key_id = $1
-	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.CreatedAt, &key.LastUsedAt, &key.IsRevoked)
+	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.Role, &key.CreatedAt, &key.LastUsedAt, &key.IsRevoked)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, wrapDBErr(err)
 	}
+	key.Role = normalizeRole(key.Role)
 	return &key, nil
 }
 
@@ -222,6 +224,151 @@ func (r *PostgresRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID str
 		WHERE key_id = $2
 	`, time.Now().UTC(), keyID)
 	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) UpsertTenantMember(ctx context.Context, member domain.TenantMember) error {
+	now := member.UpdatedAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	createdAt := member.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO tenant_members (tenant_id, subject_id, email, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT(tenant_id, subject_id) DO UPDATE SET
+			email = EXCLUDED.email,
+			role = EXCLUDED.role,
+			updated_at = EXCLUDED.updated_at
+	`, member.TenantID, member.SubjectID, nullString(member.Email), normalizeRole(member.Role), createdAt, now)
+	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT tenant_id, subject_id, email, role, created_at, updated_at
+		FROM tenant_members
+		WHERE tenant_id = $1
+		ORDER BY role, subject_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var members []domain.TenantMember
+	for rows.Next() {
+		var member domain.TenantMember
+		var email *string
+		if err := rows.Scan(&member.TenantID, &member.SubjectID, &email, &member.Role, &member.CreatedAt, &member.UpdatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if email != nil {
+			member.Email = *email
+		}
+		member.Role = normalizeRole(member.Role)
+		members = append(members, member)
+	}
+	return members, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error {
+	metadataJSON, err := marshalNullable(event.Metadata)
+	if err != nil {
+		return err
+	}
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now().UTC()
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO audit_events (tenant_id, event_id, type, actor, resource, metadata_json, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, event.TenantID, event.EventID, event.Type, event.Actor, nullString(event.Resource), metadataJSON, event.Timestamp)
+	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) ListAuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT tenant_id, event_id, type, actor, resource, metadata_json, created_at
+		FROM audit_events
+		WHERE tenant_id = $1
+		ORDER BY created_at DESC, event_id DESC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var events []domain.AuditEvent
+	for rows.Next() {
+		var event domain.AuditEvent
+		var resource *string
+		var metadataJSON []byte
+		if err := rows.Scan(&event.TenantID, &event.EventID, &event.Type, &event.Actor, &resource, &metadataJSON, &event.Timestamp); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if resource != nil {
+			event.Resource = *resource
+		}
+		if len(metadataJSON) > 0 {
+			_ = json.Unmarshal(metadataJSON, &event.Metadata)
+		}
+		events = append(events, event)
+	}
+	return events, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) SetRecommendationState(ctx context.Context, state domain.RecommendationState) error {
+	now := state.UpdatedAt
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	createdAt := state.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO recommendation_states (tenant_id, recommendation_id, status, actor, note, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(tenant_id, recommendation_id) DO UPDATE SET
+			status = EXCLUDED.status,
+			actor = EXCLUDED.actor,
+			note = EXCLUDED.note,
+			updated_at = EXCLUDED.updated_at
+	`, state.TenantID, state.RecommendationID, state.Status, nullString(state.Actor), nullString(state.Note), createdAt, now)
+	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) ListRecommendationStates(ctx context.Context, tenantID string) ([]domain.RecommendationState, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT tenant_id, recommendation_id, status, actor, note, created_at, updated_at
+		FROM recommendation_states
+		WHERE tenant_id = $1
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var states []domain.RecommendationState
+	for rows.Next() {
+		var state domain.RecommendationState
+		var actor, note *string
+		if err := rows.Scan(&state.TenantID, &state.RecommendationID, &state.Status, &actor, &note, &state.CreatedAt, &state.UpdatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if actor != nil {
+			state.Actor = *actor
+		}
+		if note != nil {
+			state.Note = *note
+		}
+		states = append(states, state)
+	}
+	return states, wrapDBErr(rows.Err())
 }
 
 func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error {
@@ -678,4 +825,83 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 		events = append(events, event)
 	}
 	return events, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error {
+	now := time.Now().UTC()
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO recommendation_states (tenant_id, recommendation_id, status, actor, note, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(tenant_id, recommendation_id) DO UPDATE SET
+			status = EXCLUDED.status,
+			updated_at = EXCLUDED.updated_at
+	`, tenantID, recID, status, nil, nil, now, now)
+	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT recommendation_id, status
+		FROM recommendation_states
+		WHERE tenant_id = $1
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	decisions := make(map[string]string)
+	for rows.Next() {
+		var recID, status string
+		if err := rows.Scan(&recID, &status); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		decisions[recID] = status
+	}
+	return decisions, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	var stripeCustID, stripeSubID *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_customer_id = $1
+	`, stripeCustomerID).Scan(&tenant.TenantID, &tenant.Name, &tenant.Tier, &tenant.UsageLimitUSD, &stripeCustID, &stripeSubID, &tenant.CreatedAt, &tenant.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCustID != nil {
+		tenant.StripeCustomerID = *stripeCustID
+	}
+	if stripeSubID != nil {
+		tenant.StripeSubscriptionID = *stripeSubID
+	}
+	return &tenant, nil
+}
+
+func (r *PostgresRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	var stripeCustID, stripeSubID *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_subscription_id = $1
+	`, stripeSubscriptionID).Scan(&tenant.TenantID, &tenant.Name, &tenant.Tier, &tenant.UsageLimitUSD, &stripeCustID, &stripeSubID, &tenant.CreatedAt, &tenant.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCustID != nil {
+		tenant.StripeCustomerID = *stripeCustID
+	}
+	if stripeSubID != nil {
+		tenant.StripeSubscriptionID = *stripeSubID
+	}
+	return &tenant, nil
 }

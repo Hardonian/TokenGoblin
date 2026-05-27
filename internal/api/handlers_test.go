@@ -3,7 +3,11 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -11,7 +15,9 @@ import (
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/cost"
+	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/moat"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 
@@ -192,15 +198,191 @@ func TestWorkerReviewAndReportEndpoints(t *testing.T) {
 	}
 }
 
+func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
+	mux, closeRepo := testRouter(t)
+	defer closeRepo()
+
+	updateBody := []byte(`{"status":"accepted","note":"Use for low-risk classification."}`)
+	stateReq := httptest.NewRequest(http.MethodPost, "/api/dashboard/recommendations/rec_test/status", bytes.NewReader(updateBody))
+	stateReq.Header.Set("x-tenant-id", "tenant-a")
+	stateRec := httptest.NewRecorder()
+	mux.ServeHTTP(stateRec, stateReq)
+	if stateRec.Code != http.StatusOK {
+		t.Fatalf("expected recommendation state 200, got %d body=%s", stateRec.Code, stateRec.Body.String())
+	}
+
+	memberBody := []byte(`{"subject_id":"user_1","email":"ops@example.com","role":"analyst"}`)
+	memberReq := httptest.NewRequest(http.MethodPost, "/api/tenant/members", bytes.NewReader(memberBody))
+	memberReq.Header.Set("x-tenant-id", "tenant-a")
+	memberRec := httptest.NewRecorder()
+	mux.ServeHTTP(memberRec, memberReq)
+	if memberRec.Code != http.StatusOK {
+		t.Fatalf("expected member upsert 200, got %d body=%s", memberRec.Code, memberRec.Body.String())
+	}
+
+	auditReq := httptest.NewRequest(http.MethodGet, "/api/audit/events", nil)
+	auditReq.Header.Set("x-tenant-id", "tenant-a")
+	auditRec := httptest.NewRecorder()
+	mux.ServeHTTP(auditRec, auditReq)
+	if auditRec.Code != http.StatusOK {
+		t.Fatalf("expected audit 200, got %d body=%s", auditRec.Code, auditRec.Body.String())
+	}
+	var envelope Envelope
+	if err := json.Unmarshal(auditRec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode audit: %v", err)
+	}
+	if envelope.Status != "success" {
+		t.Fatalf("expected audit success with persisted events, got %#v", envelope)
+	}
+}
+
+func TestViewerAPIKeyCannotMutateTenant(t *testing.T) {
+	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer repo.Close()
+
+	// Seed tenant-a
+	tenant := domain.Tenant{
+		TenantID:  "tenant-a",
+		Name:      "Tenant A",
+		Tier:      "free",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
+		t.Fatalf("seed tenant-a: %v", err)
+	}
+
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
+	apiKey, token, err := moat.GenerateAPIKey("tenant-a", "viewer")
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	apiKey.Role = domain.RoleViewer
+	if err := repo.SaveAPIKey(context.Background(), apiKey); err != nil {
+		t.Fatalf("save key: %v", err)
+	}
+	mux := NewRouter(service, repo, nil)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/dashboard/reset", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func testRouter(t *testing.T) (http.Handler, func()) {
 	t.Helper()
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+
+	// Seed tenant-a
+	tenant := domain.Tenant{
+		TenantID:  "tenant-a",
+		Name:      "Tenant A",
+		Tier:      "free",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
+		t.Fatalf("seed tenant-a: %v", err)
+	}
+
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	})
 	service.StartWorker(context.Background())
 	return NewRouter(service, repo, nil), func() { _ = repo.Close() }
+}
+
+func TestStripeWebhookHandler(t *testing.T) {
+	// Setup environment and router
+	secret := "whsec_test_secret"
+	t.Setenv("STRIPE_WEBHOOK_SECRET", secret)
+
+	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer repo.Close()
+
+	// Seed target tenant
+	tenant := domain.Tenant{
+		TenantID:         "tenant-stripe-test",
+		Name:             "Stripe Test Tenant",
+		Tier:             "free",
+		UsageLimitUSD:    10.0,
+		StripeCustomerID: "cus_stripe_123",
+		CreatedAt:        time.Now().UTC(),
+		UpdatedAt:        time.Now().UTC(),
+	}
+	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
+	mux := NewRouter(service, repo, nil)
+
+	// Create Stripe webhook payload
+	payload := []byte(`{
+		"type": "customer.subscription.created",
+		"data": {
+			"object": {
+				"customer": "cus_stripe_123",
+				"id": "sub_stripe_abc",
+				"status": "active"
+			}
+		}
+	}`)
+
+	now := time.Now()
+	timestampStr := fmt.Sprintf("%d", now.Unix())
+	macPayload := []byte(timestampStr + "." + string(payload))
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(macPayload)
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	sigHeader := fmt.Sprintf("t=%s,v1=%s", timestampStr, expectedMAC)
+
+	t.Run("Valid Signature and Event Update", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader(payload))
+		req.Header.Set("Stripe-Signature", sigHeader)
+		rec := httptest.NewRecorder()
+
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		// Verify tenant state updated
+		updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
+		if err != nil {
+			t.Fatalf("get tenant: %v", err)
+		}
+		if updated.Tier != "premium" {
+			t.Fatalf("expected tier to be premium, got %s", updated.Tier)
+		}
+		if updated.StripeSubscriptionID != "sub_stripe_abc" {
+			t.Fatalf("expected sub id to be sub_stripe_abc, got %s", updated.StripeSubscriptionID)
+		}
+	})
+
+	t.Run("Invalid Signature Rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader(payload))
+		req.Header.Set("Stripe-Signature", "t=123,v1=wrongsignature")
+		rec := httptest.NewRecorder()
+
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
 }
