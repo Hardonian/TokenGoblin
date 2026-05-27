@@ -196,14 +196,14 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		
+
 		next.ServeHTTP(lrw, r)
-		
+
 		duration := time.Since(start)
-		slog.Info("http request", 
-			"method", r.Method, 
-			"path", r.URL.Path, 
-			"status", lrw.statusCode, 
+		slog.Info("http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", lrw.statusCode,
 			"latency_ms", duration.Milliseconds(),
 		)
 	})

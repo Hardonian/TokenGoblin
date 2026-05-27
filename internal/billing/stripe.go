@@ -2,8 +2,8 @@ package billing
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -384,4 +384,3 @@ func VerifySignature(payload []byte, sigHeader string, secret string, tolerance 
 
 	return errors.New("signature is invalid")
 }
-

@@ -120,7 +120,7 @@ func main() {
 	}
 
 	slog.Info("TokenGoblin execution layer starting", "addr", addr)
-	
+
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
