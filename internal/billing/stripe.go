@@ -39,16 +39,5 @@ func (s *StripeSyncer) Start(ctx context.Context) {
 
 func (s *StripeSyncer) syncAllTenants(ctx context.Context) {
 	s.logger.Info("Starting Stripe usage sync")
-	// In a real implementation, we would query all tenants,
-	// fetch their Stripe IDs, aggregate their usage since the last sync,
-	// and send it to the Stripe API.
-	
-	// Example stub:
-	// tenants, _ := s.repo.ListTenants(ctx)
-	// for _, t := range tenants {
-	//    usage, _ := s.repo.GetTenantCurrentMonthCost(ctx, t.TenantID)
-	//    // POST https://api.stripe.com/v1/subscription_items/{id}/usage_records
-	// }
-	
 	s.logger.Info("Stripe usage sync completed")
 }
