@@ -109,6 +109,12 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 		failures := 1
 		checked := 0
 		for _, item := range prior {
+			// Early exit if it's mathematically impossible to reach the minimum failures threshold
+			// given the remaining items allowed to be checked in the window.
+			if failures+(thresholds.RepeatedFailureWindow-checked) < thresholds.RepeatedFailureMinimum {
+				break
+			}
+
 			if item.WorkerID != event.WorkerID {
 				continue
 			}
