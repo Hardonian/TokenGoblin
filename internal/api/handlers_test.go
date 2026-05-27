@@ -76,7 +76,7 @@ func TestHandleExportCSV(t *testing.T) {
 	if rec.Header().Get("Content-Type") != "text/csv" {
 		t.Fatalf("expected content type text/csv, got %s", rec.Header().Get("Content-Type"))
 	}
-	
+
 	body := rec.Body.String()
 	if len(body) == 0 {
 		t.Fatalf("expected non-empty CSV body")

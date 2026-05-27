@@ -243,7 +243,7 @@ func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*dom
 		FROM tenants
 		WHERE tenant_id = ?
 	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &createdAt, &updatedAt)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -264,14 +264,14 @@ func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*dom
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	var total sql.NullFloat64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT SUM(cost_estimate_usd)
 		FROM token_usage_events
 		WHERE tenant_id = ? AND occurred_at >= ?
 	`, tenantID, formatTime(startOfMonth)).Scan(&total)
-	
+
 	if err != nil {
 		return 0, wrapDBErr(err)
 	}
@@ -289,7 +289,7 @@ func (r *SQLiteRepository) GetPricingOverride(ctx context.Context, tenantID, pro
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = ? AND provider = ? AND model_id = ?
 	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -441,7 +441,12 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		}
 	}
 
-	tagsJSON, err := marshalNullable(event.Tags)
+	var tagsJSON interface{}
+	if event.TagsJSON != nil {
+		tagsJSON = string(event.TagsJSON)
+	} else {
+		tagsJSON, err = marshalNullable(event.GetTags())
+	}
 	if err != nil {
 		return err
 	}
@@ -664,28 +669,6 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer rollback(tx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = ?`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = ?`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = ?`,
-		`DELETE FROM token_usage_events WHERE tenant_id = ?`,
-		`DELETE FROM jobs WHERE tenant_id = ?`,
-		`DELETE FROM workers WHERE tenant_id = ?`,
-		`DELETE FROM tenants WHERE tenant_id = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
-	}
-	return wrapDBErr(tx.Commit())
-}
-
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -733,7 +716,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			event.ReviewScore = &reviewScore.Float64
 		}
 		if tags.Valid && tags.String != "" {
-			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
+			event.TagsJSON = json.RawMessage(tags.String)
 		}
 		if idempotencyKey.Valid {
 			event.IdempotencyKey = idempotencyKey.String
@@ -808,4 +791,8 @@ func wrapDBErr(err error) error {
 		return err
 	}
 	return fmt.Errorf("%w: %v", ErrUnavailable, err)
+}
+
+func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
+	return 0, nil
 }

@@ -20,13 +20,13 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Wrap ingestion routes with auth and rate limit
 	ingestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent)))
 	batchIngestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleBatchTokenEvent)))
-	
+
 	mux.Handle("/v1/events", ingestHandler)
 	mux.Handle("/v1/events/batch", batchIngestHandler)
-	
+
 	pricingHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleSetPricingOverride))
 	mux.Handle("/v1/pricing/overrides", pricingHandler)
-	
+
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
 	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
 
@@ -39,8 +39,6 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
 	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
 	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))
-	mux.Handle("/v1/tenants", wrap(handler.HandleDeleteTenant))
-	mux.Handle("/v1/tenants/export", wrap(handler.HandleExportTenant))
 
 	// Catch-all 404
 	mux.Handle("/v1/dashboard/events", wrap(handler.HandleRecentEvents))

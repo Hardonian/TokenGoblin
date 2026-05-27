@@ -79,7 +79,7 @@ func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*d
 		FROM tenants
 		WHERE tenant_id = $1
 	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &t.CreatedAt, &t.UpdatedAt)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -98,14 +98,14 @@ func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*d
 func (r *PostgresRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	var total *float64
 	err := r.pool.QueryRow(ctx, `
 		SELECT SUM(cost_estimate_usd)
 		FROM token_usage_events
 		WHERE tenant_id = $1 AND occurred_at >= $2
 	`, tenantID, startOfMonth).Scan(&total)
-	
+
 	if err != nil {
 		return 0, wrapDBErr(err)
 	}
@@ -123,7 +123,7 @@ func (r *PostgresRepository) GetPricingOverride(ctx context.Context, tenantID, p
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = $1 AND provider = $2 AND model_id = $3
 	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -275,7 +275,12 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		}
 	}
 
-	tagsJSON, err := marshalNullable(event.Tags)
+	var tagsJSON interface{}
+	if event.TagsJSON != nil {
+		tagsJSON = string(event.TagsJSON)
+	} else {
+		tagsJSON, err = marshalNullable(event.GetTags())
+	}
 	if err != nil {
 		return err
 	}
@@ -486,28 +491,6 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback(ctx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = $1`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = $1`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = $1`,
-		`DELETE FROM token_usage_events WHERE tenant_id = $1`,
-		`DELETE FROM jobs WHERE tenant_id = $1`,
-		`DELETE FROM workers WHERE tenant_id = $1`,
-		`DELETE FROM tenants WHERE tenant_id = $1`,
-	} {
-		if _, err := tx.Exec(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
-	}
-	return wrapDBErr(tx.Commit(ctx))
-}
-
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -547,14 +530,14 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 		event.TaskType = event.TaskCategory
 		if externalCost != nil {
 			event.ExternalEstimate = &domain.ExternalEstimate{
-				CostUSD:  *externalCost,
+				CostUSD: *externalCost,
 			}
 			if externalCurrency != nil {
 				event.ExternalEstimate.Currency = *externalCurrency
 			}
 		}
 		if tags != nil && *tags != "" {
-			_ = json.Unmarshal([]byte(*tags), &event.Tags)
+			event.TagsJSON = json.RawMessage(*tags)
 		}
 		if idempotencyKey != nil {
 			event.IdempotencyKey = *idempotencyKey

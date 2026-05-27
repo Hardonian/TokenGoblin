@@ -150,12 +150,12 @@ func (h *IngestionHandler) HandleBatchTokenEvent(w http.ResponseWriter, r *http.
 			break
 		}
 	}
-	
+
 	status := "success"
 	if hasDegraded {
 		status = "degraded"
 	}
-	
+
 	writeJSON(w, http.StatusAccepted, Envelope{
 		OK:     true,
 		Status: status,
@@ -190,7 +190,7 @@ func (h *IngestionHandler) HandleSetPricingOverride(w http.ResponseWriter, r *ht
 		})
 		return
 	}
-	
+
 	if override.Provider == "" || override.ModelID == "" {
 		writeJSON(w, http.StatusBadRequest, Envelope{
 			OK:     false,
@@ -324,7 +324,7 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 	} else {
 		events, err = h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
 	}
-	
+
 	if err != nil {
 		if writeDashboardError(w, err, []domain.TokenEvent{}) {
 			return
@@ -386,7 +386,7 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 
 	writer := csv.NewWriter(w)
 	writer.Write([]string{"event_id", "timestamp", "worker_id", "job_id", "provider", "model_id", "total_tokens", "cost_usd", "task_category", "output_status"})
-	
+
 	for _, event := range events {
 		costStr := ""
 		if event.CostEstimateUSD != nil {

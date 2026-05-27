@@ -52,7 +52,7 @@ func Events(tenantID string) []domain.TokenEvent {
 			TaskCategory:     "classification",
 			OutputStatus:     domain.OutputAccepted,
 			ReviewScore:      ptr(94),
-			Tags:             map[string]string{"demo": "true", "profile": "efficient"},
+			TagsJSON:         []byte(`{"demo": "true", "profile": "efficient"}`),
 		})
 	}
 
@@ -74,7 +74,7 @@ func Events(tenantID string) []domain.TokenEvent {
 			TaskCategory:     "research",
 			OutputStatus:     domain.OutputAccepted,
 			ReviewScore:      ptr(87),
-			Tags:             map[string]string{"demo": "true", "profile": "expensive"},
+			TagsJSON:         []byte(`{"demo": "true", "profile": "expensive"}`),
 		})
 	}
 
@@ -96,7 +96,7 @@ func Events(tenantID string) []domain.TokenEvent {
 			TaskCategory:     "research",
 			OutputStatus:     domain.OutputAccepted,
 			ReviewScore:      ptr(82),
-			Tags:             map[string]string{"demo": "true", "profile": "spike"},
+			TagsJSON:         []byte(`{"demo": "true", "profile": "spike"}`),
 		},
 		domain.TokenEvent{
 			EventID:          "demo-expensive-retry-01",
@@ -115,7 +115,7 @@ func Events(tenantID string) []domain.TokenEvent {
 			TaskCategory:     "research",
 			OutputStatus:     domain.OutputRejected,
 			ReviewScore:      ptr(41),
-			Tags:             map[string]string{"demo": "true", "profile": "expensive"},
+			TagsJSON:         []byte(`{"demo": "true", "profile": "expensive"}`),
 		},
 	)
 
@@ -141,7 +141,7 @@ func Events(tenantID string) []domain.TokenEvent {
 			TaskCategory:     "summarization",
 			OutputStatus:     status,
 			ReviewScore:      nil,
-			Tags:             map[string]string{"demo": "true", "profile": "unknown-pricing"},
+			TagsJSON:         []byte(`{"demo": "true", "profile": "unknown-pricing"}`),
 		})
 	}
 

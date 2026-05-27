@@ -129,7 +129,7 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 				return err
 			}
 		}
-		
+
 		// Run alerter asynchronously
 		go func() {
 			if err := s.alerter.Alert(context.Background(), normalized.TenantID, signals); err != nil {
@@ -201,9 +201,9 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
 	}
-	
+
 	results := make([]domain.IngestionResult, 0, len(events))
-	
+
 	// A simple approach is just calling the single item method for each item
 	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
 	for _, event := range events {
@@ -282,7 +282,7 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Import statement will be added automatically by goimports or we can add it later if needed.
 	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
 	return moat.RecommendRoutes(events), nil

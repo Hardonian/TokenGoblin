@@ -19,12 +19,12 @@ const (
 )
 
 type Event struct {
-	ID        string    `json:"id"`
-	TenantID  string    `json:"tenant_id"`
-	Type      EventType `json:"type"`
-	Actor     string    `json:"actor"`
+	ID        string                 `json:"id"`
+	TenantID  string                 `json:"tenant_id"`
+	Type      EventType              `json:"type"`
+	Actor     string                 `json:"actor"`
 	Metadata  map[string]interface{} `json:"metadata"`
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 type Logger struct {
@@ -45,10 +45,10 @@ func NewLogger(repo storage.Repository, logger *slog.Logger) *Logger {
 func (l *Logger) LogEvent(ctx context.Context, event Event) error {
 	// Stub implementation: log to stdout for now.
 	// In a real implementation, we would write this to an audit_logs table or a stream like Kafka/Kinesis.
-	l.logger.Info("AUDIT EVENT", 
-		"tenant_id", event.TenantID, 
-		"type", event.Type, 
-		"actor", event.Actor, 
+	l.logger.Info("AUDIT EVENT",
+		"tenant_id", event.TenantID,
+		"type", event.Type,
+		"actor", event.Actor,
 		"metadata", event.Metadata,
 	)
 	return nil

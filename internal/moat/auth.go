@@ -20,7 +20,7 @@ func GenerateAPIKey(tenantID, name string) (domain.APIKey, string, error) {
 	if _, err := rand.Read(rawBytes); err != nil {
 		return domain.APIKey{}, "", fmt.Errorf("generate random bytes: %w", err)
 	}
-	
+
 	keyIDBytes := make([]byte, 8)
 	if _, err := rand.Read(keyIDBytes); err != nil {
 		return domain.APIKey{}, "", fmt.Errorf("generate key id: %w", err)
