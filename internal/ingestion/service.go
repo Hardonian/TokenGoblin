@@ -22,10 +22,12 @@ var tenantIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{1,79}$`)
 
 type Service interface {
 	IngestTokenEvent(ctx context.Context, tenantID string, event domain.TokenEvent) (domain.IngestionResult, error)
+	IngestTokenEventBatch(ctx context.Context, tenantID string, events []domain.TokenEvent) ([]domain.IngestionResult, error)
 	Overview(ctx context.Context, tenantID string) (domain.ProductivitySummary, error)
 	Workers(ctx context.Context, tenantID string) ([]domain.WorkerBreakdown, error)
 	Anomalies(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	RecentEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
+	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
 }
 
@@ -170,6 +172,34 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 	return result, nil
 }
 
+func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID string, events []domain.TokenEvent) ([]domain.IngestionResult, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	
+	results := make([]domain.IngestionResult, 0, len(events))
+	
+	// A simple approach is just calling the single item method for each item
+	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
+	for _, event := range events {
+		res, err := s.IngestTokenEvent(ctx, tenantID, event)
+		if err != nil {
+			var validationErr ValidationError
+			if errors.As(err, &validationErr) {
+				// We can return a result with error status instead of failing the whole batch
+				res.Event = event
+				res.Degraded = append(res.Degraded, validationErr.Issues...)
+				res.Warnings = append(res.Warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."})
+			} else {
+				// For structural errors (queue full), we might fail the whole batch
+				return nil, err
+			}
+		}
+		results = append(results, res)
+	}
+	return results, nil
+}
+
 func (s *ExecutionService) Overview(ctx context.Context, tenantID string) (domain.ProductivitySummary, error) {
 	if err := validateTenantID(tenantID); err != nil {
 		return domain.ProductivitySummary{}, err
@@ -209,6 +239,13 @@ func (s *ExecutionService) RecentEvents(ctx context.Context, tenantID string, li
 		return nil, err
 	}
 	return s.repo.ListTokenEvents(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListTokenEventsBefore(ctx, tenantID, before, limit)
 }
 
 func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error) {

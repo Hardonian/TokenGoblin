@@ -83,6 +83,60 @@ func (h *IngestionHandler) HandleTokenEvent(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+func (h *IngestionHandler) HandleBatchTokenEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	var events []domain.TokenEvent
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&events); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must be a valid JSON array of token usage events."),
+			Degraded: []domain.Issue{{
+				Code:    "invalid_json",
+				Message: "JSON decoding failed.",
+				Field:   "body",
+			}},
+		})
+		return
+	}
+
+	results, err := h.Service.IngestTokenEventBatch(r.Context(), tenantID, events)
+	if err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+
+	hasDegraded := false
+	for _, res := range results {
+		if len(res.Degraded) > 0 {
+			hasDegraded = true
+			break
+		}
+	}
+	
+	status := "success"
+	if hasDegraded {
+		status = "degraded"
+	}
+	
+	writeJSON(w, http.StatusAccepted, Envelope{
+		OK:     true,
+		Status: status,
+		Data:   results,
+	})
+}
+
 func (h *IngestionHandler) HandleTaskCompletion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusGone, Envelope{
 		OK:     false,
@@ -184,7 +238,18 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	events, err := h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
+	var events []domain.TokenEvent
+	var err error
+	if beforeStr := r.URL.Query().Get("before"); beforeStr != "" {
+		if before, parseErr := time.Parse(time.RFC3339Nano, beforeStr); parseErr == nil {
+			events, err = h.Service.RecentEventsBefore(r.Context(), tenantID, before, limitFromRequest(r))
+		} else {
+			events, err = h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
+		}
+	} else {
+		events, err = h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
+	}
+	
 	if err != nil {
 		if writeDashboardError(w, err, []domain.TokenEvent{}) {
 			return

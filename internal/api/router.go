@@ -19,8 +19,13 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 
 	// Wrap ingestion routes with auth and rate limit
 	ingestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent)))
+	batchIngestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleBatchTokenEvent)))
+	
 	mux.Handle("/v1/events", ingestHandler)
+	mux.Handle("/v1/events/batch", batchIngestHandler)
+	
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
+	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
 
 	// Wrap other routes with auth only (or both, depending on requirements, but let's apply auth to all)
 	wrap := func(h http.HandlerFunc) http.Handler {
