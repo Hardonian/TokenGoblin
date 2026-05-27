@@ -29,7 +29,7 @@ type Repository interface {
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
-	DeleteTenantData(ctx context.Context, tenantID string) error
+	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	Close() error
 }
 
@@ -116,8 +116,8 @@ func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int)
 	return nil, r.err()
 }
 
-func (r *UnavailableRepository) DeleteTenantData(context.Context, string) error {
-	return r.err()
+func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int) ([]domain.AnomalySignal, error) {
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) Close() error {
