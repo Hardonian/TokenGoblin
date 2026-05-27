@@ -224,9 +224,11 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 			var validationErr ValidationError
 			if errors.As(err, &validationErr) {
 				// We can return a result with error status instead of failing the whole batch
-				res.Event = event
-				res.Degraded = append(res.Degraded, validationErr.Issues...)
-				res.Warnings = append(res.Warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."})
+				res = domain.IngestionResult{
+					Event:    event,
+					Degraded: validationErr.Issues,
+					Warnings: []domain.Issue{{Code: "validation_failed", Message: "Event failed validation."}},
+				}
 			} else {
 				// For structural errors (queue full), we might fail the whole batch
 				return nil, err

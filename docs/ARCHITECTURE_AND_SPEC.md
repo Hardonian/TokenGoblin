@@ -18,9 +18,12 @@ prompt/output excerpts, and persisted history.
 - SQLite default persistence with Postgres support through migrations.
 - Tenant boundary via `tenant_id` filters on every repository read/write.
 - API-key auth using `Bearer key_id.secret`; `x-tenant-id` remains for demo/local compatibility.
+- API-key roles with route-level RBAC for write-heavy and administrative actions.
 - Async ingestion queue with deterministic normalization, pricing, anomaly detection, and output analysis.
 - Next dashboard that consumes real API responses and exposes empty/degraded states.
 - CSV and Markdown exports scoped to the requesting tenant.
+- Persisted recommendation states, tenant-member records, and audit events for review history.
+- Stripe webhook acknowledgement in the Next.js Node runtime with raw-body signature verification.
 
 ## Data Model
 
@@ -34,8 +37,11 @@ Core persisted entities:
 - `output_analyses`: deterministic score, issues, recommendations, evidence, and degraded flags.
 - `productivity_summaries`: cached tenant summaries.
 - `tenant_pricing_overrides`, `api_keys`: SaaS control surfaces.
+- `tenant_members`: persisted membership/role registry for enterprise access review.
+- `audit_events`: tenant-scoped operational trail for imports, exports, admin actions, and recommendation decisions.
+- `recommendation_states`: accepted/rejected/implemented state for deterministic routing recommendations.
 
-Indexes exist for tenant/time, tenant/worker, idempotency, anomaly time, and output-analysis worker review paths.
+Indexes exist for tenant/time, tenant/worker, idempotency, anomaly time, output-analysis worker review paths, tenant members, audit events, and recommendation states.
 
 ## API Contracts
 
@@ -61,10 +67,15 @@ Important routes:
 - `GET /api/dashboard/workers/{worker_id}`
 - `GET /api/dashboard/output-analysis`
 - `GET /api/dashboard/recommendations`
+- `POST /api/dashboard/recommendations/{recommendation_id}/status`
+- `GET /api/audit/events`
+- `GET /api/tenant/members`
+- `POST /api/tenant/members`
 - `GET /api/dashboard/export.csv`
 - `GET /api/dashboard/report.md`
 - `GET /api/pricing`
 - `POST /api/pricing/overrides`
+- `POST /api/stripe/webhook` in the Next.js app, with `runtime = "nodejs"` and raw-body signature verification.
 
 ## Deterministic Analysis
 
@@ -85,6 +96,7 @@ Recommendations:
 - Routing recommendations compare accepted-output cost per task category across observed models.
 - Estimated savings are labeled as estimates and include evidence count/confidence.
 - No latency or quality parity is claimed unless evidence exists.
+- Decisions are persisted separately from the deterministic recommendation so a team can track acceptance, rejection, and implementation without altering the evidence model.
 
 ## Production Status
 
@@ -92,20 +104,24 @@ Implemented:
 
 - Tenant-scoped storage access.
 - API-key authentication foundation.
+- API-key roles and route-level RBAC for ingestion, pricing, reset/seed, and recommendation decisions.
 - Deterministic ingestion, pricing, anomaly, productivity, output-analysis, and routing logic.
+- Persisted tenant members, audit events, and recommendation decision states.
 - Graceful degraded states for storage unavailability, unknown pricing, no data, and missing evidence.
 - Demo seed and smoke verification.
 - Export-ready CSV and Markdown reports.
+- Verified Stripe webhook acknowledgement route in the Next.js Node runtime.
 
 Partially implemented:
 
 - Quota checks use tenant usage limits, but full plan gating/admin UI is not present.
-- Billing columns and a Stripe sync skeleton exist, but Stripe webhooks are not configured.
+- Billing columns exist, and verified Stripe webhook acknowledgement exists, but subscription lifecycle writes are not connected to tenant billing state.
 - Postgres migrations exist, but RLS policy enforcement is not included.
+- Tenant members are persisted, but external identity-provider sync and SSO login are not configured.
 
 Planned:
 
-- Verified Stripe webhooks using raw body handling in the correct runtime.
-- RBAC/SSO and organization role management.
+- Stripe subscription lifecycle processing after verified webhook acknowledgement.
+- SSO admin surfaces and identity-provider group sync.
 - Supabase RLS policy pack.
-- Recommendation acceptance state UI, recurring review runs, and scheduled reports.
+- Recurring review runs and scheduled report delivery.

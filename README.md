@@ -40,6 +40,10 @@ All API requests require either:
 - `GET /api/dashboard/events`
 - `GET /api/dashboard/output-analysis`
 - `GET /api/dashboard/recommendations`
+- `POST /api/dashboard/recommendations/{recommendation_id}/status`
+- `GET /api/audit/events`
+- `GET /api/tenant/members`
+- `POST /api/tenant/members`
 - `GET /api/dashboard/export.csv`
 - `GET /api/dashboard/report.md`
 - `GET /api/pricing`
@@ -88,6 +92,7 @@ evidence is absent, text checks are skipped and marked degraded.
 - `TG_REDIS_ADDR`: optional Redis address for rate limiting/cache diagnostics
 - `TG_DEMO_TENANT_ID`: tenant used by seed/smoke, default `demo-tenant`
 - `NEXT_PUBLIC_TG_API_BASE`: dashboard API base, default `http://localhost:8080`
+- `STRIPE_WEBHOOK_SECRET`: optional Stripe signing secret for the Next.js Node runtime route at `/api/stripe/webhook`
 
 ## Production Notes
 
@@ -95,20 +100,24 @@ Implemented:
 
 - Tenant-scoped repository reads/writes
 - API-key authentication with hashed secrets
+- API-key roles and route-level RBAC for ingestion, pricing, reset/seed, and recommendation decisions
 - Deterministic pricing, anomaly, productivity, output-analysis, and routing rules
+- Persisted recommendation acceptance/rejection/implementation state
+- Tenant member registry and audit/event log foundation
 - CSV and Markdown tenant exports
+- Verified Stripe webhook acknowledgement route in the Next.js Node runtime using raw request bodies
 - SQLite schema repair for older local/demo databases
 - Graceful degraded responses for unavailable storage and missing evidence
 
 Partially implemented:
 
-- Role/RBAC boundaries are documented but not enforced as roles
-- Billing-ready tenant fields and quota checks exist, but Stripe webhooks are not implemented
+- Billing-ready tenant fields and quota checks exist, but subscription lifecycle writes are not connected to Stripe events yet
 - Postgres migrations exist, but Supabase RLS policies are not included yet
+- Tenant members are persisted for access-review and admin workflows; full SSO/identity-provider sync is not configured
 
 Planned:
 
-- Stripe subscription lifecycle and verified webhooks
-- SSO/RBAC admin surfaces
+- Stripe subscription lifecycle processing after verified webhook acknowledgement
+- SSO admin surfaces and identity-provider group sync
 - Supabase/Postgres RLS policy pack
-- Recommendation acceptance workflows and recurring review scheduling
+- Recurring review scheduling and report delivery
