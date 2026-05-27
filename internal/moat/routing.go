@@ -86,7 +86,11 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 					CurrentModel:        worstModel,
 					RecommendedModel:    bestModel,
 					EstimatedSavingsUSD: savings,
-					Reason:              fmt.Sprintf("Routing this task to %s instead of %s will save $%.2f with zero latency penalty.", bestModel, worstModel, savings),
+					EvidenceCount:       count,
+					Basis:               "accepted_output_cost_per_task",
+					Confidence:          confidenceFor(count),
+					Status:              "open",
+					Reason:              fmt.Sprintf("Recent accepted outputs for this task cost less on %s than %s; estimated savings are $%.2f for the observed workload.", bestModel, worstModel, savings),
 				})
 			}
 		}
@@ -96,4 +100,14 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 		recs = []domain.RoutingRecommendation{}
 	}
 	return recs
+}
+
+func confidenceFor(count int) string {
+	if count >= 10 {
+		return "high"
+	}
+	if count >= 3 {
+		return "medium"
+	}
+	return "low"
 }

@@ -131,6 +131,10 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			review_score REAL,
 			occurred_at TEXT NOT NULL,
 			created_at TEXT NOT NULL,
+			prompt_excerpt TEXT,
+			output_excerpt TEXT,
+			prompt_reference TEXT,
+			output_reference TEXT,
 			tags_json TEXT,
 			idempotency_key TEXT,
 			PRIMARY KEY (tenant_id, event_id),
@@ -139,7 +143,6 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_occurred ON token_usage_events (tenant_id, occurred_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_worker ON token_usage_events (tenant_id, worker_id);`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_idempotency ON token_usage_events(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`,
 		`CREATE TABLE IF NOT EXISTS api_keys (
 			key_id TEXT PRIMARY KEY,
 			tenant_id TEXT NOT NULL,
@@ -185,6 +188,24 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_anomaly_tenant_detected ON anomaly_signals (tenant_id, detected_at DESC);`,
+		`CREATE TABLE IF NOT EXISTS output_analyses (
+			tenant_id TEXT NOT NULL,
+			analysis_id TEXT NOT NULL,
+			event_id TEXT NOT NULL,
+			worker_id TEXT NOT NULL,
+			analyzed_at TEXT NOT NULL,
+			efficiency_score INTEGER NOT NULL,
+			goblin_score INTEGER NOT NULL,
+			issues_json TEXT NOT NULL,
+			recommendations_json TEXT NOT NULL,
+			evidence_json TEXT NOT NULL,
+			degraded_json TEXT,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY (tenant_id, analysis_id),
+			FOREIGN KEY (tenant_id, event_id) REFERENCES token_usage_events(tenant_id, event_id) ON DELETE CASCADE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_output_analyses_tenant_analyzed ON output_analyses (tenant_id, analyzed_at DESC);`,
+		`CREATE INDEX IF NOT EXISTS idx_output_analyses_tenant_worker ON output_analyses (tenant_id, worker_id, analyzed_at DESC);`,
 		`CREATE TABLE IF NOT EXISTS productivity_summaries (
 			tenant_id TEXT NOT NULL,
 			summary_id TEXT NOT NULL,
@@ -208,7 +229,68 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
 		}
 	}
+	if err := r.ensureSQLiteColumns(ctx); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_idempotency ON token_usage_events(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`); err != nil {
+		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
+	}
 	return nil
+}
+
+func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
+	tables := map[string]map[string]string{
+		"tenants": {
+			"tier":                   "TEXT NOT NULL DEFAULT 'free'",
+			"usage_limit_usd":        "REAL NOT NULL DEFAULT 10.00",
+			"stripe_customer_id":     "TEXT",
+			"stripe_subscription_id": "TEXT",
+		},
+		"token_usage_events": {
+			"idempotency_key":  "TEXT",
+			"prompt_excerpt":   "TEXT",
+			"output_excerpt":   "TEXT",
+			"prompt_reference": "TEXT",
+			"output_reference": "TEXT",
+		},
+	}
+	for table, columns := range tables {
+		for column, definition := range columns {
+			exists, err := r.sqliteColumnExists(ctx, table, column)
+			if err != nil {
+				return err
+			}
+			if exists {
+				continue
+			}
+			if _, err := r.db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)); err != nil {
+				return fmt.Errorf("%w: migrate sqlite add column %s.%s: %v", ErrUnavailable, table, column, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) sqliteColumnExists(ctx context.Context, table, column string) (bool, error) {
+	rows, err := r.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false, wrapDBErr(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var defaultValue interface{}
+		var pk int
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
+			return false, wrapDBErr(err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, wrapDBErr(rows.Err())
 }
 
 func (r *SQLiteRepository) UpsertTenant(ctx context.Context, tenant domain.Tenant) error {
@@ -243,7 +325,7 @@ func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*dom
 		FROM tenants
 		WHERE tenant_id = ?
 	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &createdAt, &updatedAt)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -264,14 +346,14 @@ func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*dom
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	var total sql.NullFloat64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT SUM(cost_estimate_usd)
 		FROM token_usage_events
 		WHERE tenant_id = ? AND occurred_at >= ?
 	`, tenantID, formatTime(startOfMonth)).Scan(&total)
-	
+
 	if err != nil {
 		return 0, wrapDBErr(err)
 	}
@@ -289,7 +371,7 @@ func (r *SQLiteRepository) GetPricingOverride(ctx context.Context, tenantID, pro
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = ? AND provider = ? AND model_id = ?
 	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
-	
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -315,7 +397,6 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	`, overrideID, tenantID, point.Provider, point.ModelID, point.InputCostPerMillion, point.OutputCostPerMillion, formatTime(time.Now().UTC()))
 	return wrapDBErr(err)
 }
-
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.db.ExecContext(ctx, `
@@ -438,9 +519,10 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
-			review_score, occurred_at, created_at, tags_json, idempotency_key
+			review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
+			prompt_reference, output_reference, tags_json, idempotency_key
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = excluded.worker_id,
 			worker_name = excluded.worker_name,
@@ -466,6 +548,10 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			output_status = excluded.output_status,
 			review_score = excluded.review_score,
 			occurred_at = excluded.occurred_at,
+			prompt_excerpt = excluded.prompt_excerpt,
+			output_excerpt = excluded.output_excerpt,
+			prompt_reference = excluded.prompt_reference,
+			output_reference = excluded.output_reference,
 			tags_json = excluded.tags_json,
 			idempotency_key = excluded.idempotency_key
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
@@ -474,7 +560,9 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		event.OutputTokens, event.TotalTokens, event.CostEstimateUSD, event.CostCurrency,
 		boolInt(event.CostIsDegraded), nullString(event.CostDegradedCode), externalCost,
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
-		event.ReviewScore, formatTime(event.Timestamp), formatTime(now), tagsJSON, nullString(event.IdempotencyKey))
+		event.ReviewScore, formatTime(event.Timestamp), formatTime(now), nullString(event.PromptExcerpt),
+		nullString(event.OutputExcerpt), nullString(event.PromptReference), nullString(event.OutputReference),
+		tagsJSON, nullString(event.IdempotencyKey))
 	if err != nil {
 		return wrapDBErr(err)
 	}
@@ -529,6 +617,45 @@ func (r *SQLiteRepository) SaveAnomalySignal(ctx context.Context, signal domain.
 	return wrapDBErr(err)
 }
 
+func (r *SQLiteRepository) SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error {
+	issuesJSON, err := json.Marshal(analysis.Issues)
+	if err != nil {
+		return err
+	}
+	recsJSON, err := json.Marshal(analysis.Recommendations)
+	if err != nil {
+		return err
+	}
+	evidenceJSON, err := json.Marshal(analysis.Evidence)
+	if err != nil {
+		return err
+	}
+	degradedJSON, err := marshalNullable(analysis.Degraded)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO output_analyses (
+			tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+			efficiency_score, goblin_score, issues_json, recommendations_json,
+			evidence_json, degraded_json, created_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, analysis_id) DO UPDATE SET
+			analyzed_at = excluded.analyzed_at,
+			efficiency_score = excluded.efficiency_score,
+			goblin_score = excluded.goblin_score,
+			issues_json = excluded.issues_json,
+			recommendations_json = excluded.recommendations_json,
+			evidence_json = excluded.evidence_json,
+			degraded_json = excluded.degraded_json
+	`, analysis.TenantID, analysis.AnalysisID, analysis.EventID, analysis.WorkerID,
+		formatTime(analysis.AnalyzedAt), analysis.EfficiencyScore, analysis.GoblinScore,
+		string(issuesJSON), string(recsJSON), string(evidenceJSON), degradedJSON,
+		formatTime(time.Now().UTC()))
+	return wrapDBErr(err)
+}
+
 func (r *SQLiteRepository) SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error {
 	body, err := json.Marshal(summary)
 	if err != nil {
@@ -563,6 +690,38 @@ func (r *SQLiteRepository) SaveProductivitySummary(ctx context.Context, summary 
 		summary.TotalEvents, summary.OutputCount, avg, summary.AnomalyCount,
 		costPerAccepted, string(body))
 	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx, outputAnalysisSelect+`
+		WHERE tenant_id = ?
+		ORDER BY analyzed_at DESC, analysis_id DESC
+		LIMIT ?
+	`, tenantID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	return scanOutputAnalyses(rows)
+}
+
+func (r *SQLiteRepository) ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.db.QueryContext(ctx, outputAnalysisSelect+`
+		WHERE tenant_id = ? AND worker_id = ?
+		ORDER BY analyzed_at DESC, analysis_id DESC
+		LIMIT ?
+	`, tenantID, workerID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	return scanOutputAnalyses(rows)
 }
 
 func (r *SQLiteRepository) ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error) {
@@ -642,6 +801,45 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
+const outputAnalysisSelect = `
+	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+		efficiency_score, goblin_score, issues_json, recommendations_json,
+		evidence_json, degraded_json
+	FROM output_analyses
+`
+
+func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
+	var analyses []domain.OutputAnalysis
+	for rows.Next() {
+		var analysis domain.OutputAnalysis
+		var analyzedAt string
+		var issuesJSON, recsJSON, evidenceJSON string
+		var degradedJSON sql.NullString
+		if err := rows.Scan(&analysis.TenantID, &analysis.AnalysisID, &analysis.EventID,
+			&analysis.WorkerID, &analyzedAt, &analysis.EfficiencyScore, &analysis.GoblinScore,
+			&issuesJSON, &recsJSON, &evidenceJSON, &degradedJSON); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		analysis.AnalyzedAt = parseTime(analyzedAt)
+		_ = json.Unmarshal([]byte(issuesJSON), &analysis.Issues)
+		_ = json.Unmarshal([]byte(recsJSON), &analysis.Recommendations)
+		_ = json.Unmarshal([]byte(evidenceJSON), &analysis.Evidence)
+		if degradedJSON.Valid && degradedJSON.String != "" {
+			_ = json.Unmarshal([]byte(degradedJSON.String), &analysis.Degraded)
+		}
+		if analysis.Issues == nil {
+			analysis.Issues = []domain.AnalysisIssue{}
+		}
+		if analysis.Recommendations == nil {
+			analysis.Recommendations = []string{}
+		}
+		if analysis.Evidence == nil {
+			analysis.Evidence = []domain.AnalysisEvidence{}
+		}
+		analyses = append(analyses, analysis)
+	}
+	return analyses, wrapDBErr(rows.Err())
+}
 
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
@@ -649,7 +847,8 @@ const tokenEventSelect = `
 		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 		cost_is_degraded, cost_degraded_code, external_estimate_usd,
 		external_estimate_currency, latency_ms, task_category, output_status,
-		review_score, occurred_at, created_at, tags_json, idempotency_key
+		review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
+		prompt_reference, output_reference, tags_json, idempotency_key
 	FROM token_usage_events
 `
 
@@ -657,7 +856,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, tags, idempotencyKey sql.NullString
+		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey sql.NullString
 		var cost, externalCost, reviewScore sql.NullFloat64
 		var costIsDegraded int
 		var occurredAt, createdAt string
@@ -666,7 +865,8 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
 			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
-			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &tags, &idempotencyKey); err != nil {
+			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		event.JobID = jobID.String
@@ -674,6 +874,10 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 		event.RunID = runID.String
 		event.CostIsDegraded = costIsDegraded == 1
 		event.CostDegradedCode = costCode.String
+		event.PromptExcerpt = promptExcerpt.String
+		event.OutputExcerpt = outputExcerpt.String
+		event.PromptReference = promptReference.String
+		event.OutputReference = outputReference.String
 		event.Timestamp = parseTime(occurredAt)
 		event.CreatedAt = parseTime(createdAt)
 		event.TaskType = event.TaskCategory
@@ -811,4 +1015,3 @@ func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string
 	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
 	return wrapDBErr(err)
 }
-

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/analysis"
 	"github.com/Hardonian/TokenGoblin/internal/anomaly"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
@@ -28,6 +29,8 @@ type Service interface {
 	Anomalies(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	RecentEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
+	OutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
+	WorkerReview(ctx context.Context, tenantID, workerID string) (domain.WorkerReview, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
 	GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
@@ -121,6 +124,10 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 	if err := s.repo.SaveTokenEvent(ctx, normalized); err != nil {
 		return err
 	}
+	outputAnalysis := analysis.Analyze(normalized, s.now())
+	if err := s.repo.SaveOutputAnalysis(ctx, outputAnalysis); err != nil {
+		return err
+	}
 	if err := s.repo.SaveCostSnapshot(ctx, snapshot); err != nil {
 		return err
 	}
@@ -130,7 +137,7 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 				return err
 			}
 		}
-		
+
 		// Run alerter asynchronously
 		go func() {
 			if err := s.alerter.Alert(context.Background(), normalized.TenantID, signals); err != nil {
@@ -202,9 +209,9 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
 	}
-	
+
 	results := make([]domain.IngestionResult, 0, len(events))
-	
+
 	// A simple approach is just calling the single item method for each item
 	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
 	for _, event := range events {
@@ -274,6 +281,77 @@ func (s *ExecutionService) RecentEventsBefore(ctx context.Context, tenantID stri
 	return s.repo.ListTokenEventsBefore(ctx, tenantID, before, limit)
 }
 
+func (s *ExecutionService) OutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListOutputAnalyses(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) WorkerReview(ctx context.Context, tenantID, workerID string) (domain.WorkerReview, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.WorkerReview{}, err
+	}
+	workerID = strings.TrimSpace(workerID)
+	if workerID == "" {
+		return domain.WorkerReview{}, ValidationError{Issues: []domain.Issue{{
+			Code:    "required",
+			Message: "worker_id is required.",
+			Field:   "worker_id",
+		}}}
+	}
+	workers, err := s.Workers(ctx, tenantID)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	review := domain.WorkerReview{
+		WasteSignals:           []domain.AnalysisIssue{},
+		RecommendedConstraints: []string{},
+	}
+	found := false
+	for _, worker := range workers {
+		if worker.WorkerID == workerID {
+			review.Worker = worker
+			found = true
+			break
+		}
+	}
+	if !found {
+		review.Worker = domain.WorkerBreakdown{WorkerID: workerID, WorkerName: workerID}
+		review.Degraded = append(review.Degraded, domain.Issue{Code: "no_data", Message: "No usage exists for this worker."})
+		return review, nil
+	}
+
+	events, err := s.repo.ListTokenEvents(ctx, tenantID, 500)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	for i := range events {
+		if events[i].WorkerID == workerID {
+			review.LatestOutput = &events[i]
+			break
+		}
+	}
+	analyses, err := s.repo.ListOutputAnalysesByWorker(ctx, tenantID, workerID, 25)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	if len(analyses) > 0 {
+		review.LatestAnalysis = &analyses[0]
+		for _, item := range analyses {
+			review.WasteSignals = append(review.WasteSignals, item.Issues...)
+			review.RecommendedConstraints = append(review.RecommendedConstraints, item.Recommendations...)
+		}
+		review.RecommendedConstraints = dedupeStrings(review.RecommendedConstraints)
+		if len(review.WasteSignals) > 8 {
+			review.WasteSignals = review.WasteSignals[:8]
+		}
+	} else {
+		review.Degraded = append(review.Degraded, domain.Issue{Code: "analysis_pending", Message: "No persisted output analysis exists for this worker yet."})
+	}
+	return review, nil
+}
+
 func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error) {
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
@@ -283,7 +361,7 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Import statement will be added automatically by goimports or we can add it later if needed.
 	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
 	return moat.RecommendRoutes(events), nil
@@ -354,6 +432,10 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 	event.WorkerName = strings.TrimSpace(event.WorkerName)
 	event.TaskCategory = strings.TrimSpace(event.TaskCategory)
 	event.TaskType = strings.TrimSpace(event.TaskType)
+	event.PromptExcerpt = truncate(strings.TrimSpace(event.PromptExcerpt), 4000)
+	event.OutputExcerpt = truncate(strings.TrimSpace(event.OutputExcerpt), 4000)
+	event.PromptReference = truncate(strings.TrimSpace(event.PromptReference), 512)
+	event.OutputReference = truncate(strings.TrimSpace(event.OutputReference), 512)
 
 	if event.EventID == "" {
 		event.EventID = "evt_" + randomHex(12)
@@ -506,4 +588,25 @@ func randomHex(bytes int) string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buffer)
+}
+
+func truncate(value string, max int) string {
+	if len(value) <= max {
+		return value
+	}
+	return value[:max]
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	var result []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }

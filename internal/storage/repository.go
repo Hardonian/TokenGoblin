@@ -26,10 +26,13 @@ type Repository interface {
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
+	SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error
 	SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
+	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
+	ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error)
 	Close() error
 }
 
@@ -104,6 +107,10 @@ func (r *UnavailableRepository) SaveAnomalySignal(context.Context, domain.Anomal
 	return r.err()
 }
 
+func (r *UnavailableRepository) SaveOutputAnalysis(context.Context, domain.OutputAnalysis) error {
+	return r.err()
+}
+
 func (r *UnavailableRepository) SaveProductivitySummary(context.Context, domain.ProductivitySummary) error {
 	return r.err()
 }
@@ -117,6 +124,14 @@ func (r *UnavailableRepository) ListTokenEventsBefore(context.Context, string, t
 }
 
 func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int) ([]domain.AnomalySignal, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalyses(context.Context, string, int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalysesByWorker(context.Context, string, string, int) ([]domain.OutputAnalysis, error) {
 	return nil, r.err()
 }
 

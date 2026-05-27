@@ -79,7 +79,7 @@ func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*d
 		FROM tenants
 		WHERE tenant_id = $1
 	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &t.CreatedAt, &t.UpdatedAt)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -98,14 +98,14 @@ func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*d
 func (r *PostgresRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	var total *float64
 	err := r.pool.QueryRow(ctx, `
 		SELECT SUM(cost_estimate_usd)
 		FROM token_usage_events
 		WHERE tenant_id = $1 AND occurred_at >= $2
 	`, tenantID, startOfMonth).Scan(&total)
-	
+
 	if err != nil {
 		return 0, wrapDBErr(err)
 	}
@@ -123,7 +123,7 @@ func (r *PostgresRepository) GetPricingOverride(ctx context.Context, tenantID, p
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = $1 AND provider = $2 AND model_id = $3
 	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -190,7 +190,6 @@ func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID stri
 	_, err := r.pool.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID)
 	return wrapDBErr(err)
 }
-
 
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
@@ -304,9 +303,10 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
-			review_score, occurred_at, created_at, tags_json, idempotency_key
+			review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
+			prompt_reference, output_reference, tags_json, idempotency_key
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = EXCLUDED.worker_id,
 			worker_name = EXCLUDED.worker_name,
@@ -332,6 +332,10 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			output_status = EXCLUDED.output_status,
 			review_score = EXCLUDED.review_score,
 			occurred_at = EXCLUDED.occurred_at,
+			prompt_excerpt = EXCLUDED.prompt_excerpt,
+			output_excerpt = EXCLUDED.output_excerpt,
+			prompt_reference = EXCLUDED.prompt_reference,
+			output_reference = EXCLUDED.output_reference,
 			tags_json = EXCLUDED.tags_json,
 			idempotency_key = EXCLUDED.idempotency_key
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
@@ -340,7 +344,9 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		event.OutputTokens, event.TotalTokens, event.CostEstimateUSD, event.CostCurrency,
 		event.CostIsDegraded, nullString(event.CostDegradedCode), externalCost,
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
-		event.ReviewScore, event.Timestamp, now, tagsJSON, nullString(event.IdempotencyKey))
+		event.ReviewScore, event.Timestamp, now, nullString(event.PromptExcerpt),
+		nullString(event.OutputExcerpt), nullString(event.PromptReference), nullString(event.OutputReference),
+		tagsJSON, nullString(event.IdempotencyKey))
 	if err != nil {
 		return wrapDBErr(err)
 	}
@@ -395,6 +401,44 @@ func (r *PostgresRepository) SaveAnomalySignal(ctx context.Context, signal domai
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error {
+	issuesJSON, err := json.Marshal(analysis.Issues)
+	if err != nil {
+		return err
+	}
+	recsJSON, err := json.Marshal(analysis.Recommendations)
+	if err != nil {
+		return err
+	}
+	evidenceJSON, err := json.Marshal(analysis.Evidence)
+	if err != nil {
+		return err
+	}
+	degradedJSON, err := marshalNullable(analysis.Degraded)
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO output_analyses (
+			tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+			efficiency_score, goblin_score, issues_json, recommendations_json,
+			evidence_json, degraded_json, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		ON CONFLICT(tenant_id, analysis_id) DO UPDATE SET
+			analyzed_at = EXCLUDED.analyzed_at,
+			efficiency_score = EXCLUDED.efficiency_score,
+			goblin_score = EXCLUDED.goblin_score,
+			issues_json = EXCLUDED.issues_json,
+			recommendations_json = EXCLUDED.recommendations_json,
+			evidence_json = EXCLUDED.evidence_json,
+			degraded_json = EXCLUDED.degraded_json
+	`, analysis.TenantID, analysis.AnalysisID, analysis.EventID, analysis.WorkerID,
+		analysis.AnalyzedAt, analysis.EfficiencyScore, analysis.GoblinScore,
+		string(issuesJSON), string(recsJSON), string(evidenceJSON), degradedJSON, time.Now().UTC())
+	return wrapDBErr(err)
+}
+
 func (r *PostgresRepository) SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error {
 	body, err := json.Marshal(summary)
 	if err != nil {
@@ -422,6 +466,38 @@ func (r *PostgresRepository) SaveProductivitySummary(ctx context.Context, summar
 		summary.TotalEvents, summary.OutputCount, summary.AvgLatencyMs, summary.AnomalyCount,
 		summary.CostPerAcceptedOutputWithReview, string(body))
 	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, outputAnalysisSelectPostgres+`
+		WHERE tenant_id = $1
+		ORDER BY analyzed_at DESC, analysis_id DESC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	return scanOutputAnalysesPostgres(rows)
+}
+
+func (r *PostgresRepository) ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, outputAnalysisSelectPostgres+`
+		WHERE tenant_id = $1 AND worker_id = $2
+		ORDER BY analyzed_at DESC, analysis_id DESC
+		LIMIT $3
+	`, tenantID, workerID, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	return scanOutputAnalysesPostgres(rows)
 }
 
 func (r *PostgresRepository) ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error) {
@@ -496,6 +572,43 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
+const outputAnalysisSelectPostgres = `
+	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+		efficiency_score, goblin_score, issues_json, recommendations_json,
+		evidence_json, degraded_json
+	FROM output_analyses
+`
+
+func scanOutputAnalysesPostgres(rows pgx.Rows) ([]domain.OutputAnalysis, error) {
+	var analyses []domain.OutputAnalysis
+	for rows.Next() {
+		var analysis domain.OutputAnalysis
+		var issuesJSON, recsJSON, evidenceJSON []byte
+		var degradedJSON []byte
+		if err := rows.Scan(&analysis.TenantID, &analysis.AnalysisID, &analysis.EventID,
+			&analysis.WorkerID, &analysis.AnalyzedAt, &analysis.EfficiencyScore, &analysis.GoblinScore,
+			&issuesJSON, &recsJSON, &evidenceJSON, &degradedJSON); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		_ = json.Unmarshal(issuesJSON, &analysis.Issues)
+		_ = json.Unmarshal(recsJSON, &analysis.Recommendations)
+		_ = json.Unmarshal(evidenceJSON, &analysis.Evidence)
+		if len(degradedJSON) > 0 {
+			_ = json.Unmarshal(degradedJSON, &analysis.Degraded)
+		}
+		if analysis.Issues == nil {
+			analysis.Issues = []domain.AnalysisIssue{}
+		}
+		if analysis.Recommendations == nil {
+			analysis.Recommendations = []string{}
+		}
+		if analysis.Evidence == nil {
+			analysis.Evidence = []domain.AnalysisEvidence{}
+		}
+		analyses = append(analyses, analysis)
+	}
+	return analyses, wrapDBErr(rows.Err())
+}
 
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
@@ -503,7 +616,8 @@ const tokenEventSelectPostgres = `
 		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 		cost_is_degraded, cost_degraded_code, external_estimate_usd,
 		external_estimate_currency, latency_ms, task_category, output_status,
-		review_score, occurred_at, created_at, tags_json, idempotency_key
+		review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
+		prompt_reference, output_reference, tags_json, idempotency_key
 	FROM token_usage_events
 `
 
@@ -511,14 +625,15 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, tags, idempotencyKey *string
+		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey *string
 		var externalCost *float64
 		if err := rows.Scan(&event.TenantID, &event.EventID, &event.WorkerID, &event.WorkerName,
 			&jobID, &sessionID, &runID, &event.Provider, &event.ModelID, &event.PromptTokens,
 			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
 			&event.TotalTokens, &event.CostEstimateUSD, &event.CostCurrency, &event.CostIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
-			&event.OutputStatus, &event.ReviewScore, &event.Timestamp, &event.CreatedAt, &tags, &idempotencyKey); err != nil {
+			&event.OutputStatus, &event.ReviewScore, &event.Timestamp, &event.CreatedAt, &promptExcerpt,
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		if jobID != nil {
@@ -533,10 +648,22 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 		if costCode != nil {
 			event.CostDegradedCode = *costCode
 		}
+		if promptExcerpt != nil {
+			event.PromptExcerpt = *promptExcerpt
+		}
+		if outputExcerpt != nil {
+			event.OutputExcerpt = *outputExcerpt
+		}
+		if promptReference != nil {
+			event.PromptReference = *promptReference
+		}
+		if outputReference != nil {
+			event.OutputReference = *outputReference
+		}
 		event.TaskType = event.TaskCategory
 		if externalCost != nil {
 			event.ExternalEstimate = &domain.ExternalEstimate{
-				CostUSD:  *externalCost,
+				CostUSD: *externalCost,
 			}
 			if externalCurrency != nil {
 				event.ExternalEstimate.Currency = *externalCurrency

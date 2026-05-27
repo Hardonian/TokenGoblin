@@ -50,6 +50,7 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 		}
 		if isAccepted(event.OutputStatus) {
 			summary.OutputCount++
+			summary.TotalOutputTokens += event.OutputTokens
 			if event.ReviewScore != nil && event.CostEstimateUSD != nil {
 				acceptedReviewedCost += *event.CostEstimateUSD
 				acceptedReviewedCount++
@@ -208,7 +209,7 @@ func (a *workerAccumulator) add(event domain.TokenEvent) {
 	if isAccepted(event.OutputStatus) && event.CostEstimateUSD != nil {
 		sevenDaysAgo := a.now.Add(-7 * 24 * time.Hour)
 		fourteenDaysAgo := a.now.Add(-14 * 24 * time.Hour)
-		
+
 		if event.Timestamp.After(sevenDaysAgo) && !event.Timestamp.After(a.now) {
 			a.currentPeriodCost += *event.CostEstimateUSD
 			a.currentPeriodCount++

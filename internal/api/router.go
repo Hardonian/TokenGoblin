@@ -10,9 +10,9 @@ import (
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.
-func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter) *http.ServeMux {
+func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter) http.Handler {
 	mux := http.NewServeMux()
-	handler := NewIngestionHandler(service)
+	handler := NewIngestionHandler(service, repo)
 
 	// Prometheus Metrics
 	mux.Handle("/metrics", promhttp.Handler())
@@ -20,13 +20,16 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Wrap ingestion routes with auth and rate limit
 	ingestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent)))
 	batchIngestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleBatchTokenEvent)))
-	
+
 	mux.Handle("/v1/events", ingestHandler)
 	mux.Handle("/v1/events/batch", batchIngestHandler)
-	
+
 	pricingHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleSetPricingOverride))
 	mux.Handle("/v1/pricing/overrides", pricingHandler)
-	
+
+	mux.Handle("/v1/pricing", AuthMiddleware(repo, http.HandlerFunc(handler.HandleGetPricing)))
+	mux.Handle("/api/pricing", AuthMiddleware(repo, http.HandlerFunc(handler.HandleGetPricing)))
+
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
 	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
 
@@ -38,19 +41,31 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/completions", wrap(handler.HandleTaskCompletion))
 	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
 	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
+	mux.Handle("/v1/dashboard/workers/", wrap(handler.HandleWorkerReview))
 	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))
+
+	mux.Handle("/v1/dashboard/reset", wrap(handler.HandleResetTenantData))
+	mux.Handle("/api/dashboard/reset", wrap(handler.HandleResetTenantData))
+
+	mux.Handle("/v1/dashboard/seed", wrap(handler.HandleSeedDemoData))
+	mux.Handle("/api/dashboard/seed", wrap(handler.HandleSeedDemoData))
 
 	// Catch-all 404
 	mux.Handle("/v1/dashboard/events", wrap(handler.HandleRecentEvents))
+	mux.Handle("/v1/dashboard/output-analysis", wrap(handler.HandleOutputAnalyses))
 	mux.Handle("/v1/dashboard/recommendations", wrap(handler.HandleRecommendations))
 	mux.Handle("/v1/dashboard/export.csv", wrap(handler.HandleExportCSV))
+	mux.Handle("/v1/dashboard/report.md", wrap(handler.HandleReportMarkdown))
 
 	mux.Handle("/api/dashboard/overview", wrap(handler.HandleOverview))
 	mux.Handle("/api/dashboard/workers", wrap(handler.HandleWorkers))
+	mux.Handle("/api/dashboard/workers/", wrap(handler.HandleWorkerReview))
 	mux.Handle("/api/dashboard/anomalies", wrap(handler.HandleAnomalies))
 	mux.Handle("/api/dashboard/events", wrap(handler.HandleRecentEvents))
+	mux.Handle("/api/dashboard/output-analysis", wrap(handler.HandleOutputAnalyses))
 	mux.Handle("/api/dashboard/recommendations", wrap(handler.HandleRecommendations))
 	mux.Handle("/api/dashboard/export.csv", wrap(handler.HandleExportCSV))
+	mux.Handle("/api/dashboard/report.md", wrap(handler.HandleReportMarkdown))
 
-	return mux
+	return CORSMiddleware(mux)
 }

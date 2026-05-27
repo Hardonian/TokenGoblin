@@ -106,6 +106,38 @@ func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 	}
 }
 
+func TestIngestPersistsOutputAnalysis(t *testing.T) {
+	ctx := context.Background()
+	service, repo := testService(t)
+	defer repo.Close()
+
+	_, err := service.IngestTokenEvent(ctx, "tenant-a", domain.TokenEvent{
+		EventID:       "evt-analysis",
+		WorkerID:      "worker-a",
+		Provider:      "demo",
+		ModelID:       "efficient-model",
+		InputTokens:   100,
+		OutputTokens:  300,
+		PromptExcerpt: "Write an answer.",
+		OutputExcerpt: "This is a long unstructured answer without evidence markers that repeats. This is a long unstructured answer without evidence markers that repeats.",
+		OutputStatus:  domain.OutputAccepted,
+	})
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	analyses, err := repo.ListOutputAnalyses(ctx, "tenant-a", 10)
+	if err != nil {
+		t.Fatalf("list analyses: %v", err)
+	}
+	if len(analyses) != 1 {
+		t.Fatalf("expected one analysis, got %d", len(analyses))
+	}
+	if analyses[0].EfficiencyScore >= 100 || len(analyses[0].Issues) == 0 {
+		t.Fatalf("expected scored analysis with issues, got %#v", analyses[0])
+	}
+}
+
 func testService(t *testing.T) (*ExecutionService, storage.Repository) {
 	t.Helper()
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))

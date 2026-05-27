@@ -106,6 +106,7 @@ type ProductivitySummary struct {
 	KnownCostEventCount             int                 `json:"known_cost_event_count"`
 	UnknownCostEventCount           int                 `json:"unknown_cost_event_count"`
 	TotalEvents                     int                 `json:"total_events"`
+	TotalOutputTokens               int                 `json:"total_output_tokens"`
 	OutputCount                     int                 `json:"output_count"`
 	AvgLatencyMs                    *float64            `json:"avg_latency_ms,omitempty"`
 	AnomalyCount                    int                 `json:"anomaly_count"`
@@ -121,5 +122,9 @@ type RoutingRecommendation struct {
 	CurrentModel        string  `json:"current_model"`
 	RecommendedModel    string  `json:"recommended_model"`
 	EstimatedSavingsUSD float64 `json:"estimated_savings_usd"`
+	EvidenceCount       int     `json:"evidence_count"`
+	Basis               string  `json:"basis"`
+	Confidence          string  `json:"confidence"`
+	Status              string  `json:"status"`
 	Reason              string  `json:"reason"`
 }
