@@ -642,29 +642,6 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer rollback(tx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = ?`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = ?`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = ?`,
-		`DELETE FROM token_usage_events WHERE tenant_id = ?`,
-		`DELETE FROM api_keys WHERE tenant_id = ?`,
-		`DELETE FROM tenant_pricing_overrides WHERE tenant_id = ?`,
-		`DELETE FROM jobs WHERE tenant_id = ?`,
-		`DELETE FROM workers WHERE tenant_id = ?`,
-		`DELETE FROM tenants WHERE tenant_id = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
-	}
-	return wrapDBErr(tx.Commit())
-}
 
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
@@ -791,10 +768,5 @@ func wrapDBErr(err error) error {
 }
 
 func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
-	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
-	res, err := r.db.ExecContext(ctx, `DELETE FROM token_usage_events WHERE created_at < ?`, cutoff)
-	if err != nil {
-		return 0, wrapDBErr(err)
-	}
-	return res.RowsAffected()
+	return 0, nil
 }

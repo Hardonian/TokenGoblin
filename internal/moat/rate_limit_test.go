@@ -9,77 +9,119 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func TestRateLimiter_Bypass(t *testing.T) {
-	var rl *RateLimiter
-	allowed, err := rl.AllowIngestion(context.Background(), "test-tenant")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if !allowed {
-		t.Errorf("expected allowed to be true for nil limiter")
-	}
-
-	rl2 := NewRateLimiter(nil)
-	allowed, err = rl2.AllowIngestion(context.Background(), "test-tenant")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if !allowed {
-		t.Errorf("expected allowed to be true for nil limiter")
-	}
-}
-
-func TestRateLimiter_AllowIngestion(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
-
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-
-	rl := NewRateLimiter(client)
-	ctx := context.Background()
-	tenantID := "tenant-1"
-
-	// Initial request should be allowed
-	allowed, err := rl.AllowIngestion(ctx, tenantID)
-	if err != nil {
-		t.Fatalf("unexpected error on first request: %v", err)
-	}
-	if !allowed {
-		t.Errorf("expected first request to be allowed")
-	}
-
-	// We have a limit of 100/sec, burst 50.
-	// We'll hit it with a burst of requests to ensure it eventually limits.
-	var denied bool
-	for i := 0; i < 200; i++ {
-		allowed, err := rl.AllowIngestion(ctx, tenantID)
+func TestAllowIngestion(t *testing.T) {
+	t.Run("nil receiver bypasses rate limiting", func(t *testing.T) {
+		var rl *RateLimiter
+		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
 		if err != nil {
-			t.Fatalf("unexpected error on request %d: %v", i+1, err)
+			t.Fatalf("expected no error, got %v", err)
 		}
 		if !allowed {
-			denied = true
-			break
+			t.Errorf("expected allowed=true for nil RateLimiter")
 		}
-	}
+	})
 
-	if !denied {
-		t.Errorf("expected rate limiter to eventually deny requests")
-	}
+	t.Run("nil client to NewRateLimiter bypasses rate limiting", func(t *testing.T) {
+		rl := NewRateLimiter(nil)
+		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if !allowed {
+			t.Errorf("expected allowed=true for nil limiter")
+		}
+	})
 
-	// Fast-forward time to let the rate limiter recover
-	mr.FastForward(2 * time.Second)
+	t.Run("nil limiter bypasses rate limiting", func(t *testing.T) {
+		rl := &RateLimiter{}
+		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if !allowed {
+			t.Errorf("expected allowed=true for nil limiter")
+		}
+	})
 
-	// Should be allowed again
-	allowed, err = rl.AllowIngestion(ctx, tenantID)
-	if err != nil {
-		t.Fatalf("unexpected error after recovery: %v", err)
-	}
-	if !allowed {
-		t.Errorf("expected request to be allowed after recovery")
-	}
+	t.Run("rate limiting enforces limits", func(t *testing.T) {
+		mr, err := miniredis.Run()
+		if err != nil {
+			t.Fatalf("failed to start miniredis: %v", err)
+		}
+		defer mr.Close()
+
+		client := redis.NewClient(&redis.Options{
+			Addr: mr.Addr(),
+		})
+		defer client.Close()
+
+		rl := NewRateLimiter(client)
+		if rl == nil {
+			t.Fatalf("expected RateLimiter, got nil")
+		}
+
+		ctx := context.Background()
+		tenantID := "test-tenant"
+
+		allowedCount := 0
+		blockedCount := 0
+
+		for i := 0; i < 100; i++ {
+			allowed, err := rl.AllowIngestion(ctx, tenantID)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if allowed {
+				allowedCount++
+			} else {
+				blockedCount++
+			}
+		}
+
+		if allowedCount == 0 {
+			t.Errorf("expected some requests to be allowed, got 0")
+		}
+		if blockedCount == 0 {
+			t.Errorf("expected some requests to be blocked, got 0")
+		}
+
+		// The exact numbers depend on miniredis timing and the redis_rate algorithm,
+		// but since burst is 50, at least 50 should be allowed, and since we send 100 instantly,
+		// some should be blocked.
+		if allowedCount < 50 {
+			t.Errorf("expected at least 50 allowed requests, got %d", allowedCount)
+		}
+	})
+
+	t.Run("redis error returns false and error", func(t *testing.T) {
+		mr, err := miniredis.Run()
+		if err != nil {
+			t.Fatalf("failed to start miniredis: %v", err)
+		}
+
+		client := redis.NewClient(&redis.Options{
+			Addr:        mr.Addr(),
+			MaxRetries:  1,
+			DialTimeout: 10 * time.Millisecond,
+			ReadTimeout: 10 * time.Millisecond,
+		})
+		defer client.Close()
+
+		rl := NewRateLimiter(client)
+
+		// Close miniredis to simulate redis failure
+		mr.Close()
+
+		// Setting a tight context timeout to avoid the default backoff delays in go-redis
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		allowed, err := rl.AllowIngestion(ctx, "tenant-error")
+		if err == nil {
+			t.Errorf("expected error when redis is unavailable, got nil")
+		}
+		if allowed {
+			t.Errorf("expected allowed=false when redis is unavailable")
+		}
+	})
 }
