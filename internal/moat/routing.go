@@ -24,15 +24,20 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 			continue
 		}
 
-		if modelStatsByCategory[event.TaskCategory] == nil {
-			modelStatsByCategory[event.TaskCategory] = make(map[string]*stats)
-		}
-		if modelStatsByCategory[event.TaskCategory][event.ModelID] == nil {
-			modelStatsByCategory[event.TaskCategory][event.ModelID] = &stats{}
+		catMap, ok := modelStatsByCategory[event.TaskCategory]
+		if !ok {
+			catMap = make(map[string]*stats)
+			modelStatsByCategory[event.TaskCategory] = catMap
 		}
 
-		modelStatsByCategory[event.TaskCategory][event.ModelID].AcceptedCount++
-		modelStatsByCategory[event.TaskCategory][event.ModelID].TotalCost += *event.CostEstimateUSD
+		st, ok := catMap[event.ModelID]
+		if !ok {
+			st = &stats{}
+			catMap[event.ModelID] = st
+		}
+
+		st.AcceptedCount++
+		st.TotalCost += *event.CostEstimateUSD
 	}
 
 	for category, models := range modelStatsByCategory {
