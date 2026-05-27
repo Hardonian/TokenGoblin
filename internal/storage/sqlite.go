@@ -316,28 +316,6 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	return wrapDBErr(err)
 }
 
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, `DELETE FROM token_events WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM tenant_pricing_overrides WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM api_keys WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-
-	return wrapDBErr(tx.Commit())
-}
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.db.ExecContext(ctx, `
@@ -670,18 +648,11 @@ func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string
 		return wrapDBErr(err)
 	}
 	defer rollback(tx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = ?`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = ?`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = ?`,
-		`DELETE FROM token_usage_events WHERE tenant_id = ?`,
-		`DELETE FROM jobs WHERE tenant_id = ?`,
-		`DELETE FROM workers WHERE tenant_id = ?`,
-		`DELETE FROM tenants WHERE tenant_id = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
+
+	// Using ON DELETE CASCADE configured in the schema,
+	// deleting from the tenants table automatically cleans up related records.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID); err != nil {
+		return wrapDBErr(err)
 	}
 	return wrapDBErr(tx.Commit())
 }
@@ -808,4 +779,15 @@ func wrapDBErr(err error) error {
 		return err
 	}
 	return fmt.Errorf("%w: %v", ErrUnavailable, err)
+}
+
+func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
+	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
+
+	res, err := r.db.ExecContext(ctx, `DELETE FROM token_usage_events WHERE occurred_at < ?`, formatTime(cutoff))
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+
+	return res.RowsAffected()
 }
