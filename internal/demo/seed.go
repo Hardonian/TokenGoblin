@@ -33,6 +33,15 @@ func Events(tenantID string) []domain.TokenEvent {
 	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	var events []domain.TokenEvent
 
+	events = append(events, efficientEvents(tenantID, base)...)
+	events = append(events, expensiveEvents(tenantID, base)...)
+	events = append(events, unknownEvents(tenantID, base)...)
+
+	return events
+}
+
+func efficientEvents(tenantID string, base time.Time) []domain.TokenEvent {
+	var events []domain.TokenEvent
 	for i := 0; i < 9; i++ {
 		events = append(events, domain.TokenEvent{
 			EventID:          fmt.Sprintf("demo-efficient-%02d", i+1),
@@ -55,7 +64,11 @@ func Events(tenantID string) []domain.TokenEvent {
 			Tags:             map[string]string{"demo": "true", "profile": "efficient"},
 		})
 	}
+	return events
+}
 
+func expensiveEvents(tenantID string, base time.Time) []domain.TokenEvent {
+	var events []domain.TokenEvent
 	for i := 0; i < 6; i++ {
 		events = append(events, domain.TokenEvent{
 			EventID:          fmt.Sprintf("demo-expensive-base-%02d", i+1),
@@ -118,7 +131,11 @@ func Events(tenantID string) []domain.TokenEvent {
 			Tags:             map[string]string{"demo": "true", "profile": "expensive"},
 		},
 	)
+	return events
+}
 
+func unknownEvents(tenantID string, base time.Time) []domain.TokenEvent {
+	var events []domain.TokenEvent
 	for i := 0; i < 6; i++ {
 		status := domain.OutputFailed
 		if i > 2 {
@@ -144,7 +161,6 @@ func Events(tenantID string) []domain.TokenEvent {
 			Tags:             map[string]string{"demo": "true", "profile": "unknown-pricing"},
 		})
 	}
-
 	return events
 }
 
