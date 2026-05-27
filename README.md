@@ -8,6 +8,7 @@ demo seed.
 
 ```bash
 npm install
+docker-compose up -d
 npm run db:seed
 npm run smoke
 npm run dev
