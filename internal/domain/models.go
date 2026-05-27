@@ -9,10 +9,14 @@ type Issue struct {
 }
 
 type Tenant struct {
-	TenantID  string    `json:"tenant_id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	TenantID             string    `json:"tenant_id"`
+	Name                 string    `json:"name"`
+	Tier                 string    `json:"tier"`
+	UsageLimitUSD        float64   `json:"usage_limit_usd"`
+	StripeCustomerID     string    `json:"stripe_customer_id,omitempty"`
+	StripeSubscriptionID string    `json:"stripe_subscription_id,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 type Worker struct {

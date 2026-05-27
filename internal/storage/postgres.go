@@ -58,13 +58,61 @@ func (r *PostgresRepository) Close() error {
 
 func (r *PostgresRepository) UpsertTenant(ctx context.Context, tenant domain.Tenant) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO tenants (tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT(tenant_id) DO UPDATE SET
 			name = EXCLUDED.name,
+			tier = EXCLUDED.tier,
+			usage_limit_usd = EXCLUDED.usage_limit_usd,
+			stripe_customer_id = EXCLUDED.stripe_customer_id,
+			stripe_subscription_id = EXCLUDED.stripe_subscription_id,
 			updated_at = EXCLUDED.updated_at
-	`, tenant.TenantID, tenant.Name, tenant.CreatedAt, tenant.UpdatedAt)
+	`, tenant.TenantID, tenant.Name, tenant.Tier, tenant.UsageLimitUSD, nullString(tenant.StripeCustomerID), nullString(tenant.StripeSubscriptionID), tenant.CreatedAt, tenant.UpdatedAt)
 	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error) {
+	var t domain.Tenant
+	var stripeCust, stripeSub *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE tenant_id = $1
+	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &t.CreatedAt, &t.UpdatedAt)
+	
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCust != nil {
+		t.StripeCustomerID = *stripeCust
+	}
+	if stripeSub != nil {
+		t.StripeSubscriptionID = *stripeSub
+	}
+	return &t, nil
+}
+
+func (r *PostgresRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
+	now := time.Now().UTC()
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	
+	var total *float64
+	err := r.pool.QueryRow(ctx, `
+		SELECT SUM(cost_estimate_usd)
+		FROM token_usage_events
+		WHERE tenant_id = $1 AND occurred_at >= $2
+	`, tenantID, startOfMonth).Scan(&total)
+	
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
 }
 
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {

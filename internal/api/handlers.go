@@ -66,6 +66,19 @@ func (h *IngestionHandler) HandleTokenEvent(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.Service.IngestTokenEvent(r.Context(), tenantID, event)
 	if err != nil {
+		var quotaErr ingestion.QuotaExceededError
+		if errors.As(err, &quotaErr) {
+			writeJSON(w, http.StatusPaymentRequired, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("quota_exceeded", err.Error()),
+				Degraded: []domain.Issue{{
+					Code:    "quota_exceeded",
+					Message: err.Error(),
+				}},
+			})
+			return
+		}
 		writeServiceError(w, err, false)
 		return
 	}
@@ -113,6 +126,19 @@ func (h *IngestionHandler) HandleBatchTokenEvent(w http.ResponseWriter, r *http.
 
 	results, err := h.Service.IngestTokenEventBatch(r.Context(), tenantID, events)
 	if err != nil {
+		var quotaErr ingestion.QuotaExceededError
+		if errors.As(err, &quotaErr) {
+			writeJSON(w, http.StatusPaymentRequired, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("quota_exceeded", err.Error()),
+				Degraded: []domain.Issue{{
+					Code:    "quota_exceeded",
+					Message: err.Error(),
+				}},
+			})
+			return
+		}
 		writeServiceError(w, err, false)
 		return
 	}

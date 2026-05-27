@@ -135,6 +135,17 @@ func (s *ExecutionService) WithClock(clock func() time.Time) *ExecutionService {
 }
 
 func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string, event domain.TokenEvent) (domain.IngestionResult, error) {
+	tenant, err := s.repo.GetTenant(ctx, tenantID)
+	if err != nil {
+		return domain.IngestionResult{}, err
+	}
+	if tenant != nil {
+		usage, err := s.repo.GetTenantCurrentMonthCost(ctx, tenantID)
+		if err == nil && usage >= tenant.UsageLimitUSD {
+			return domain.IngestionResult{}, QuotaExceededError{Limit: tenant.UsageLimitUSD, Usage: usage}
+		}
+	}
+
 	normalized, warnings, err := s.normalize(tenantID, event)
 	if err != nil {
 		return domain.IngestionResult{}, err
@@ -415,6 +426,15 @@ type TenantMismatchError struct {
 
 func (e TenantMismatchError) Error() string {
 	return "payload tenant does not match request tenant context"
+}
+
+type QuotaExceededError struct {
+	Limit float64
+	Usage float64
+}
+
+func (e QuotaExceededError) Error() string {
+	return fmt.Sprintf("tenant quota exceeded: current usage $%.2f is greater than or equal to limit $%.2f", e.Usage, e.Limit)
 }
 
 func randomHex(bytes int) string {

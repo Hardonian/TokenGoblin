@@ -62,8 +62,22 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		`CREATE TABLE IF NOT EXISTS tenants (
 			tenant_id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
+			tier TEXT NOT NULL DEFAULT 'free',
+			usage_limit_usd REAL NOT NULL DEFAULT 10.00,
+			stripe_customer_id TEXT,
+			stripe_subscription_id TEXT,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
+		);`,
+		`CREATE TABLE IF NOT EXISTS tenant_pricing_overrides (
+			override_id TEXT PRIMARY KEY,
+			tenant_id TEXT NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+			provider TEXT NOT NULL,
+			model_id TEXT NOT NULL,
+			prompt_price_per_million REAL NOT NULL,
+			completion_price_per_million REAL NOT NULL,
+			created_at TEXT NOT NULL,
+			UNIQUE(tenant_id, provider, model_id)
 		);`,
 		`CREATE TABLE IF NOT EXISTS workers (
 			tenant_id TEXT NOT NULL,
@@ -198,14 +212,73 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 }
 
 func (r *SQLiteRepository) UpsertTenant(ctx context.Context, tenant domain.Tenant) error {
+	tier := tenant.Tier
+	if tier == "" {
+		tier = "free"
+	}
+	limit := tenant.UsageLimitUSD
+	if limit == 0 {
+		limit = 10.0
+	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO tenants (tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(tenant_id) DO UPDATE SET
 			name = excluded.name,
+			tier = excluded.tier,
+			usage_limit_usd = excluded.usage_limit_usd,
+			stripe_customer_id = excluded.stripe_customer_id,
+			stripe_subscription_id = excluded.stripe_subscription_id,
 			updated_at = excluded.updated_at
-	`, tenant.TenantID, tenant.Name, formatTime(tenant.CreatedAt), formatTime(tenant.UpdatedAt))
+	`, tenant.TenantID, tenant.Name, tier, limit, nullString(tenant.StripeCustomerID), nullString(tenant.StripeSubscriptionID), formatTime(tenant.CreatedAt), formatTime(tenant.UpdatedAt))
 	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error) {
+	var t domain.Tenant
+	var stripeCust, stripeSub sql.NullString
+	var createdAt, updatedAt string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE tenant_id = ?
+	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &createdAt, &updatedAt)
+	
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCust.Valid {
+		t.StripeCustomerID = stripeCust.String
+	}
+	if stripeSub.Valid {
+		t.StripeSubscriptionID = stripeSub.String
+	}
+	t.CreatedAt = parseTime(createdAt)
+	t.UpdatedAt = parseTime(updatedAt)
+	return &t, nil
+}
+
+func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
+	now := time.Now().UTC()
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	
+	var total sql.NullFloat64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT SUM(cost_estimate_usd)
+		FROM token_usage_events
+		WHERE tenant_id = ? AND occurred_at >= ?
+	`, tenantID, formatTime(startOfMonth)).Scan(&total)
+	
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	if !total.Valid {
+		return 0, nil
+	}
+	return total.Float64, nil
 }
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
