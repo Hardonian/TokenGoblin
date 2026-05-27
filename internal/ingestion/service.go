@@ -129,7 +129,7 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 				return err
 			}
 		}
-		
+
 		// Run alerter asynchronously
 		go func() {
 			if err := s.alerter.Alert(context.Background(), normalized.TenantID, signals); err != nil {
@@ -201,27 +201,72 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
 	}
-	
+
+	tenant, err := s.repo.GetTenant(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	var usage float64
+	if tenant != nil {
+		usage, err = s.repo.GetTenantCurrentMonthCost(ctx, tenantID)
+		if err == nil && usage >= tenant.UsageLimitUSD {
+			return nil, QuotaExceededError{Limit: tenant.UsageLimitUSD, Usage: usage}
+		}
+	}
+
 	results := make([]domain.IngestionResult, 0, len(events))
-	
-	// A simple approach is just calling the single item method for each item
-	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
+
 	for _, event := range events {
-		res, err := s.IngestTokenEvent(ctx, tenantID, event)
+		normalized, warnings, err := s.normalize(tenantID, event)
 		if err != nil {
 			var validationErr ValidationError
 			if errors.As(err, &validationErr) {
 				// We can return a result with error status instead of failing the whole batch
-				res.Event = event
-				res.Degraded = append(res.Degraded, validationErr.Issues...)
-				res.Warnings = append(res.Warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."})
+				res := domain.IngestionResult{
+					Event:    event,
+					Warnings: append(warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."}),
+					Degraded: validationErr.Issues,
+				}
+				results = append(results, res)
+				continue
 			} else {
 				// For structural errors (queue full), we might fail the whole batch
 				return nil, err
 			}
 		}
+
+		costResult := s.pricing.Calculate(ctx, normalized, s.repo)
+		normalized.CostEstimateUSD = costResult.CostEstimateUSD
+		normalized.CostCurrency = costResult.Currency
+		normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
+		normalized.CostDegradedCode = costResult.DegradedCode
+
+		select {
+		case s.eventQueue <- normalized:
+			// Buffered successfully
+		default:
+			// Queue is full, return error
+			return nil, errors.New("ingestion buffer full")
+		}
+
+		res := domain.IngestionResult{
+			Event:    normalized,
+			Warnings: append(warnings, s.pricing.Diagnostics()...),
+		}
+		if normalized.CostIsDegraded {
+			res.Degraded = append(res.Degraded, domain.Issue{
+				Code:    normalized.CostDegradedCode,
+				Message: "Internal cost estimate is unavailable for this provider/model.",
+			})
+		}
+		res.Degraded = append(res.Degraded, domain.Issue{
+			Code:    "buffered",
+			Message: "Event buffered for asynchronous processing.",
+		})
+
 		results = append(results, res)
 	}
+
 	return results, nil
 }
 
@@ -282,7 +327,7 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Import statement will be added automatically by goimports or we can add it later if needed.
 	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
 	return moat.RecommendRoutes(events), nil

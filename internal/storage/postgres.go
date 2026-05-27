@@ -486,27 +486,7 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback(ctx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = $1`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = $1`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = $1`,
-		`DELETE FROM token_usage_events WHERE tenant_id = $1`,
-		`DELETE FROM jobs WHERE tenant_id = $1`,
-		`DELETE FROM workers WHERE tenant_id = $1`,
-		`DELETE FROM tenants WHERE tenant_id = $1`,
-	} {
-		if _, err := tx.Exec(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
-	}
-	return wrapDBErr(tx.Commit(ctx))
-}
+
 
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
