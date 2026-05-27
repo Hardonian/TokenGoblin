@@ -4,12 +4,16 @@ import (
 	"net/http"
 
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // NewRouter creates a new HTTP multiplexer with all routes registered.
 func NewRouter(service ingestion.Service) *http.ServeMux {
 	mux := http.NewServeMux()
 	handler := NewIngestionHandler(service)
+
+	// Prometheus Metrics
+	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.HandleFunc("/v1/events", handler.HandleTokenEvent)
 	mux.HandleFunc("/v1/completions", handler.HandleTaskCompletion)
