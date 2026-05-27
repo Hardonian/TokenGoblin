@@ -97,6 +97,10 @@ func main() {
 	stripeSyncer := billing.NewStripeSyncer(repo, logger)
 	go stripeSyncer.Start(ctx)
 
+	// Start Retention Worker (30 days retention default for MVP)
+	retentionWorker := ingestion.NewRetentionWorker(repo, logger, 30)
+	go retentionWorker.Start(ctx)
+
 	rateLimiter := moat.NewRateLimiter(redisClient)
 	mux := api.NewRouter(ingestionService, repo, rateLimiter)
 

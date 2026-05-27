@@ -173,6 +173,15 @@ func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID stri
 	return wrapDBErr(tx.Commit(ctx))
 }
 
+func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
+	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
+	res, err := r.pool.Exec(ctx, `DELETE FROM token_events WHERE created_at < $1`, cutoff)
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	return res.RowsAffected(), nil
+}
+
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)
