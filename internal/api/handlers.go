@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"crypto/rand"
 	"encoding/csv"
 	"encoding/hex"
@@ -9,10 +10,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/demo"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
@@ -708,6 +711,67 @@ func (h *IngestionHandler) HandleTenantMembers(w http.ResponseWriter, r *http.Re
 	}
 }
 
+func (h *IngestionHandler) HandleVerifiedStripeEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	if !validInternalBearer(r) {
+		writeJSON(w, http.StatusUnauthorized, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("internal_auth_invalid", "Internal billing route requires a valid service bearer token."),
+		})
+		return
+	}
+
+	var event billing.VerifiedStripeEvent
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&event); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must be a verified Stripe lifecycle event JSON object."),
+		})
+		return
+	}
+
+	result, err := billing.ProcessVerifiedStripeEvent(r.Context(), h.Repo, event, time.Now().UTC())
+	if err != nil {
+		var validationErr billing.StripeValidationError
+		if errors.As(err, &validationErr) {
+			writeJSON(w, http.StatusBadRequest, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("invalid_stripe_event", validationErr.Error()),
+			})
+			return
+		}
+		var conflictErr billing.StripeConflictError
+		if errors.As(err, &conflictErr) {
+			writeJSON(w, http.StatusConflict, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("stripe_owner_conflict", conflictErr.Error()),
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("billing_update_failed", "Verified Stripe event could not be applied."),
+		})
+		return
+	}
+
+	status := "ignored"
+	if result.Applied {
+		status = "success"
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: result})
+}
+
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if val := r.Context().Value(tenantIDKey); val != nil {
 		if tenantID, ok := val.(string); ok && tenantID != "" {
@@ -760,6 +824,22 @@ func (h *IngestionHandler) audit(r *http.Request, tenantID, eventType, resource 
 		Metadata:  metadata,
 		Timestamp: time.Now().UTC(),
 	})
+}
+
+func validInternalBearer(r *http.Request) bool {
+	expected := strings.TrimSpace(os.Getenv("TG_INTERNAL_WEBHOOK_SECRET"))
+	if expected == "" {
+		return false
+	}
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+	if token == "" || len(token) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
 }
 
 func randomHex(bytes int) string {

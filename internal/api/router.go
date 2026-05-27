@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/moat"
@@ -27,6 +28,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Webhook endpoints are publicly available (auth is done cryptographically inside handler)
 	mux.Handle("/v1/webhooks/stripe", http.HandlerFunc(handler.HandleStripeWebhook))
 	mux.Handle("/api/v1/webhooks/stripe", http.HandlerFunc(handler.HandleStripeWebhook))
+	mux.Handle("/internal/billing/stripe-event", http.HandlerFunc(handler.HandleVerifiedStripeEvent))
 
 	pricingHandler := AuthMiddleware(repo, RequireRole("admin")(http.HandlerFunc(handler.HandleSetPricingOverride)))
 	mux.Handle("/v1/pricing/overrides", pricingHandler)
@@ -84,5 +86,6 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/api/audit/events", wrap(handler.HandleAuditEvents))
 	mux.Handle("/api/tenant/members", wrap(handler.HandleTenantMembers))
 
-	return CORSMiddleware(mux)
+	handlerWithMiddleware := TimeoutMiddleware(15*time.Second, CORSMiddleware(LoggingMiddleware(RecoverMiddleware(mux))))
+	return handlerWithMiddleware
 }

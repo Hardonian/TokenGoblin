@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TokenGoblin | AI Spend & Token-Efficiency Observability",
   description: "Enterprise operational intelligence and pricing audit controls for autonomous AI agents.",
+  openGraph: {
+    title: "TokenGoblin",
+    description: "Enterprise operational intelligence and pricing audit controls for autonomous AI agents.",
+    url: "https://tokengoblin.com",
+    siteName: "TokenGoblin",
+    type: "website",
+  },
+  themeColor: "#0e100d",
 };
 
 export default function RootLayout({

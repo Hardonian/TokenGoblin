@@ -38,7 +38,12 @@ func OpenSQLite(ctx context.Context, dbPath string) (*SQLiteRepository, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// Append pragmas for WAL mode, busy timeout, and synchronous mode
+	dsn := dbPath
+	if dbPath != ":memory:" {
+		dsn = dbPath + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%w: open sqlite: %v", ErrUnavailable, err)
 	}
@@ -69,6 +74,8 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_customer ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_stripe_subscription ON tenants(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;`,
 		`CREATE TABLE IF NOT EXISTS tenant_pricing_overrides (
 			override_id TEXT PRIMARY KEY,
 			tenant_id TEXT NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,

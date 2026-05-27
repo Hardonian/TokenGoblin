@@ -40,6 +40,11 @@ func OpenPostgres(ctx context.Context, dsn string) (*PostgresRepository, error) 
 		return nil, fmt.Errorf("%w: parse dsn: %v", ErrUnavailable, err)
 	}
 
+	config.MaxConns = 25
+	config.MinConns = 5
+	config.MaxConnIdleTime = 30 * time.Minute
+	config.MaxConnLifetime = time.Hour
+
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("%w: connect to postgres: %v", ErrUnavailable, err)
