@@ -87,6 +87,14 @@ function verifyStripeSignature(
   if (!timestamp || !v1) {
     return false;
   }
+  const issuedAt = Number(timestamp);
+  if (!Number.isFinite(issuedAt)) {
+    return false;
+  }
+  const ageSeconds = Math.abs(Date.now() / 1000 - issuedAt);
+  if (ageSeconds > 300) {
+    return false;
+  }
 
   const payload = `${timestamp}.${rawBody}`;
   const expected = crypto

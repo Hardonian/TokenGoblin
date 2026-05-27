@@ -3,11 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -303,10 +299,6 @@ func testRouter(t *testing.T) (http.Handler, func()) {
 }
 
 func TestStripeWebhookHandler(t *testing.T) {
-	// Setup environment and router
-	secret := "whsec_test_secret"
-	t.Setenv("STRIPE_WEBHOOK_SECRET", secret)
-
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -330,59 +322,20 @@ func TestStripeWebhookHandler(t *testing.T) {
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service, repo, nil)
 
-	// Create Stripe webhook payload
-	payload := []byte(`{
-		"type": "customer.subscription.created",
-		"data": {
-			"object": {
-				"customer": "cus_stripe_123",
-				"id": "sub_stripe_abc",
-				"status": "active"
-			}
-		}
-	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader([]byte(`{"type":"customer.subscription.created"}`)))
+	rec := httptest.NewRecorder()
 
-	now := time.Now()
-	timestampStr := fmt.Sprintf("%d", now.Unix())
-	macPayload := []byte(timestampStr + "." + string(payload))
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(macPayload)
-	expectedMAC := hex.EncodeToString(mac.Sum(nil))
-	sigHeader := fmt.Sprintf("t=%s,v1=%s", timestampStr, expectedMAC)
+	mux.ServeHTTP(rec, req)
 
-	t.Run("Valid Signature and Event Update", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader(payload))
-		req.Header.Set("Stripe-Signature", sigHeader)
-		rec := httptest.NewRecorder()
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("expected 501, got %d body=%s", rec.Code, rec.Body.String())
+	}
 
-		mux.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
-		}
-
-		// Verify tenant state updated
-		updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
-		if err != nil {
-			t.Fatalf("get tenant: %v", err)
-		}
-		if updated.Tier != "premium" {
-			t.Fatalf("expected tier to be premium, got %s", updated.Tier)
-		}
-		if updated.StripeSubscriptionID != "sub_stripe_abc" {
-			t.Fatalf("expected sub id to be sub_stripe_abc, got %s", updated.StripeSubscriptionID)
-		}
-	})
-
-	t.Run("Invalid Signature Rejected", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader(payload))
-		req.Header.Set("Stripe-Signature", "t=123,v1=wrongsignature")
-		rec := httptest.NewRecorder()
-
-		mux.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400, got %d", rec.Code)
-		}
-	})
+	updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
+	if err != nil {
+		t.Fatalf("get tenant: %v", err)
+	}
+	if updated.Tier != "free" || updated.StripeSubscriptionID != "" {
+		t.Fatalf("Go webhook route should not mutate billing state: tier=%s subscription=%s", updated.Tier, updated.StripeSubscriptionID)
+	}
 }

@@ -7,15 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/demo"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
@@ -901,122 +898,12 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	if secret == "" {
-		writeJSON(w, http.StatusInternalServerError, Envelope{
-			OK:     false,
-			Status: "error",
-			Error:  issue("webhook_secret_missing", "Webhook secret is not configured."),
-		})
-		return
-	}
-
-	sigHeader := r.Header.Get("Stripe-Signature")
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, Envelope{
-			OK:     false,
-			Status: "error",
-			Error:  issue("read_failed", "Failed to read request body."),
-		})
-		return
-	}
-
-	// Verify signature using our custom VerifySignature implementation
-	if err := billing.VerifySignature(body, sigHeader, secret, 5 * time.Minute); err != nil {
-		writeJSON(w, http.StatusBadRequest, Envelope{
-			OK:     false,
-			Status: "error",
-			Error:  issue("invalid_signature", "Webhook signature verification failed: " + err.Error()),
-		})
-		return
-	}
-
-	var stripeEvent struct {
-		Type string `json:"type"`
-		Data struct {
-			Object map[string]interface{} `json:"object"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &stripeEvent); err != nil {
-		writeJSON(w, http.StatusBadRequest, Envelope{
-			OK:     false,
-			Status: "error",
-			Error:  issue("invalid_json", "Could not parse Stripe event JSON."),
-		})
-		return
-	}
-
-	ctx := r.Context()
-	switch stripeEvent.Type {
-	case "customer.subscription.created", "customer.subscription.updated":
-		obj := stripeEvent.Data.Object
-		customerID, _ := obj["customer"].(string)
-		subscriptionID, _ := obj["id"].(string)
-		status, _ := obj["status"].(string)
-
-		if customerID == "" {
-			writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("invalid_data", "Missing customer ID in event.")})
-			return
-		}
-
-		tenant, err := h.Repo.GetTenantByStripeCustomerID(ctx, customerID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("db_error", err.Error())})
-			return
-		}
-		if tenant == nil {
-			writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "ignored", Data: "No tenant found for customer ID"})
-			return
-		}
-
-		tenant.StripeSubscriptionID = subscriptionID
-		if status == "active" || status == "trialing" {
-			tenant.Tier = "premium"
-			tenant.UsageLimitUSD = 100.0
-		} else {
-			tenant.Tier = "free"
-			tenant.UsageLimitUSD = 10.0
-		}
-		tenant.UpdatedAt = time.Now().UTC()
-
-		if err := h.Repo.UpsertTenant(ctx, *tenant); err != nil {
-			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("db_error", err.Error())})
-			return
-		}
-
-	case "customer.subscription.deleted":
-		obj := stripeEvent.Data.Object
-		customerID, _ := obj["customer"].(string)
-
-		if customerID == "" {
-			writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("invalid_data", "Missing customer ID in event.")})
-			return
-		}
-
-		tenant, err := h.Repo.GetTenantByStripeCustomerID(ctx, customerID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("db_error", err.Error())})
-			return
-		}
-		if tenant == nil {
-			writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "ignored", Data: "No tenant found for customer ID"})
-			return
-		}
-
-		tenant.StripeSubscriptionID = ""
-		tenant.Tier = "free"
-		tenant.UsageLimitUSD = 10.0
-		tenant.UpdatedAt = time.Now().UTC()
-
-		if err := h.Repo.UpsertTenant(ctx, *tenant); err != nil {
-			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("db_error", err.Error())})
-			return
-		}
-	}
-
-	writeJSON(w, http.StatusOK, Envelope{
-		OK:     true,
-		Status: "success",
+	writeJSON(w, http.StatusNotImplemented, Envelope{
+		OK:     false,
+		Status: "not_configured",
+		Error: issue(
+			"webhook_runtime_boundary",
+			"Stripe webhooks are handled by the Next.js Node runtime route at /api/stripe/webhook so raw-body verification is preserved.",
+		),
 	})
 }

@@ -507,6 +507,14 @@ func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string
 }
 
 func (s *ExecutionService) ensureTenant(ctx context.Context, tenantID string) error {
+	existing, err := s.repo.GetTenant(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+
 	now := s.now().UTC()
 	return s.repo.UpsertTenant(ctx, domain.Tenant{
 		TenantID:      tenantID,
