@@ -1,0 +1,3 @@
+🎯 **What:** Added a missing test suite for the anomaly detector to verify deterministic threshold calculation and signal detection.
+📊 **Coverage:** Covered all scenario branches in `Detect` (unknown model pricing, spend spikes, token spikes, velocity spikes, latency spikes, repeated failed outputs, and high cost per accepted output), as well as a test for `DefaultThresholds`.
+✨ **Result:** Enhanced test coverage and ensured anomaly detection logic is reliable and safe to refactor.

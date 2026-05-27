@@ -9,13 +9,13 @@ import (
 
 func TestCalculateKnownModelUsesInternalPricing(t *testing.T) {
 	registry := LoadRegistry(context.Background(), RegistryConfig{})
-	result := registry.Calculate(domain.TokenEvent{
+	result := registry.Calculate(context.Background(), domain.TokenEvent{
 		Provider:     "demo",
 		ModelID:      "efficient-model",
 		InputTokens:  1_000_000,
 		OutputTokens: 1_000_000,
 		CachedTokens: 100_000,
-	})
+	}, nil)
 
 	if result.Status != StatusPriced {
 		t.Fatalf("expected priced result, got %s", result.Status)
@@ -30,12 +30,12 @@ func TestCalculateKnownModelUsesInternalPricing(t *testing.T) {
 
 func TestCalculateUnknownModelDegrades(t *testing.T) {
 	registry := LoadRegistry(context.Background(), RegistryConfig{DisableDefaults: true})
-	result := registry.Calculate(domain.TokenEvent{
+	result := registry.Calculate(context.Background(), domain.TokenEvent{
 		Provider:     "unknown",
 		ModelID:      "unknown-model",
 		InputTokens:  100,
 		OutputTokens: 50,
-	})
+	}, nil)
 
 	if result.Status != StatusDegraded {
 		t.Fatalf("expected degraded result, got %s", result.Status)
@@ -53,12 +53,12 @@ func TestPricingEnvOverride(t *testing.T) {
 		DisableDefaults: true,
 		PricingJSON:     `{"custom:model-a":{"inputPerMillion":2,"outputPerMillion":4,"currency":"USD"}}`,
 	})
-	result := registry.Calculate(domain.TokenEvent{
+	result := registry.Calculate(context.Background(), domain.TokenEvent{
 		Provider:     "custom",
 		ModelID:      "model-a",
 		InputTokens:  500_000,
 		OutputTokens: 250_000,
-	})
+	}, nil)
 
 	if result.CostEstimateUSD == nil || *result.CostEstimateUSD != 2 {
 		t.Fatalf("expected override cost 2 USD, got %#v", result.CostEstimateUSD)
