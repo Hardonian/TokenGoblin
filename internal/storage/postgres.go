@@ -150,32 +150,9 @@ func (r *PostgresRepository) SetPricingOverride(ctx context.Context, tenantID st
 	return wrapDBErr(err)
 }
 
-func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, `DELETE FROM token_events WHERE tenant_id = $1`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM tenant_pricing_overrides WHERE tenant_id = $1`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM api_keys WHERE tenant_id = $1`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-
-	return wrapDBErr(tx.Commit(ctx))
-}
-
 func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
-	res, err := r.pool.Exec(ctx, `DELETE FROM token_events WHERE created_at < $1`, cutoff)
+	res, err := r.pool.Exec(ctx, `DELETE FROM token_usage_events WHERE created_at < $1`, cutoff)
 	if err != nil {
 		return 0, wrapDBErr(err)
 	}

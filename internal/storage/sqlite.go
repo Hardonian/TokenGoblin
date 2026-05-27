@@ -316,28 +316,6 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	return wrapDBErr(err)
 }
 
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, `DELETE FROM token_events WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM tenant_pricing_overrides WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM api_keys WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-
-	return wrapDBErr(tx.Commit())
-}
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.db.ExecContext(ctx, `
