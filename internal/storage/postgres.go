@@ -67,6 +67,39 @@ func (r *PostgresRepository) UpsertTenant(ctx context.Context, tenant domain.Ten
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, key.CreatedAt, key.LastUsedAt, key.IsRevoked)
+	return wrapDBErr(err)
+}
+
+func (r *PostgresRepository) GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error) {
+	var key domain.APIKey
+	err := r.pool.QueryRow(ctx, `
+		SELECT key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked
+		FROM api_keys
+		WHERE key_id = $1
+	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.CreatedAt, &key.LastUsedAt, &key.IsRevoked)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	return &key, nil
+}
+
+func (r *PostgresRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE api_keys
+		SET last_used_at = $1
+		WHERE key_id = $2
+	`, time.Now().UTC(), keyID)
+	return wrapDBErr(err)
+}
+
 func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -146,9 +179,9 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
-			review_score, occurred_at, created_at, tags_json
+			review_score, occurred_at, created_at, tags_json, idempotency_key
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = EXCLUDED.worker_id,
 			worker_name = EXCLUDED.worker_name,
@@ -174,14 +207,15 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			output_status = EXCLUDED.output_status,
 			review_score = EXCLUDED.review_score,
 			occurred_at = EXCLUDED.occurred_at,
-			tags_json = EXCLUDED.tags_json
+			tags_json = EXCLUDED.tags_json,
+			idempotency_key = EXCLUDED.idempotency_key
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
 		nullString(event.SessionID), nullString(event.RunID), event.Provider, event.ModelID,
 		event.PromptTokens, event.CompletionTokens, event.CachedTokens, event.InputTokens,
 		event.OutputTokens, event.TotalTokens, event.CostEstimateUSD, event.CostCurrency,
 		event.CostIsDegraded, nullString(event.CostDegradedCode), externalCost,
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
-		event.ReviewScore, event.Timestamp, now, tagsJSON)
+		event.ReviewScore, event.Timestamp, now, tagsJSON, nullString(event.IdempotencyKey))
 	if err != nil {
 		return wrapDBErr(err)
 	}
@@ -365,7 +399,7 @@ const tokenEventSelectPostgres = `
 		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 		cost_is_degraded, cost_degraded_code, external_estimate_usd,
 		external_estimate_currency, latency_ms, task_category, output_status,
-		review_score, occurred_at, created_at, tags_json
+		review_score, occurred_at, created_at, tags_json, idempotency_key
 	FROM token_usage_events
 `
 
@@ -373,14 +407,14 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, tags *string
+		var jobID, sessionID, runID, costCode, externalCurrency, tags, idempotencyKey *string
 		var externalCost *float64
 		if err := rows.Scan(&event.TenantID, &event.EventID, &event.WorkerID, &event.WorkerName,
 			&jobID, &sessionID, &runID, &event.Provider, &event.ModelID, &event.PromptTokens,
 			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
 			&event.TotalTokens, &event.CostEstimateUSD, &event.CostCurrency, &event.CostIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
-			&event.OutputStatus, &event.ReviewScore, &event.Timestamp, &event.CreatedAt, &tags); err != nil {
+			&event.OutputStatus, &event.ReviewScore, &event.Timestamp, &event.CreatedAt, &tags, &idempotencyKey); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		if jobID != nil {
@@ -406,6 +440,9 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 		}
 		if tags != nil && *tags != "" {
 			_ = json.Unmarshal([]byte(*tags), &event.Tags)
+		}
+		if idempotencyKey != nil {
+			event.IdempotencyKey = *idempotencyKey
 		}
 		events = append(events, event)
 	}

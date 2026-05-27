@@ -118,12 +118,25 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			occurred_at TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			tags_json TEXT,
+			idempotency_key TEXT,
 			PRIMARY KEY (tenant_id, event_id),
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
 			FOREIGN KEY (tenant_id, worker_id) REFERENCES workers(tenant_id, worker_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_occurred ON token_usage_events (tenant_id, occurred_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_worker ON token_usage_events (tenant_id, worker_id);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_idempotency ON token_usage_events(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`,
+		`CREATE TABLE IF NOT EXISTS api_keys (
+			key_id TEXT PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			key_hash TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			last_used_at TEXT,
+			is_revoked INTEGER NOT NULL DEFAULT 0,
+			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);`,
 		`CREATE TABLE IF NOT EXISTS cost_snapshots (
 			tenant_id TEXT NOT NULL,
 			snapshot_id TEXT NOT NULL,
@@ -192,6 +205,48 @@ func (r *SQLiteRepository) UpsertTenant(ctx context.Context, tenant domain.Tenan
 			name = excluded.name,
 			updated_at = excluded.updated_at
 	`, tenant.TenantID, tenant.Name, formatTime(tenant.CreatedAt), formatTime(tenant.UpdatedAt))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, key.KeyID, key.TenantID, key.Name, key.KeyHash, formatTime(key.CreatedAt), timePtrString(key.LastUsedAt), boolInt(key.IsRevoked))
+	return wrapDBErr(err)
+}
+
+func (r *SQLiteRepository) GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error) {
+	var key domain.APIKey
+	var createdAt string
+	var lastUsedAt sql.NullString
+	var isRevoked int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked
+		FROM api_keys
+		WHERE key_id = ?
+	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &createdAt, &lastUsedAt, &isRevoked)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	key.CreatedAt = parseTime(createdAt)
+	if lastUsedAt.Valid {
+		parsed := parseTime(lastUsedAt.String)
+		key.LastUsedAt = &parsed
+	}
+	key.IsRevoked = isRevoked == 1
+	return &key, nil
+}
+
+func (r *SQLiteRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE api_keys
+		SET last_used_at = ?
+		WHERE key_id = ?
+	`, formatTime(time.Now().UTC()), keyID)
 	return wrapDBErr(err)
 }
 
@@ -274,9 +329,9 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
-			review_score, occurred_at, created_at, tags_json
+			review_score, occurred_at, created_at, tags_json, idempotency_key
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = excluded.worker_id,
 			worker_name = excluded.worker_name,
@@ -302,14 +357,15 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			output_status = excluded.output_status,
 			review_score = excluded.review_score,
 			occurred_at = excluded.occurred_at,
-			tags_json = excluded.tags_json
+			tags_json = excluded.tags_json,
+			idempotency_key = excluded.idempotency_key
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
 		nullString(event.SessionID), nullString(event.RunID), event.Provider, event.ModelID,
 		event.PromptTokens, event.CompletionTokens, event.CachedTokens, event.InputTokens,
 		event.OutputTokens, event.TotalTokens, event.CostEstimateUSD, event.CostCurrency,
 		boolInt(event.CostIsDegraded), nullString(event.CostDegradedCode), externalCost,
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
-		event.ReviewScore, formatTime(event.Timestamp), formatTime(now), tagsJSON)
+		event.ReviewScore, formatTime(event.Timestamp), formatTime(now), tagsJSON, nullString(event.IdempotencyKey))
 	if err != nil {
 		return wrapDBErr(err)
 	}
@@ -505,7 +561,7 @@ const tokenEventSelect = `
 		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
 		cost_is_degraded, cost_degraded_code, external_estimate_usd,
 		external_estimate_currency, latency_ms, task_category, output_status,
-		review_score, occurred_at, created_at, tags_json
+		review_score, occurred_at, created_at, tags_json, idempotency_key
 	FROM token_usage_events
 `
 
@@ -513,7 +569,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, tags sql.NullString
+		var jobID, sessionID, runID, costCode, externalCurrency, tags, idempotencyKey sql.NullString
 		var cost, externalCost, reviewScore sql.NullFloat64
 		var costIsDegraded int
 		var occurredAt, createdAt string
@@ -522,7 +578,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
 			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
-			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &tags); err != nil {
+			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &tags, &idempotencyKey); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		event.JobID = jobID.String
@@ -547,6 +603,9 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 		}
 		if tags.Valid && tags.String != "" {
 			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
+		}
+		if idempotencyKey.Valid {
+			event.IdempotencyKey = idempotencyKey.String
 		}
 		events = append(events, event)
 	}

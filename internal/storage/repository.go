@@ -13,6 +13,9 @@ var ErrUnavailable = errors.New("database unavailable")
 // Repository defines the persistent schema surface used by the execution layer.
 type Repository interface {
 	UpsertTenant(ctx context.Context, tenant domain.Tenant) error
+	SaveAPIKey(ctx context.Context, key domain.APIKey) error
+	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
+	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
@@ -40,6 +43,18 @@ func (r *UnavailableRepository) err() error {
 }
 
 func (r *UnavailableRepository) UpsertTenant(context.Context, domain.Tenant) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) SaveAPIKey(context.Context, domain.APIKey) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) GetAPIKey(context.Context, string) (*domain.APIKey, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) UpdateAPIKeyLastUsed(context.Context, string) error {
 	return r.err()
 }
 

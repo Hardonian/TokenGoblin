@@ -49,4 +49,5 @@ type TokenEvent struct {
 	OutputStatus     OutputStatus      `json:"output_status"`
 	ReviewScore      *float64          `json:"review_score,omitempty"`
 	Tags             map[string]string `json:"tags,omitempty"`
+	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
 }
