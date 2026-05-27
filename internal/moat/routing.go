@@ -16,7 +16,8 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 
 	modelStatsByCategory := make(map[string]map[string]*stats)
 
-	for _, event := range events {
+	for i := range events {
+		event := &events[i] // Use pointer to avoid copying struct
 		if event.TaskCategory == "" || event.ModelID == "" || event.CostEstimateUSD == nil {
 			continue
 		}
@@ -24,20 +25,20 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 			continue
 		}
 
-		catMap, ok := modelStatsByCategory[event.TaskCategory]
-		if !ok {
+		catMap := modelStatsByCategory[event.TaskCategory]
+		if catMap == nil {
 			catMap = make(map[string]*stats)
 			modelStatsByCategory[event.TaskCategory] = catMap
 		}
 
-		st, ok := catMap[event.ModelID]
-		if !ok {
-			st = &stats{}
-			catMap[event.ModelID] = st
+		stat := catMap[event.ModelID]
+		if stat == nil {
+			stat = &stats{}
+			catMap[event.ModelID] = stat
 		}
 
-		st.AcceptedCount++
-		st.TotalCost += *event.CostEstimateUSD
+		stat.AcceptedCount++
+		stat.TotalCost += *event.CostEstimateUSD
 	}
 
 	for category, models := range modelStatsByCategory {
