@@ -2,7 +2,6 @@ package moat
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"

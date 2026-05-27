@@ -2,7 +2,6 @@ package moat
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/go-redis/redis_rate/v10"
