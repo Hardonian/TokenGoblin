@@ -115,6 +115,7 @@ Implemented:
 - Stripe subscription lifecycle updates for tenant tier, quota, customer ID, and subscription ID.
 - Production startup checks that require Postgres DSN/internal webhook secret and disable demo tenant auth.
 - Supabase/Postgres RLS migration pack using `app.tenant_id` for tenant-scoped tables and deny-by-default API key access.
+- Postgres startup verification that required tenant tables have RLS enabled after migrations.
 
 Partially implemented:
 

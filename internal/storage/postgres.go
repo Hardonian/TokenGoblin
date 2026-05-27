@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
@@ -53,8 +54,44 @@ func OpenPostgres(ctx context.Context, dsn string) (*PostgresRepository, error) 
 	if err := pool.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("%w: ping postgres: %v", ErrUnavailable, err)
 	}
+	if err := verifyPostgresRLS(ctx, pool); err != nil {
+		pool.Close()
+		return nil, err
+	}
 
 	return &PostgresRepository{pool: pool}, nil
+}
+
+func verifyPostgresRLS(ctx context.Context, pool *pgxpool.Pool) error {
+	tables := []string{
+		"tenants",
+		"workers",
+		"jobs",
+		"token_usage_events",
+		"cost_snapshots",
+		"anomaly_signals",
+		"productivity_summaries",
+		"tenant_pricing_overrides",
+		"output_analyses",
+		"tenant_members",
+		"audit_events",
+		"recommendation_states",
+		"api_keys",
+	}
+	var missing []string
+	for _, table := range tables {
+		var enabled bool
+		if err := pool.QueryRow(ctx, `SELECT COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass($1)), false)`, table).Scan(&enabled); err != nil {
+			return fmt.Errorf("%w: verify postgres rls for %s: %v", ErrUnavailable, table, err)
+		}
+		if !enabled {
+			missing = append(missing, table)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: postgres row level security is not enabled for: %s", ErrUnavailable, strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func (r *PostgresRepository) Close() error {
