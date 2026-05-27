@@ -159,6 +159,12 @@ func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays 
 	return res.RowsAffected(), nil
 }
 
+func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID)
+	return wrapDBErr(err)
+}
+
+
 func (r *PostgresRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO api_keys (key_id, tenant_id, name, key_hash, created_at, last_used_at, is_revoked)

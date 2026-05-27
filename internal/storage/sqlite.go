@@ -770,3 +770,9 @@ func wrapDBErr(err error) error {
 func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
 	return 0, nil
 }
+
+func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
+	return wrapDBErr(err)
+}
+
