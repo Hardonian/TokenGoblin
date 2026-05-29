@@ -17,7 +17,9 @@
 *.exe
 
 # local data
-/data
+/data/*
+!/data/migrations/
+!/data/migrations/*.sql
 
 # misc
 .DS_Store

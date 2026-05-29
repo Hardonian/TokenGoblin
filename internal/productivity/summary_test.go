@@ -58,6 +58,9 @@ func TestBuildSummaryGroupsCostAndDegradedUnknownPricing(t *testing.T) {
 	if summary.TotalEvents != 3 {
 		t.Fatalf("expected 3 events, got %d", summary.TotalEvents)
 	}
+	if summary.TotalOutputTokens != 0 {
+		t.Fatalf("expected zero output tokens when fixtures omit output_tokens, got %d", summary.TotalOutputTokens)
+	}
 	if summary.TotalCostUSD != 6 {
 		t.Fatalf("expected total cost 6, got %.2f", summary.TotalCostUSD)
 	}

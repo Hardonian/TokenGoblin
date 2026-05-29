@@ -40,6 +40,7 @@ func GenerateAPIKey(tenantID, name string) (domain.APIKey, string, error) {
 		TenantID:  tenantID,
 		Name:      name,
 		KeyHash:   string(hashed),
+		Role:      domain.RoleAdmin,
 		CreatedAt: time.Now().UTC(),
 		IsRevoked: false,
 	}

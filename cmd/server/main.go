@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/api"
 	"github.com/Hardonian/TokenGoblin/internal/billing"
+	"github.com/Hardonian/TokenGoblin/internal/config"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/moat"
@@ -55,6 +60,11 @@ func main() {
 	}
 
 	ctx := context.Background()
+
+	if err := config.ValidateServerEnv(); err != nil {
+		slog.Error("unsafe production configuration", "error", err)
+		os.Exit(1)
+	}
 
 	// 3. Storage Initialization (Postgres or SQLite fallback)
 	var repo storage.Repository
@@ -110,8 +120,35 @@ func main() {
 	}
 
 	slog.Info("TokenGoblin execution layer starting", "addr", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		slog.Error("server failed to start", "error", err)
+
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server failed to start", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down gracefully...")
+
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctxShutdown); err != nil {
+		slog.Error("server shutdown failed", "error", err)
 		os.Exit(1)
 	}
+
+	slog.Info("server exited gracefully")
 }

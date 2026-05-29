@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/analysis"
 	"github.com/Hardonian/TokenGoblin/internal/anomaly"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
@@ -28,8 +29,15 @@ type Service interface {
 	Anomalies(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
 	RecentEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	RecentEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
+	OutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
+	WorkerReview(ctx context.Context, tenantID, workerID string) (domain.WorkerReview, error)
 	Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error)
+	SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error)
+	AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error)
+	TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
+	UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
 	DeleteTenantData(ctx context.Context, tenantID string) error
 }
 
@@ -84,12 +92,9 @@ func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.T
 }
 
 func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domain.TokenEvent) error {
-	// Calculate cost synchronously since it is purely in-memory (or fetched from DB)
-	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
-	normalized.CostEstimateUSD = costResult.CostEstimateUSD
-	normalized.CostCurrency = costResult.Currency
-	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
-	normalized.CostDegradedCode = costResult.DegradedCode
+	if normalized.CostEstimateUSD == nil && !normalized.CostIsDegraded && normalized.CostDegradedCode == "" {
+		normalized = applyCostResult(normalized, s.pricing.Calculate(ctx, normalized, s.repo))
+	}
 
 	prior, err := s.repo.ListTokenEventsBefore(ctx, normalized.TenantID, normalized.Timestamp, 100)
 	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
@@ -115,9 +120,14 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 		CreatedAt:       normalized.CreatedAt,
 	}
 
-	signals := anomaly.Detect(normalized, prior, s.now(), s.thresholds)
+	now := s.now()
+	signals := anomaly.Detect(normalized, prior, now, s.thresholds)
 
 	if err := s.repo.SaveTokenEvent(ctx, normalized); err != nil {
+		return err
+	}
+	outputAnalysis := analysis.Analyze(normalized, now)
+	if err := s.repo.SaveOutputAnalysis(ctx, outputAnalysis); err != nil {
 		return err
 	}
 	if err := s.repo.SaveCostSnapshot(ctx, snapshot); err != nil {
@@ -166,10 +176,7 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 	}
 
 	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
-	normalized.CostEstimateUSD = costResult.CostEstimateUSD
-	normalized.CostCurrency = costResult.Currency
-	normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
-	normalized.CostDegradedCode = costResult.DegradedCode
+	normalized = applyCostResult(normalized, costResult)
 
 	select {
 	case s.eventQueue <- normalized:
@@ -207,21 +214,56 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 	// A simple approach is just calling the single item method for each item
 	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
 	for _, event := range events {
-		res, err := s.IngestTokenEvent(ctx, tenantID, event)
+		normalized, warnings, err := s.normalize(tenantID, event)
 		if err != nil {
 			var validationErr ValidationError
 			if errors.As(err, &validationErr) {
 				// We can return a result with error status instead of failing the whole batch
-				res.Event = event
-				res.Degraded = append(res.Degraded, validationErr.Issues...)
-				res.Warnings = append(res.Warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."})
+				res := domain.IngestionResult{
+					Event:    event,
+					Warnings: append(warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."}),
+					Degraded: validationErr.Issues,
+				}
+				results = append(results, res)
+				continue
 			} else {
 				// For structural errors (queue full), we might fail the whole batch
 				return nil, err
 			}
 		}
+
+		costResult := s.pricing.Calculate(ctx, normalized, s.repo)
+		normalized.CostEstimateUSD = costResult.CostEstimateUSD
+		normalized.CostCurrency = costResult.Currency
+		normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
+		normalized.CostDegradedCode = costResult.DegradedCode
+
+		select {
+		case s.eventQueue <- normalized:
+			// Buffered successfully
+		default:
+			// Queue is full, return error
+			return nil, errors.New("ingestion buffer full")
+		}
+
+		res := domain.IngestionResult{
+			Event:    normalized,
+			Warnings: append(warnings, s.pricing.Diagnostics()...),
+		}
+		if normalized.CostIsDegraded {
+			res.Degraded = append(res.Degraded, domain.Issue{
+				Code:    normalized.CostDegradedCode,
+				Message: "Internal cost estimate is unavailable for this provider/model.",
+			})
+		}
+		res.Degraded = append(res.Degraded, domain.Issue{
+			Code:    "buffered",
+			Message: "Event buffered for asynchronous processing.",
+		})
+
 		results = append(results, res)
 	}
+
 	return results, nil
 }
 
@@ -273,6 +315,77 @@ func (s *ExecutionService) RecentEventsBefore(ctx context.Context, tenantID stri
 	return s.repo.ListTokenEventsBefore(ctx, tenantID, before, limit)
 }
 
+func (s *ExecutionService) OutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListOutputAnalyses(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) WorkerReview(ctx context.Context, tenantID, workerID string) (domain.WorkerReview, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.WorkerReview{}, err
+	}
+	workerID = strings.TrimSpace(workerID)
+	if workerID == "" {
+		return domain.WorkerReview{}, ValidationError{Issues: []domain.Issue{{
+			Code:    "required",
+			Message: "worker_id is required.",
+			Field:   "worker_id",
+		}}}
+	}
+	workers, err := s.Workers(ctx, tenantID)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	review := domain.WorkerReview{
+		WasteSignals:           []domain.AnalysisIssue{},
+		RecommendedConstraints: []string{},
+	}
+	found := false
+	for _, worker := range workers {
+		if worker.WorkerID == workerID {
+			review.Worker = worker
+			found = true
+			break
+		}
+	}
+	if !found {
+		review.Worker = domain.WorkerBreakdown{WorkerID: workerID, WorkerName: workerID}
+		review.Degraded = append(review.Degraded, domain.Issue{Code: "no_data", Message: "No usage exists for this worker."})
+		return review, nil
+	}
+
+	events, err := s.repo.ListTokenEvents(ctx, tenantID, 500)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	for i := range events {
+		if events[i].WorkerID == workerID {
+			review.LatestOutput = &events[i]
+			break
+		}
+	}
+	analyses, err := s.repo.ListOutputAnalysesByWorker(ctx, tenantID, workerID, 25)
+	if err != nil {
+		return domain.WorkerReview{}, err
+	}
+	if len(analyses) > 0 {
+		review.LatestAnalysis = &analyses[0]
+		for _, item := range analyses {
+			review.WasteSignals = append(review.WasteSignals, item.Issues...)
+			review.RecommendedConstraints = append(review.RecommendedConstraints, item.Recommendations...)
+		}
+		review.RecommendedConstraints = dedupeStrings(review.RecommendedConstraints)
+		if len(review.WasteSignals) > 8 {
+			review.WasteSignals = review.WasteSignals[:8]
+		}
+	} else {
+		review.Degraded = append(review.Degraded, domain.Issue{Code: "analysis_pending", Message: "No persisted output analysis exists for this worker yet."})
+	}
+	return review, nil
+}
+
 func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string) ([]domain.RoutingRecommendation, error) {
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
@@ -292,7 +405,44 @@ func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID stri
 	if err := validateTenantID(tenantID); err != nil {
 		return err
 	}
+	if err := s.ensureTenant(ctx, tenantID); err != nil {
+		return err
+	}
 	return s.repo.SetPricingOverride(ctx, tenantID, point)
+}
+
+func (s *ExecutionService) GetActivePricing(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+
+	overrides, err := s.repo.ListPricingOverrides(ctx, tenantID)
+	if err != nil && !errors.Is(err, storage.ErrUnavailable) {
+		return nil, err
+	}
+
+	overrideMap := make(map[string]domain.PricePoint)
+	for _, o := range overrides {
+		key := strings.ToLower(o.Provider) + ":" + strings.ToLower(o.ModelID)
+		overrideMap[key] = o
+	}
+
+	var active []domain.PricePoint
+	for _, dp := range cost.DefaultPrices() {
+		key := strings.ToLower(dp.Provider) + ":" + strings.ToLower(dp.ModelID)
+		if over, ok := overrideMap[key]; ok {
+			active = append(active, over)
+			delete(overrideMap, key)
+		} else {
+			active = append(active, dp)
+		}
+	}
+
+	for _, over := range overrideMap {
+		active = append(active, over)
+	}
+
+	return active, nil
 }
 
 func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string) error {
@@ -300,6 +450,26 @@ func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string
 		return err
 	}
 	return s.repo.DeleteTenantData(ctx, tenantID)
+}
+
+func (s *ExecutionService) ensureTenant(ctx context.Context, tenantID string) error {
+	existing, err := s.repo.GetTenant(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+
+	now := s.now().UTC()
+	return s.repo.UpsertTenant(ctx, domain.Tenant{
+		TenantID:      tenantID,
+		Name:          tenantID,
+		Tier:          "free",
+		UsageLimitUSD: 10,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	})
 }
 
 func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (domain.TokenEvent, []domain.Issue, error) {
@@ -319,6 +489,10 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 	event.WorkerName = strings.TrimSpace(event.WorkerName)
 	event.TaskCategory = strings.TrimSpace(event.TaskCategory)
 	event.TaskType = strings.TrimSpace(event.TaskType)
+	event.PromptExcerpt = truncate(strings.TrimSpace(event.PromptExcerpt), 4000)
+	event.OutputExcerpt = truncate(strings.TrimSpace(event.OutputExcerpt), 4000)
+	event.PromptReference = truncate(strings.TrimSpace(event.PromptReference), 512)
+	event.OutputReference = truncate(strings.TrimSpace(event.OutputReference), 512)
 
 	if event.EventID == "" {
 		event.EventID = "evt_" + randomHex(12)
@@ -379,16 +553,17 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 
 func validateEvent(event domain.TokenEvent) []domain.Issue {
 	var issues []domain.Issue
-	required := map[string]string{
-		"event_id":  event.EventID,
-		"worker_id": event.WorkerID,
-		"provider":  event.Provider,
-		"model_id":  event.ModelID,
+	if strings.TrimSpace(event.EventID) == "" {
+		issues = append(issues, requiredIssue("event_id"))
 	}
-	for field, value := range required {
-		if strings.TrimSpace(value) == "" {
-			issues = append(issues, domain.Issue{Code: "required", Message: field + " is required.", Field: field})
-		}
+	if strings.TrimSpace(event.WorkerID) == "" {
+		issues = append(issues, requiredIssue("worker_id"))
+	}
+	if strings.TrimSpace(event.Provider) == "" {
+		issues = append(issues, requiredIssue("provider"))
+	}
+	if strings.TrimSpace(event.ModelID) == "" {
+		issues = append(issues, requiredIssue("model_id"))
 	}
 	if event.InputTokens < 0 || event.OutputTokens < 0 || event.PromptTokens < 0 || event.CompletionTokens < 0 || event.CachedTokens < 0 {
 		issues = append(issues, domain.Issue{Code: "invalid_tokens", Message: "Token counts must be non-negative.", Field: "tokens"})
@@ -411,12 +586,50 @@ func validateEvent(event domain.TokenEvent) []domain.Issue {
 	return issues
 }
 
+func applyCostResult(event domain.TokenEvent, result domain.CostResult) domain.TokenEvent {
+	event.CostEstimateUSD = result.CostEstimateUSD
+	event.CostCurrency = result.Currency
+	event.CostIsDegraded = result.Status == cost.StatusDegraded
+	event.CostDegradedCode = result.DegradedCode
+	return event
+}
+
+func requiredIssue(field string) domain.Issue {
+	return domain.Issue{Code: "required", Message: field + " is required.", Field: field}
+}
+
 func validOutputStatus(status domain.OutputStatus) bool {
 	switch status {
 	case domain.OutputAccepted, domain.OutputSucceeded, domain.OutputFailed, domain.OutputRejected, domain.OutputPending:
 		return true
 	default:
 		return false
+	}
+}
+
+func validRecommendationStatus(status string) bool {
+	switch status {
+	case "open", "accepted", "rejected", "implemented":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeRole(role string) string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case domain.RoleOwner:
+		return domain.RoleOwner
+	case domain.RoleAdmin:
+		return domain.RoleAdmin
+	case domain.RoleAnalyst:
+		return domain.RoleAnalyst
+	case domain.RoleIngest:
+		return domain.RoleIngest
+	case domain.RoleViewer:
+		return domain.RoleViewer
+	default:
+		return domain.RoleViewer
 	}
 }
 
@@ -471,4 +684,25 @@ func randomHex(bytes int) string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buffer)
+}
+
+func truncate(value string, max int) string {
+	if len(value) <= max {
+		return value
+	}
+	return value[:max]
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	var result []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }

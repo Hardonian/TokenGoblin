@@ -21,14 +21,20 @@ type Repository interface {
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
 	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error
+	UpsertTenantMember(ctx context.Context, member domain.TenantMember) error
+	ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
+	SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error
+	ListAuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error)
+	SetRecommendationState(ctx context.Context, state domain.RecommendationState) error
+	ListRecommendationStates(ctx context.Context, tenantID string) ([]domain.RecommendationState, error)
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
+	SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error
 	SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
-	DeleteTenantData(ctx context.Context, tenantID string) error
 	Close() error
 }
 
@@ -67,6 +73,10 @@ func (r *UnavailableRepository) SetPricingOverride(ctx context.Context, tenantID
 	return r.err()
 }
 
+func (r *UnavailableRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	return nil, r.err()
+}
+
 func (r *UnavailableRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
 	return r.err()
 }
@@ -87,6 +97,30 @@ func (r *UnavailableRepository) UpdateAPIKeyLastUsed(context.Context, string) er
 	return r.err()
 }
 
+func (r *UnavailableRepository) UpsertTenantMember(context.Context, domain.TenantMember) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListTenantMembers(context.Context, string) ([]domain.TenantMember, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) SaveAuditEvent(context.Context, domain.AuditEvent) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListAuditEvents(context.Context, string, int) ([]domain.AuditEvent, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) SetRecommendationState(context.Context, domain.RecommendationState) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListRecommendationStates(context.Context, string) ([]domain.RecommendationState, error) {
+	return nil, r.err()
+}
+
 func (r *UnavailableRepository) SaveTokenEvent(context.Context, domain.TokenEvent) error {
 	return r.err()
 }
@@ -96,6 +130,10 @@ func (r *UnavailableRepository) SaveCostSnapshot(context.Context, domain.CostSna
 }
 
 func (r *UnavailableRepository) SaveAnomalySignal(context.Context, domain.AnomalySignal) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) SaveOutputAnalysis(context.Context, domain.OutputAnalysis) error {
 	return r.err()
 }
 

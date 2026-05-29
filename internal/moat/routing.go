@@ -16,7 +16,8 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 
 	modelStatsByCategory := make(map[string]map[string]*stats)
 
-	for _, event := range events {
+	for i := range events {
+		event := &events[i] // Use pointer to avoid copying struct
 		if event.TaskCategory == "" || event.ModelID == "" || event.CostEstimateUSD == nil {
 			continue
 		}
@@ -24,15 +25,20 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 			continue
 		}
 
-		if modelStatsByCategory[event.TaskCategory] == nil {
-			modelStatsByCategory[event.TaskCategory] = make(map[string]*stats)
-		}
-		if modelStatsByCategory[event.TaskCategory][event.ModelID] == nil {
-			modelStatsByCategory[event.TaskCategory][event.ModelID] = &stats{}
+		catMap := modelStatsByCategory[event.TaskCategory]
+		if catMap == nil {
+			catMap = make(map[string]*stats)
+			modelStatsByCategory[event.TaskCategory] = catMap
 		}
 
-		modelStatsByCategory[event.TaskCategory][event.ModelID].AcceptedCount++
-		modelStatsByCategory[event.TaskCategory][event.ModelID].TotalCost += *event.CostEstimateUSD
+		stat := catMap[event.ModelID]
+		if stat == nil {
+			stat = &stats{}
+			catMap[event.ModelID] = stat
+		}
+
+		stat.AcceptedCount++
+		stat.TotalCost += *event.CostEstimateUSD
 	}
 
 	for category, models := range modelStatsByCategory {
@@ -75,12 +81,18 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 			savings := worstTotalCost - projectedCost
 
 			if savings > 0.01 { // Only recommend if savings are notable
+				recID := fmt.Sprintf("rec_%s_%s_%s", category, worstModel, bestModel)
 				recs = append(recs, domain.RoutingRecommendation{
+					RecommendationID:    recID,
 					TaskCategory:        category,
 					CurrentModel:        worstModel,
 					RecommendedModel:    bestModel,
 					EstimatedSavingsUSD: savings,
-					Reason:              fmt.Sprintf("Routing this task to %s instead of %s will save $%.2f with zero latency penalty.", bestModel, worstModel, savings),
+					EvidenceCount:       count,
+					Basis:               "accepted_output_cost_per_task",
+					Confidence:          confidenceFor(count),
+					Status:              "open",
+					Reason:              fmt.Sprintf("Recent accepted outputs for this task cost less on %s than %s; estimated savings are $%.2f for the observed workload.", bestModel, worstModel, savings),
 				})
 			}
 		}
@@ -90,4 +102,14 @@ func RecommendRoutes(events []domain.TokenEvent) []domain.RoutingRecommendation 
 		recs = []domain.RoutingRecommendation{}
 	}
 	return recs
+}
+
+func confidenceFor(count int) string {
+	if count >= 10 {
+		return "high"
+	}
+	if count >= 3 {
+		return "medium"
+	}
+	return "low"
 }
