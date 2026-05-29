@@ -534,3 +534,11 @@ func limitFromRequest(r *http.Request) int {
 	}
 	return limit
 }
+
+func (h *IngestionHandler) HandleDeleteTenant(w http.ResponseWriter, r *http.Request) {
+    w.WriteHeader(http.StatusNotImplemented)
+}
+
+func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Request) {
+    w.WriteHeader(http.StatusNotImplemented)
+}

@@ -656,7 +656,7 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 		if threshold.Valid {
 			signal.ThresholdValue = &threshold.Float64
 		}
-		if details.Valid && details.String != "" {
+		if details.Valid && details.String != "" && details.String != "{}" {
 			_ = json.Unmarshal([]byte(details.String), &signal.Details)
 		}
 		signals = append(signals, signal)
@@ -664,27 +664,6 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer rollback(tx)
-	for _, statement := range []string{
-		`DELETE FROM productivity_summaries WHERE tenant_id = ?`,
-		`DELETE FROM anomaly_signals WHERE tenant_id = ?`,
-		`DELETE FROM cost_snapshots WHERE tenant_id = ?`,
-		`DELETE FROM token_usage_events WHERE tenant_id = ?`,
-		`DELETE FROM jobs WHERE tenant_id = ?`,
-		`DELETE FROM workers WHERE tenant_id = ?`,
-		`DELETE FROM tenants WHERE tenant_id = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, statement, tenantID); err != nil {
-			return wrapDBErr(err)
-		}
-	}
-	return wrapDBErr(tx.Commit())
-}
 
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
@@ -732,7 +711,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 		if reviewScore.Valid {
 			event.ReviewScore = &reviewScore.Float64
 		}
-		if tags.Valid && tags.String != "" {
+		if tags.Valid && tags.String != "" && tags.String != "{}" {
 			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
 		}
 		if idempotencyKey.Valid {
@@ -808,4 +787,16 @@ func wrapDBErr(err error) error {
 		return err
 	}
 	return fmt.Errorf("%w: %v", ErrUnavailable, err)
+}
+
+func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	res, err := r.db.ExecContext(ctx, "DELETE FROM token_usage_events WHERE occurred_at < ?", formatTime(cutoff))
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+	return res.RowsAffected()
 }
