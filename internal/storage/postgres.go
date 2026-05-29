@@ -761,43 +761,7 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
-const outputAnalysisSelectPostgres = `
-	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
-		efficiency_score, goblin_score, issues_json, recommendations_json,
-		evidence_json, degraded_json
-	FROM output_analyses
-`
 
-func scanOutputAnalysesPostgres(rows pgx.Rows) ([]domain.OutputAnalysis, error) {
-	var analyses []domain.OutputAnalysis
-	for rows.Next() {
-		var analysis domain.OutputAnalysis
-		var issuesJSON, recsJSON, evidenceJSON []byte
-		var degradedJSON []byte
-		if err := rows.Scan(&analysis.TenantID, &analysis.AnalysisID, &analysis.EventID,
-			&analysis.WorkerID, &analysis.AnalyzedAt, &analysis.EfficiencyScore, &analysis.GoblinScore,
-			&issuesJSON, &recsJSON, &evidenceJSON, &degradedJSON); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		_ = json.Unmarshal(issuesJSON, &analysis.Issues)
-		_ = json.Unmarshal(recsJSON, &analysis.Recommendations)
-		_ = json.Unmarshal(evidenceJSON, &analysis.Evidence)
-		if len(degradedJSON) > 0 {
-			_ = json.Unmarshal(degradedJSON, &analysis.Degraded)
-		}
-		if analysis.Issues == nil {
-			analysis.Issues = []domain.AnalysisIssue{}
-		}
-		if analysis.Recommendations == nil {
-			analysis.Recommendations = []string{}
-		}
-		if analysis.Evidence == nil {
-			analysis.Evidence = []domain.AnalysisEvidence{}
-		}
-		analyses = append(analyses, analysis)
-	}
-	return analyses, wrapDBErr(rows.Err())
-}
 
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,

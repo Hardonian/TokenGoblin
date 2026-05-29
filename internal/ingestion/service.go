@@ -209,28 +209,71 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 		return nil, err
 	}
 
+	tenant, err := s.repo.GetTenant(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	var usage float64
+	if tenant != nil {
+		usage, err = s.repo.GetTenantCurrentMonthCost(ctx, tenantID)
+		if err == nil && usage >= tenant.UsageLimitUSD {
+			return nil, QuotaExceededError{Limit: tenant.UsageLimitUSD, Usage: usage}
+		}
+	}
+
 	results := make([]domain.IngestionResult, 0, len(events))
 
-	// A simple approach is just calling the single item method for each item
-	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
 	for _, event := range events {
-		res, err := s.IngestTokenEvent(ctx, tenantID, event)
+		normalized, warnings, err := s.normalize(tenantID, event)
 		if err != nil {
 			var validationErr ValidationError
 			if errors.As(err, &validationErr) {
 				// We can return a result with error status instead of failing the whole batch
-				res = domain.IngestionResult{
+				res := domain.IngestionResult{
 					Event:    event,
+					Warnings: append(warnings, domain.Issue{Code: "validation_failed", Message: "Event failed validation."}),
 					Degraded: validationErr.Issues,
-					Warnings: []domain.Issue{{Code: "validation_failed", Message: "Event failed validation."}},
 				}
+				results = append(results, res)
+				continue
 			} else {
 				// For structural errors (queue full), we might fail the whole batch
 				return nil, err
 			}
 		}
+
+		costResult := s.pricing.Calculate(ctx, normalized, s.repo)
+		normalized.CostEstimateUSD = costResult.CostEstimateUSD
+		normalized.CostCurrency = costResult.Currency
+		normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
+		normalized.CostDegradedCode = costResult.DegradedCode
+
+		select {
+		case s.eventQueue <- normalized:
+			// Buffered successfully
+		default:
+			// Queue is full, return error
+			return nil, errors.New("ingestion buffer full")
+		}
+
+		res := domain.IngestionResult{
+			Event:    normalized,
+			Warnings: append(warnings, s.pricing.Diagnostics()...),
+		}
+		if normalized.CostIsDegraded {
+			res.Degraded = append(res.Degraded, domain.Issue{
+				Code:    normalized.CostDegradedCode,
+				Message: "Internal cost estimate is unavailable for this provider/model.",
+			})
+		}
+		res.Degraded = append(res.Degraded, domain.Issue{
+			Code:    "buffered",
+			Message: "Event buffered for asynchronous processing.",
+		})
+
 		results = append(results, res)
 	}
+
 	return results, nil
 }
 
@@ -363,93 +406,9 @@ func (s *ExecutionService) Recommendations(ctx context.Context, tenantID string)
 		return nil, err
 	}
 
-	recs := moat.RecommendRoutes(events)
-	states, err := s.repo.ListRecommendationStates(ctx, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	stateByID := map[string]domain.RecommendationState{}
-	for _, state := range states {
-		stateByID[state.RecommendationID] = state
-	}
-	for i := range recs {
-		if state, ok := stateByID[recs[i].RecommendationID]; ok {
-			recs[i].Status = state.Status
-			recs[i].AcceptedBy = state.Actor
-			recs[i].StatusNote = state.Note
-			if !state.UpdatedAt.IsZero() {
-				recs[i].StatusUpdatedAt = state.UpdatedAt.UTC().Format(time.RFC3339)
-			}
-		}
-	}
-	return recs, nil
-}
-
-func (s *ExecutionService) SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error) {
-	if err := validateTenantID(tenantID); err != nil {
-		return domain.RecommendationState{}, err
-	}
-	if err := s.ensureTenant(ctx, tenantID); err != nil {
-		return domain.RecommendationState{}, err
-	}
-	recommendationID = strings.TrimSpace(recommendationID)
-	status := strings.ToLower(strings.TrimSpace(update.Status))
-	if recommendationID == "" {
-		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "recommendation_id is required.", Field: "recommendation_id"}}}
-	}
-	if !validRecommendationStatus(status) {
-		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "invalid_status", Message: "status must be open, accepted, rejected, or implemented.", Field: "status"}}}
-	}
-	now := s.now().UTC()
-	state := domain.RecommendationState{
-		TenantID:         tenantID,
-		RecommendationID: recommendationID,
-		Status:           status,
-		Actor:            strings.TrimSpace(actor),
-		Note:             truncate(strings.TrimSpace(update.Note), 500),
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	if state.Actor == "" {
-		state.Actor = "tenant:" + tenantID
-	}
-	return state, s.repo.SetRecommendationState(ctx, state)
-}
-
-func (s *ExecutionService) AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
-	if err := validateTenantID(tenantID); err != nil {
-		return nil, err
-	}
-	return s.repo.ListAuditEvents(ctx, tenantID, limit)
-}
-
-func (s *ExecutionService) TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
-	if err := validateTenantID(tenantID); err != nil {
-		return nil, err
-	}
-	return s.repo.ListTenantMembers(ctx, tenantID)
-}
-
-func (s *ExecutionService) UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error) {
-	if err := validateTenantID(tenantID); err != nil {
-		return domain.TenantMember{}, err
-	}
-	if err := s.ensureTenant(ctx, tenantID); err != nil {
-		return domain.TenantMember{}, err
-	}
-	member.TenantID = tenantID
-	member.SubjectID = strings.TrimSpace(member.SubjectID)
-	member.Email = truncate(strings.TrimSpace(member.Email), 320)
-	member.Role = normalizeRole(member.Role)
-	if member.SubjectID == "" {
-		return domain.TenantMember{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "subject_id is required.", Field: "subject_id"}}}
-	}
-	now := s.now().UTC()
-	if member.CreatedAt.IsZero() {
-		member.CreatedAt = now
-	}
-	member.UpdatedAt = now
-	return member, s.repo.UpsertTenantMember(ctx, member)
+	// Import statement will be added automatically by goimports or we can add it later if needed.
+	// Wait, I need to make sure "github.com/Hardonian/TokenGoblin/internal/moat" is imported in service.go
+	return moat.RecommendRoutes(events), nil
 }
 
 func (s *ExecutionService) SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error {

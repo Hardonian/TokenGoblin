@@ -37,12 +37,6 @@ type Repository interface {
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
-	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
-	ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error)
-	SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error
-	GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error)
-	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
-	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
 	Close() error
 }
 
@@ -161,17 +155,7 @@ func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int)
 	return nil, r.err()
 }
 
-func (r *UnavailableRepository) ListOutputAnalyses(context.Context, string, int) ([]domain.OutputAnalysis, error) {
-	return nil, r.err()
-}
 
-func (r *UnavailableRepository) ListOutputAnalysesByWorker(context.Context, string, string, int) ([]domain.OutputAnalysis, error) {
-	return nil, r.err()
-}
-
-func (r *UnavailableRepository) SaveRecommendationDecision(ctx context.Context, tenantID, recID, status string) error {
-	return r.err()
-}
 
 func (r *UnavailableRepository) GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error) {
 	return nil, r.err()

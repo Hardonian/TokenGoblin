@@ -57,12 +57,6 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/dashboard/workers/", wrap(handler.HandleWorkerReview))
 	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))
 
-	mux.Handle("/v1/dashboard/reset", wrapAdmin(handler.HandleResetTenantData))
-	mux.Handle("/api/dashboard/reset", wrapAdmin(handler.HandleResetTenantData))
-
-	mux.Handle("/v1/dashboard/seed", wrapAdmin(handler.HandleSeedDemoData))
-	mux.Handle("/api/dashboard/seed", wrapAdmin(handler.HandleSeedDemoData))
-
 	// Catch-all 404
 	mux.Handle("/v1/dashboard/events", wrap(handler.HandleRecentEvents))
 	mux.Handle("/v1/dashboard/output-analysis", wrap(handler.HandleOutputAnalyses))
