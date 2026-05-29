@@ -193,32 +193,6 @@ func (r *PostgresRepository) SetPricingOverride(ctx context.Context, tenantID st
 	return wrapDBErr(err)
 }
 
-func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
-		FROM tenant_pricing_overrides
-		WHERE tenant_id = $1
-	`, tenantID)
-	if err != nil {
-		return nil, wrapDBErr(err)
-	}
-	defer rows.Close()
-
-	var points []domain.PricePoint
-	for rows.Next() {
-		var point domain.PricePoint
-		var created time.Time
-		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		point.Currency = "USD"
-		point.Source = "override"
-		point.EffectiveFrom = created
-		point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
-		points = append(points, point)
-	}
-	return points, wrapDBErr(rows.Err())
-}
 
 func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
@@ -764,6 +738,21 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 		signals = append(signals, signal)
 	}
 	return signals, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Using ON DELETE CASCADE configured in the schema,
+	// deleting from the tenants table automatically cleans up related records.
+	if _, err := tx.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+	return wrapDBErr(tx.Commit(ctx))
 }
 
 const tokenEventSelectPostgres = `

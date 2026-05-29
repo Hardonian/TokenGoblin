@@ -446,6 +446,7 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	return wrapDBErr(err)
 }
 
+
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	role := normalizeRole(key.Role)
 	_, err := r.db.ExecContext(ctx, `
@@ -999,6 +1000,21 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
+func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer rollback(tx)
+
+	// Using ON DELETE CASCADE configured in the schema,
+	// deleting from the tenants table automatically cleans up related records.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID); err != nil {
+		return wrapDBErr(err)
+	}
+	return wrapDBErr(tx.Commit())
+}
+
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -1139,5 +1155,12 @@ func wrapDBErr(err error) error {
 }
 
 func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
-	return 0, nil
+	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
+
+	res, err := r.db.ExecContext(ctx, `DELETE FROM token_usage_events WHERE occurred_at < ?`, formatTime(cutoff))
+	if err != nil {
+		return 0, wrapDBErr(err)
+	}
+
+	return res.RowsAffected()
 }

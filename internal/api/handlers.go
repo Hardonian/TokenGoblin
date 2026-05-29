@@ -972,18 +972,27 @@ func limitFromRequest(r *http.Request) int {
 	return limit
 }
 
-func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+func (h *IngestionHandler) HandleDeleteTenant(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	if r.Method != http.MethodDelete {
 		writeMethodError(w)
 		return
 	}
 
-	writeJSON(w, http.StatusNotImplemented, Envelope{
-		OK:     false,
-		Status: "not_configured",
-		Error: issue(
-			"webhook_runtime_boundary",
-			"Stripe webhooks are handled by the Next.js Node runtime route at /api/stripe/webhook so raw-body verification is preserved.",
-		),
-	})
+	if err := h.Service.DeleteTenantData(r.Context(), tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNotImplemented)
 }

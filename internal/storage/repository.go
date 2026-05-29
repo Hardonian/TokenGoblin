@@ -153,6 +153,7 @@ func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int)
 	return nil, r.err()
 }
 
+
 func (r *UnavailableRepository) Close() error {
 	return nil
 }
