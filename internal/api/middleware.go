@@ -23,32 +23,35 @@ const (
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := moat.ExtractBearerToken(r.Header.Get("Authorization"))
+
 		if token != "" {
 			parts := strings.SplitN(token, ".", 2)
-			if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-				writeAuthError(w, "api_key_malformed", "Bearer token must use key_id.secret format.")
+			if len(parts) != 2 {
+				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 
 			keyID := parts[0]
 			secret := parts[1]
+
 			apiKey, err := repo.GetAPIKey(r.Context(), keyID)
 			if err != nil || apiKey == nil || apiKey.IsRevoked {
-				writeAuthError(w, "api_key_invalid", "API key is invalid or unavailable.")
-				return
-			}
-			if !moat.VerifyAPIKey(secret, apiKey.KeyHash) {
-				writeAuthError(w, "api_key_invalid", "API key is invalid.")
+				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 
+			if !moat.VerifyAPIKey(secret, apiKey.KeyHash) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			// Update last used (async to not block)
 			go func() {
 				_ = repo.UpdateAPIKeyLastUsed(context.Background(), keyID)
 			}()
 
 			ctx := context.WithValue(r.Context(), tenantIDKey, apiKey.TenantID)
 			ctx = context.WithValue(ctx, apiKeyIDKey, keyID)
-			ctx = context.WithValue(ctx, roleKey, apiKey.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -62,6 +65,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 			writeAuthError(w, "tenant_missing", "Missing required x-tenant-id header.")
 			return
 		}
+
 		ctx := context.WithValue(r.Context(), tenantIDKey, tenantID)
 		ctx = context.WithValue(ctx, roleKey, "owner")
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -70,11 +74,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 
 func RateLimitMiddleware(limiter *moat.RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tenantID, ok := r.Context().Value(tenantIDKey).(string)
-		if !ok || tenantID == "" {
-			writeAuthError(w, "tenant_missing", "Missing tenant context for rate limiting.")
-			return
-		}
+		tenantID := r.Context().Value(tenantIDKey).(string)
 
 		if limiter != nil {
 			allowed, err := limiter.AllowIngestion(r.Context(), tenantID)

@@ -995,7 +995,6 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 }
 
 
-
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,

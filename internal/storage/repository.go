@@ -156,19 +156,6 @@ func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int)
 }
 
 
-
-func (r *UnavailableRepository) GetRecommendationDecisions(ctx context.Context, tenantID string) (map[string]string, error) {
-	return nil, r.err()
-}
-
-func (r *UnavailableRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
-	return nil, r.err()
-}
-
-func (r *UnavailableRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
-	return nil, r.err()
-}
-
 func (r *UnavailableRepository) Close() error {
 	return nil
 }
