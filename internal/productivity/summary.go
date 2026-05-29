@@ -221,7 +221,10 @@ func (a *workerAccumulator) add(event domain.TokenEvent) {
 
 	// Memory Trend (7-day vs prior 7-day)
 	if isAccepted(event.OutputStatus) && event.CostEstimateUSD != nil {
-		if event.Timestamp.After(a.currentPeriodStart) && !event.Timestamp.After(a.now) {
+		sevenDaysAgo := a.now.Add(-7 * 24 * time.Hour)
+		fourteenDaysAgo := a.now.Add(-14 * 24 * time.Hour)
+
+		if event.Timestamp.After(sevenDaysAgo) && !event.Timestamp.After(a.now) {
 			a.currentPeriodCost += *event.CostEstimateUSD
 			a.currentPeriodCount++
 		} else if event.Timestamp.After(a.priorPeriodStart) && !event.Timestamp.After(a.currentPeriodStart) {

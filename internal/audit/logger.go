@@ -46,6 +46,8 @@ func NewLogger(repo storage.Repository, logger *slog.Logger) *Logger {
 }
 
 func (l *Logger) LogEvent(ctx context.Context, event Event) error {
+	// Stub implementation: log to stdout for now.
+	// In a real implementation, we would write this to an audit_logs table or a stream like Kafka/Kinesis.
 	l.logger.Info("AUDIT EVENT",
 		"tenant_id", event.TenantID,
 		"type", event.Type,

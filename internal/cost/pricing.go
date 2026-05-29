@@ -40,7 +40,7 @@ func ConfigFromEnv() RegistryConfig {
 
 func LoadRegistry(ctx context.Context, config RegistryConfig) Registry {
 	registry := Registry{prices: map[string]domain.PricePoint{}}
-	
+
 	if config.RedisAddr != "" {
 		registry.setupRedis(ctx, config.RedisAddr)
 	}
@@ -127,7 +127,7 @@ func (r Registry) Calculate(ctx context.Context, event domain.TokenEvent, fetche
 	if !ok {
 		point, ok = r.prices[key(event.Provider, event.ModelID)]
 	}
-	
+
 	if !ok {
 		return domain.CostResult{
 			Status:        StatusDegraded,

@@ -473,7 +473,12 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		}
 	}
 
-	tagsJSON, err := marshalNullable(event.Tags)
+	var tagsJSON interface{}
+	if event.TagsJSON != nil {
+		tagsJSON = string(event.TagsJSON)
+	} else {
+		tagsJSON, err = marshalNullable(event.GetTags())
+	}
 	if err != nil {
 		return err
 	}
@@ -761,7 +766,6 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
-
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -822,7 +826,7 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 			}
 		}
 		if tags != nil && *tags != "" {
-			_ = json.Unmarshal([]byte(*tags), &event.Tags)
+			event.TagsJSON = json.RawMessage(*tags)
 		}
 		if idempotencyKey != nil {
 			event.IdempotencyKey = *idempotencyKey

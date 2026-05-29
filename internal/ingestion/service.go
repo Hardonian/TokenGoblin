@@ -209,20 +209,10 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 		return nil, err
 	}
 
-	tenant, err := s.repo.GetTenant(ctx, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	var usage float64
-	if tenant != nil {
-		usage, err = s.repo.GetTenantCurrentMonthCost(ctx, tenantID)
-		if err == nil && usage >= tenant.UsageLimitUSD {
-			return nil, QuotaExceededError{Limit: tenant.UsageLimitUSD, Usage: usage}
-		}
-	}
-
 	results := make([]domain.IngestionResult, 0, len(events))
 
+	// A simple approach is just calling the single item method for each item
+	// In a real enterprise app with massive batches, you would want bulk DB ops and bulk queuing
 	for _, event := range events {
 		normalized, warnings, err := s.normalize(tenantID, event)
 		if err != nil {

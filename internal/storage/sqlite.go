@@ -693,7 +693,12 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		}
 	}
 
-	tagsJSON, err := marshalNullable(event.Tags)
+	var tagsJSON interface{}
+	if event.TagsJSON != nil {
+		tagsJSON = string(event.TagsJSON)
+	} else {
+		tagsJSON, err = marshalNullable(event.GetTags())
+	}
 	if err != nil {
 		return err
 	}
@@ -994,7 +999,6 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
-
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -1048,7 +1052,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			event.ReviewScore = &reviewScore.Float64
 		}
 		if tags.Valid && tags.String != "" {
-			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
+			event.TagsJSON = json.RawMessage(tags.String)
 		}
 		if idempotencyKey.Valid {
 			event.IdempotencyKey = idempotencyKey.String

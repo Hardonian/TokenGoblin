@@ -19,23 +19,14 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Wrap ingestion routes with auth and rate limit
-	ingestHandler := AuthMiddleware(repo, RequireRole("admin", "analyst", "ingest")(RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent))))
-	batchIngestHandler := AuthMiddleware(repo, RequireRole("admin", "analyst", "ingest")(RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleBatchTokenEvent))))
+	ingestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleTokenEvent)))
+	batchIngestHandler := AuthMiddleware(repo, RateLimitMiddleware(limiter, http.HandlerFunc(handler.HandleBatchTokenEvent)))
 
 	mux.Handle("/v1/events", ingestHandler)
 	mux.Handle("/v1/events/batch", batchIngestHandler)
 
-	// Webhook endpoints are publicly available (auth is done cryptographically inside handler)
-	mux.Handle("/v1/webhooks/stripe", http.HandlerFunc(handler.HandleStripeWebhook))
-	mux.Handle("/api/v1/webhooks/stripe", http.HandlerFunc(handler.HandleStripeWebhook))
-	mux.Handle("/internal/billing/stripe-event", http.HandlerFunc(handler.HandleVerifiedStripeEvent))
-
-	pricingHandler := AuthMiddleware(repo, RequireRole("admin")(http.HandlerFunc(handler.HandleSetPricingOverride)))
+	pricingHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleSetPricingOverride))
 	mux.Handle("/v1/pricing/overrides", pricingHandler)
-	mux.Handle("/api/pricing/overrides", pricingHandler)
-
-	mux.Handle("/v1/pricing", AuthMiddleware(repo, http.HandlerFunc(handler.HandleGetPricing)))
-	mux.Handle("/api/pricing", AuthMiddleware(repo, http.HandlerFunc(handler.HandleGetPricing)))
 
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
 	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
