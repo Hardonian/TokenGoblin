@@ -40,22 +40,13 @@ func ConfigFromEnv() RegistryConfig {
 
 func LoadRegistry(ctx context.Context, config RegistryConfig) Registry {
 	registry := Registry{prices: map[string]domain.PricePoint{}}
-	
+
 	if config.RedisAddr != "" {
-		registry.redis = redis.NewClient(&redis.Options{
-			Addr: config.RedisAddr,
-		})
-		if err := registry.redis.Ping(ctx).Err(); err != nil {
-			registry.diagnostics = append(registry.diagnostics, domain.Issue{
-				Code:    "redis_unavailable",
-				Message: "Redis cache is unavailable; falling back to memory/defaults.",
-			})
-			registry.redis = nil
-		}
+		registry.setupRedis(ctx, config.RedisAddr)
 	}
 
 	if !config.DisableDefaults {
-		for _, point := range defaultPrices() {
+		for _, point := range DefaultPrices() {
 			registry.prices[key(point.Provider, point.ModelID)] = point
 		}
 	}
@@ -101,6 +92,19 @@ func LoadRegistry(ctx context.Context, config RegistryConfig) Registry {
 	return registry
 }
 
+func (r *Registry) setupRedis(ctx context.Context, addr string) {
+	r.redis = redis.NewClient(&redis.Options{
+		Addr: addr,
+	})
+	if err := r.redis.Ping(ctx).Err(); err != nil {
+		r.diagnostics = append(r.diagnostics, domain.Issue{
+			Code:    "redis_unavailable",
+			Message: "Redis cache is unavailable; falling back to memory/defaults.",
+		})
+		r.redis = nil
+	}
+}
+
 func (r Registry) Diagnostics() []domain.Issue {
 	return append([]domain.Issue(nil), r.diagnostics...)
 }
@@ -123,7 +127,7 @@ func (r Registry) Calculate(ctx context.Context, event domain.TokenEvent, fetche
 	if !ok {
 		point, ok = r.prices[key(event.Provider, event.ModelID)]
 	}
-	
+
 	if !ok {
 		return domain.CostResult{
 			Status:        StatusDegraded,
@@ -163,7 +167,7 @@ type priceJSON struct {
 	Currency              string  `json:"currency"`
 }
 
-func defaultPrices() []domain.PricePoint {
+func DefaultPrices() []domain.PricePoint {
 	epoch := time.Unix(0, 0).UTC()
 	return []domain.PricePoint{
 		{

@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS productivity_summaries;
+DROP INDEX IF EXISTS idx_anomaly_tenant_detected;
+DROP TABLE IF EXISTS anomaly_signals;
+DROP TABLE IF EXISTS cost_snapshots;
+DROP INDEX IF EXISTS idx_token_usage_tenant_worker;
+DROP INDEX IF EXISTS idx_token_usage_tenant_occurred;
+DROP TABLE IF EXISTS token_usage_events;
+DROP TABLE IF EXISTS jobs;
+DROP TABLE IF EXISTS workers;
+DROP TABLE IF EXISTS tenants;
