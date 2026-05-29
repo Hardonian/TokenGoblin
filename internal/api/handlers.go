@@ -1,15 +1,22 @@
 package api
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Hardonian/TokenGoblin/internal/billing"
+	"github.com/Hardonian/TokenGoblin/internal/demo"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
@@ -17,6 +24,7 @@ import (
 
 type IngestionHandler struct {
 	Service ingestion.Service
+	Repo    storage.Repository
 }
 
 type Envelope struct {
@@ -28,8 +36,8 @@ type Envelope struct {
 	Error    *domain.Issue  `json:"error,omitempty"`
 }
 
-func NewIngestionHandler(service ingestion.Service) *IngestionHandler {
-	return &IngestionHandler{Service: service}
+func NewIngestionHandler(service ingestion.Service, repo storage.Repository) *IngestionHandler {
+	return &IngestionHandler{Service: service, Repo: repo}
 }
 
 func (h *IngestionHandler) HandleTokenEvent(w http.ResponseWriter, r *http.Request) {
@@ -150,12 +158,12 @@ func (h *IngestionHandler) HandleBatchTokenEvent(w http.ResponseWriter, r *http.
 			break
 		}
 	}
-	
+
 	status := "success"
 	if hasDegraded {
 		status = "degraded"
 	}
-	
+
 	writeJSON(w, http.StatusAccepted, Envelope{
 		OK:     true,
 		Status: status,
@@ -190,7 +198,7 @@ func (h *IngestionHandler) HandleSetPricingOverride(w http.ResponseWriter, r *ht
 		})
 		return
 	}
-	
+
 	if override.Provider == "" || override.ModelID == "" {
 		writeJSON(w, http.StatusBadRequest, Envelope{
 			OK:     false,
@@ -204,6 +212,10 @@ func (h *IngestionHandler) HandleSetPricingOverride(w http.ResponseWriter, r *ht
 		writeServiceError(w, err, false)
 		return
 	}
+	h.audit(r, tenantID, "pricing.override_set", "pricing:"+override.Provider+":"+override.ModelID, map[string]interface{}{
+		"provider": override.Provider,
+		"model_id": override.ModelID,
+	})
 
 	writeJSON(w, http.StatusOK, Envelope{
 		OK:     true,
@@ -279,6 +291,30 @@ func (h *IngestionHandler) HandleWorkers(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: workers, Degraded: degraded})
 }
 
+func (h *IngestionHandler) HandleWorkerReview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	workerID := workerIDFromPath(r.URL.Path)
+	review, err := h.Service.WorkerReview(r.Context(), tenantID, workerID)
+	if err != nil {
+		if writeDashboardError(w, err, domain.WorkerReview{}) {
+			return
+		}
+		return
+	}
+	status := "success"
+	if len(review.Degraded) > 0 {
+		status = "degraded"
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: review, Degraded: review.Degraded})
+}
+
 func (h *IngestionHandler) HandleAnomalies(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeMethodError(w)
@@ -324,7 +360,7 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 	} else {
 		events, err = h.Service.RecentEvents(r.Context(), tenantID, limitFromRequest(r))
 	}
-	
+
 	if err != nil {
 		if writeDashboardError(w, err, []domain.TokenEvent{}) {
 			return
@@ -338,6 +374,31 @@ func (h *IngestionHandler) HandleRecentEvents(w http.ResponseWriter, r *http.Req
 		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No usage events exist for this tenant."})
 	}
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: events, Degraded: degraded})
+}
+
+func (h *IngestionHandler) HandleOutputAnalyses(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	analyses, err := h.Service.OutputAnalyses(r.Context(), tenantID, limitFromRequest(r))
+	if err != nil {
+		if writeDashboardError(w, err, []domain.OutputAnalysis{}) {
+			return
+		}
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(analyses) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No output analyses exist for this tenant."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: analyses, Degraded: degraded})
 }
 
 func (h *IngestionHandler) HandleRecommendations(w http.ResponseWriter, r *http.Request) {
@@ -365,6 +426,40 @@ func (h *IngestionHandler) HandleRecommendations(w http.ResponseWriter, r *http.
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: recs, Degraded: degraded})
 }
 
+func (h *IngestionHandler) HandleRecommendationState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	recommendationID := recommendationIDFromPath(r.URL.Path)
+	var update domain.RecommendationStateUpdate
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&update); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:       false,
+			Status:   "error",
+			Error:    issue("invalid_json", "Request body must be a valid recommendation state update."),
+			Degraded: []domain.Issue{{Code: "invalid_json", Message: "JSON decoding failed.", Field: "body"}},
+		})
+		return
+	}
+	state, err := h.Service.SetRecommendationState(r.Context(), tenantID, recommendationID, getActor(r), update)
+	if err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	h.audit(r, tenantID, "recommendation.state_changed", "recommendation:"+recommendationID, map[string]interface{}{
+		"recommendation_id": recommendationID,
+		"status":            state.Status,
+	})
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: state})
+}
+
 func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeMethodError(w)
@@ -376,7 +471,12 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 	}
 	events, err := h.Service.RecentEvents(r.Context(), tenantID, 10000)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "text/csv")
+		w.WriteHeader(http.StatusOK)
+		writer := csv.NewWriter(w)
+		_ = writer.Write([]string{"status", "code", "message"})
+		_ = writer.Write([]string{"degraded", "database_unavailable", "Storage is unavailable; export contains no tenant records."})
+		writer.Flush()
 		return
 	}
 
@@ -386,7 +486,7 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 
 	writer := csv.NewWriter(w)
 	writer.Write([]string{"event_id", "timestamp", "worker_id", "job_id", "provider", "model_id", "total_tokens", "cost_usd", "task_category", "output_status"})
-	
+
 	for _, event := range events {
 		costStr := ""
 		if event.CostEstimateUSD != nil {
@@ -406,9 +506,278 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 		})
 	}
 	writer.Flush()
+	h.audit(r, tenantID, "export.csv", "tenant_export", map[string]interface{}{"format": "csv"})
+}
+
+func (h *IngestionHandler) HandleReportMarkdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	summary, err := h.Service.Overview(r.Context(), tenantID)
+	if err != nil {
+		if errors.Is(err, storage.ErrUnavailable) {
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("# TokenGoblin Review Report\n\nStatus: degraded\n\nStorage is unavailable; no tenant records were exported.\n"))
+			return
+		}
+		writeServiceError(w, err, true)
+		return
+	}
+	recs, _ := h.Service.Recommendations(r.Context(), tenantID)
+	analyses, _ := h.Service.OutputAnalyses(r.Context(), tenantID, 10)
+
+	var b strings.Builder
+	b.WriteString("# TokenGoblin Review Report\n\n")
+	b.WriteString(fmt.Sprintf("- Tenant: `%s`\n", tenantID))
+	b.WriteString(fmt.Sprintf("- Generated: `%s`\n", summary.GeneratedAt.Format(time.RFC3339)))
+	b.WriteString(fmt.Sprintf("- Total tokens: `%d`\n", totalTokens(summary.CostByWorker)))
+	b.WriteString(fmt.Sprintf("- Estimated cost: `$%.4f USD`\n", summary.TotalCostUSD))
+	b.WriteString(fmt.Sprintf("- Outputs: `%d`\n", summary.OutputCount))
+	b.WriteString(fmt.Sprintf("- Unknown-cost events: `%d`\n\n", summary.UnknownCostEventCount))
+
+	b.WriteString("## Waste Signals\n\n")
+	if len(summary.TopCostDrivers) == 0 && len(analyses) == 0 {
+		b.WriteString("No usage evidence exists for this tenant yet.\n\n")
+	} else {
+		for _, driver := range summary.TopCostDrivers {
+			b.WriteString(fmt.Sprintf("- %s `%s`: estimated `$%.4f` across `%d` events\n", driver.Type, driver.Key, driver.TotalCostUSD, driver.EventCount))
+		}
+		for _, item := range analyses {
+			for _, issue := range item.Issues {
+				b.WriteString(fmt.Sprintf("- `%s` on event `%s`: %s\n", issue.Code, item.EventID, issue.Message))
+			}
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("## Top Recommendations\n\n")
+	if len(recs) == 0 {
+		b.WriteString("No routing recommendations are available from the current evidence set.\n")
+	} else {
+		for _, rec := range recs {
+			b.WriteString(fmt.Sprintf("- %s Estimated savings: `$%.2f`. Evidence count: `%d`.\n", rec.Reason, rec.EstimatedSavingsUSD, rec.EvidenceCount))
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(b.String()))
+	h.audit(r, tenantID, "export.markdown", "tenant_report", map[string]interface{}{"format": "markdown"})
+}
+
+func (h *IngestionHandler) HandleGetPricing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	pricing, err := h.Service.GetActivePricing(r.Context(), tenantID)
+	if err != nil {
+		writeServiceError(w, err, true)
+		return
+	}
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   pricing,
+	})
+}
+
+func (h *IngestionHandler) HandleResetTenantData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	if err := h.Service.DeleteTenantData(r.Context(), tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	h.audit(r, tenantID, "tenant.reset", "tenant:"+tenantID, nil)
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   "Tenant data cleared successfully.",
+	})
+}
+
+func (h *IngestionHandler) HandleSeedDemoData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	if err := demo.Seed(r.Context(), h.Repo, h.Service, tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	h.audit(r, tenantID, "tenant.seed_demo", "tenant:"+tenantID, nil)
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   "Demo data seeded successfully.",
+	})
+}
+
+func (h *IngestionHandler) HandleAuditEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	events, err := h.Service.AuditEvents(r.Context(), tenantID, limitFromRequest(r))
+	if err != nil {
+		if writeDashboardError(w, err, []domain.AuditEvent{}) {
+			return
+		}
+		return
+	}
+	status := "success"
+	degraded := []domain.Issue(nil)
+	if len(events) == 0 {
+		status = "degraded"
+		degraded = append(degraded, domain.Issue{Code: "no_data", Message: "No audit events exist for this tenant."})
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: events, Degraded: degraded})
+}
+
+func (h *IngestionHandler) HandleTenantMembers(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		members, err := h.Service.TenantMembers(r.Context(), tenantID)
+		if err != nil {
+			if writeDashboardError(w, err, []domain.TenantMember{}) {
+				return
+			}
+			return
+		}
+		status := "success"
+		degraded := []domain.Issue(nil)
+		if len(members) == 0 {
+			status = "degraded"
+			degraded = append(degraded, domain.Issue{Code: "no_members", Message: "No explicit tenant members have been configured."})
+		}
+		writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: members, Degraded: degraded})
+	case http.MethodPost:
+		if getRole(r) != "owner" && getRole(r) != "admin" {
+			writeJSON(w, http.StatusForbidden, Envelope{OK: false, Status: "error", Error: issue("forbidden", "Only admin or owner roles can change tenant members.")})
+			return
+		}
+		var member domain.TenantMember
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&member); err != nil {
+			writeJSON(w, http.StatusBadRequest, Envelope{
+				OK:       false,
+				Status:   "error",
+				Error:    issue("invalid_json", "Request body must be a valid tenant member."),
+				Degraded: []domain.Issue{{Code: "invalid_json", Message: "JSON decoding failed.", Field: "body"}},
+			})
+			return
+		}
+		saved, err := h.Service.UpsertTenantMember(r.Context(), tenantID, member)
+		if err != nil {
+			writeServiceError(w, err, false)
+			return
+		}
+		h.audit(r, tenantID, "tenant_member.upserted", "member:"+saved.SubjectID, map[string]interface{}{"role": saved.Role})
+		writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: saved})
+	default:
+		writeMethodError(w)
+	}
+}
+
+func (h *IngestionHandler) HandleVerifiedStripeEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	if !validInternalBearer(r) {
+		writeJSON(w, http.StatusUnauthorized, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("internal_auth_invalid", "Internal billing route requires a valid service bearer token."),
+		})
+		return
+	}
+
+	var event billing.VerifiedStripeEvent
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&event); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must be a verified Stripe lifecycle event JSON object."),
+		})
+		return
+	}
+
+	result, err := billing.ProcessVerifiedStripeEvent(r.Context(), h.Repo, event, time.Now().UTC())
+	if err != nil {
+		var validationErr billing.StripeValidationError
+		if errors.As(err, &validationErr) {
+			writeJSON(w, http.StatusBadRequest, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("invalid_stripe_event", validationErr.Error()),
+			})
+			return
+		}
+		var conflictErr billing.StripeConflictError
+		if errors.As(err, &conflictErr) {
+			writeJSON(w, http.StatusConflict, Envelope{
+				OK:     false,
+				Status: "error",
+				Error:  issue("stripe_owner_conflict", conflictErr.Error()),
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("billing_update_failed", "Verified Stripe event could not be applied."),
+		})
+		return
+	}
+
+	status := "ignored"
+	if result.Applied {
+		status = "success"
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: result})
 }
 
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if val := r.Context().Value(tenantIDKey); val != nil {
+		if tenantID, ok := val.(string); ok && tenantID != "" {
+			return tenantID, true
+		}
+	}
 	tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
 	if tenantID == "" {
 		writeJSON(w, http.StatusUnauthorized, Envelope{
@@ -419,6 +788,74 @@ func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 		return "", false
 	}
 	return tenantID, true
+}
+
+func workerIDFromPath(path string) string {
+	for _, prefix := range []string{"/api/dashboard/workers/", "/v1/dashboard/workers/"} {
+		if strings.HasPrefix(path, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(path, prefix))
+		}
+	}
+	return ""
+}
+
+func recommendationIDFromPath(path string) string {
+	for _, prefix := range []string{"/api/dashboard/recommendations/", "/v1/dashboard/recommendations/"} {
+		if strings.HasPrefix(path, prefix) {
+			rest := strings.Trim(strings.TrimPrefix(path, prefix), "/")
+			raw := strings.TrimSuffix(rest, "/status")
+			decoded, err := url.PathUnescape(raw)
+			if err == nil {
+				return decoded
+			}
+			return raw
+		}
+	}
+	return ""
+}
+
+func (h *IngestionHandler) audit(r *http.Request, tenantID, eventType, resource string, metadata map[string]interface{}) {
+	_ = h.Repo.SaveAuditEvent(r.Context(), domain.AuditEvent{
+		EventID:   "aud_" + randomHex(12),
+		TenantID:  tenantID,
+		Type:      eventType,
+		Actor:     getActor(r),
+		Resource:  resource,
+		Metadata:  metadata,
+		Timestamp: time.Now().UTC(),
+	})
+}
+
+func validInternalBearer(r *http.Request) bool {
+	expected := strings.TrimSpace(os.Getenv("TG_INTERNAL_WEBHOOK_SECRET"))
+	if expected == "" {
+		return false
+	}
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+	if token == "" || len(token) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
+}
+
+func randomHex(bytes int) string {
+	buffer := make([]byte, bytes)
+	if _, err := rand.Read(buffer); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buffer)
+}
+
+func totalTokens(workers []domain.WorkerBreakdown) int {
+	total := 0
+	for _, worker := range workers {
+		total += worker.TotalTokens
+	}
+	return total
 }
 
 func writeMethodError(w http.ResponseWriter) {
@@ -533,4 +970,20 @@ func limitFromRequest(r *http.Request) int {
 		return 500
 	}
 	return limit
+}
+
+func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	writeJSON(w, http.StatusNotImplemented, Envelope{
+		OK:     false,
+		Status: "not_configured",
+		Error: issue(
+			"webhook_runtime_boundary",
+			"Stripe webhooks are handled by the Next.js Node runtime route at /api/stripe/webhook so raw-body verification is preserved.",
+		),
+	})
 }

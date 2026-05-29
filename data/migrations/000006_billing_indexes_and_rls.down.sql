@@ -1,0 +1,30 @@
+DROP POLICY IF EXISTS tenants_tenant_isolation ON tenants;
+DROP POLICY IF EXISTS workers_tenant_isolation ON workers;
+DROP POLICY IF EXISTS jobs_tenant_isolation ON jobs;
+DROP POLICY IF EXISTS token_usage_events_tenant_isolation ON token_usage_events;
+DROP POLICY IF EXISTS cost_snapshots_tenant_isolation ON cost_snapshots;
+DROP POLICY IF EXISTS anomaly_signals_tenant_isolation ON anomaly_signals;
+DROP POLICY IF EXISTS productivity_summaries_tenant_isolation ON productivity_summaries;
+DROP POLICY IF EXISTS tenant_pricing_overrides_tenant_isolation ON tenant_pricing_overrides;
+DROP POLICY IF EXISTS output_analyses_tenant_isolation ON output_analyses;
+DROP POLICY IF EXISTS tenant_members_tenant_isolation ON tenant_members;
+DROP POLICY IF EXISTS audit_events_tenant_isolation ON audit_events;
+DROP POLICY IF EXISTS recommendation_states_tenant_isolation ON recommendation_states;
+
+ALTER TABLE tenants DISABLE ROW LEVEL SECURITY;
+ALTER TABLE workers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE token_usage_events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cost_snapshots DISABLE ROW LEVEL SECURITY;
+ALTER TABLE anomaly_signals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE productivity_summaries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_pricing_overrides DISABLE ROW LEVEL SECURITY;
+ALTER TABLE output_analyses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE recommendation_states DISABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys DISABLE ROW LEVEL SECURITY;
+
+DROP FUNCTION IF EXISTS tg_current_tenant_id();
+DROP INDEX IF EXISTS idx_tenants_stripe_subscription;
+DROP INDEX IF EXISTS idx_tenants_stripe_customer;

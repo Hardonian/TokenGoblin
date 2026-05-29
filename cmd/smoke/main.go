@@ -9,6 +9,7 @@ import (
 
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/demo"
+	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
@@ -25,6 +26,7 @@ func main() {
 	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv())).WithClock(func() time.Time {
 		return base
 	})
+	service.StartWorker(ctx)
 
 	tenantID := os.Getenv("TG_DEMO_TENANT_ID")
 	if tenantID == "" {
@@ -34,9 +36,25 @@ func main() {
 		log.Fatalf("seed demo: %v", err)
 	}
 
-	summary, err := service.Overview(ctx, tenantID)
-	if err != nil {
-		log.Fatalf("overview: %v", err)
+	var summary domain.ProductivitySummary
+	var overview = func() (int, error) {
+		s, err := service.Overview(ctx, tenantID)
+		if err != nil {
+			return 0, err
+		}
+		summary = s
+		return s.TotalEvents, nil
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		count, err := overview()
+		if err != nil {
+			log.Fatalf("overview: %v", err)
+		}
+		if count >= 20 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	if summary.TotalEvents < 20 {
 		log.Fatalf("expected at least 20 events, got %d", summary.TotalEvents)

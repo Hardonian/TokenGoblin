@@ -25,10 +25,10 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 		return summary
 	}
 
-	workerStats := map[string]*workerAccumulator{}
-	categoryStats := map[string]*categoryAccumulator{}
-	modelStats := map[string]*driverAccumulator{}
-	anomalyByWorker := map[string]int{}
+	workerStats := make(map[string]*workerAccumulator, len(events))
+	categoryStats := make(map[string]*categoryAccumulator, len(events))
+	modelStats := make(map[string]*driverAccumulator, len(events))
+	anomalyByWorker := make(map[string]int, len(anomalies))
 	for _, signal := range anomalies {
 		if signal.WorkerID != "" {
 			anomalyByWorker[signal.WorkerID]++
@@ -39,6 +39,8 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 	var latencyCount int
 	var acceptedReviewedCost float64
 	var acceptedReviewedCount int
+	currentPeriodStart := generatedAt.Add(-7 * 24 * time.Hour)
+	priorPeriodStart := generatedAt.Add(-14 * 24 * time.Hour)
 
 	for _, event := range events {
 		summary.TotalEvents++
@@ -50,6 +52,7 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 		}
 		if isAccepted(event.OutputStatus) {
 			summary.OutputCount++
+			summary.TotalOutputTokens += event.OutputTokens
 			if event.ReviewScore != nil && event.CostEstimateUSD != nil {
 				acceptedReviewedCost += *event.CostEstimateUSD
 				acceptedReviewedCount++
@@ -62,7 +65,13 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 
 		worker := workerStats[event.WorkerID]
 		if worker == nil {
-			worker = &workerAccumulator{workerID: event.WorkerID, workerName: event.WorkerName, now: generatedAt}
+			worker = &workerAccumulator{
+				workerID:           event.WorkerID,
+				workerName:         event.WorkerName,
+				now:                generatedAt,
+				currentPeriodStart: currentPeriodStart,
+				priorPeriodStart:   priorPeriodStart,
+			}
 			workerStats[event.WorkerID] = worker
 		}
 		worker.add(event)
@@ -96,6 +105,10 @@ func BuildSummary(tenantID string, events []domain.TokenEvent, anomalies []domai
 		value := acceptedReviewedCost / float64(acceptedReviewedCount)
 		summary.CostPerAcceptedOutputWithReview = &value
 	}
+
+	summary.CostByWorker = make([]domain.WorkerBreakdown, 0, len(workerStats))
+	summary.CostByCategory = make([]domain.CategoryBreakdown, 0, len(categoryStats))
+	summary.TopCostDrivers = make([]domain.CostDriver, 0, len(workerStats)+len(categoryStats)+len(modelStats))
 
 	for _, item := range workerStats {
 		breakdown := item.breakdown()
@@ -176,6 +189,8 @@ type workerAccumulator struct {
 	priorPeriodCost    float64
 	priorPeriodCount   int
 	now                time.Time
+	currentPeriodStart time.Time
+	priorPeriodStart   time.Time
 }
 
 func (a *workerAccumulator) add(event domain.TokenEvent) {
@@ -206,13 +221,10 @@ func (a *workerAccumulator) add(event domain.TokenEvent) {
 
 	// Memory Trend (7-day vs prior 7-day)
 	if isAccepted(event.OutputStatus) && event.CostEstimateUSD != nil {
-		sevenDaysAgo := a.now.Add(-7 * 24 * time.Hour)
-		fourteenDaysAgo := a.now.Add(-14 * 24 * time.Hour)
-		
-		if event.Timestamp.After(sevenDaysAgo) && !event.Timestamp.After(a.now) {
+		if event.Timestamp.After(a.currentPeriodStart) && !event.Timestamp.After(a.now) {
 			a.currentPeriodCost += *event.CostEstimateUSD
 			a.currentPeriodCount++
-		} else if event.Timestamp.After(fourteenDaysAgo) && !event.Timestamp.After(sevenDaysAgo) {
+		} else if event.Timestamp.After(a.priorPeriodStart) && !event.Timestamp.After(a.currentPeriodStart) {
 			a.priorPeriodCost += *event.CostEstimateUSD
 			a.priorPeriodCount++
 		}

@@ -48,15 +48,41 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 			"Pricing was unavailable for this provider/model; cost is degraded.", nil, nil))
 	}
 
+	var costTotal float64
+	var costCount int
+	var tokenTotal float64
+	var tokenCount int
+	var latencyTotal float64
+	var latencyCount int
+	var acceptedCostTotal float64
+	var acceptedCostCount int
+	var recentTokens int
+
+	for _, item := range prior {
+		if item.CostEstimateUSD != nil {
+			costTotal += *item.CostEstimateUSD
+			costCount++
+		}
+		if item.TotalTokens > 0 {
+			tokenTotal += float64(item.TotalTokens)
+			tokenCount++
+		}
+		if item.WorkerID == event.WorkerID && event.Timestamp.Sub(item.Timestamp).Seconds() <= thresholds.VelocitySpikeSeconds {
+			recentTokens += item.TotalTokens
+		}
+		if item.LatencyMs > 0 {
+			latencyTotal += float64(item.LatencyMs)
+			latencyCount++
+		}
+		if isAccepted(item.OutputStatus) && item.ReviewScore != nil && item.CostEstimateUSD != nil {
+			acceptedCostTotal += *item.CostEstimateUSD
+			acceptedCostCount++
+		}
+	}
+
 	if event.CostEstimateUSD != nil {
-		costs := numericPrior(prior, func(item domain.TokenEvent) (float64, bool) {
-			if item.CostEstimateUSD == nil {
-				return 0, false
-			}
-			return *item.CostEstimateUSD, true
-		})
-		if len(costs) >= 3 {
-			threshold := math.Max(thresholds.SpendSpikeMinimumUSD, mean(costs)*thresholds.SpendSpikeMultiplier)
+		if costCount >= 3 {
+			threshold := math.Max(thresholds.SpendSpikeMinimumUSD, (costTotal/float64(costCount))*thresholds.SpendSpikeMultiplier)
 			if *event.CostEstimateUSD > threshold {
 				signals = append(signals, signal(event, now, domain.AnomalySpendSpike, domain.SeverityHigh,
 					"Event cost exceeded the deterministic spend spike threshold.", event.CostEstimateUSD, &threshold))
@@ -64,11 +90,8 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 		}
 	}
 
-	tokens := numericPrior(prior, func(item domain.TokenEvent) (float64, bool) {
-		return float64(item.TotalTokens), item.TotalTokens > 0
-	})
-	if len(tokens) >= 3 {
-		threshold := math.Max(thresholds.TokenSpikeMinimumTokens, mean(tokens)*thresholds.TokenSpikeMultiplier)
+	if tokenCount >= 3 {
+		threshold := math.Max(thresholds.TokenSpikeMinimumTokens, (tokenTotal/float64(tokenCount))*thresholds.TokenSpikeMultiplier)
 		observed := float64(event.TotalTokens)
 		if observed > threshold {
 			signals = append(signals, signal(event, now, domain.AnomalyTokenSpike, domain.SeverityHigh,
@@ -76,15 +99,6 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 		}
 	}
 
-	// Velocity Spike
-	var recentTokens int
-	for _, p := range prior {
-		if p.WorkerID == event.WorkerID {
-			if event.Timestamp.Sub(p.Timestamp).Seconds() <= thresholds.VelocitySpikeSeconds {
-				recentTokens += p.TotalTokens
-			}
-		}
-	}
 	recentTokens += event.TotalTokens
 	if recentTokens > thresholds.VelocitySpikeTokens {
 		observed := float64(recentTokens)
@@ -93,11 +107,8 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 			"Worker exceeded token velocity threshold (runaway loop).", &observed, &threshold))
 	}
 
-	latencies := numericPrior(prior, func(item domain.TokenEvent) (float64, bool) {
-		return float64(item.LatencyMs), item.LatencyMs > 0
-	})
-	if len(latencies) >= 3 && event.LatencyMs > 0 {
-		threshold := math.Max(thresholds.LatencySpikeMinimumMs, mean(latencies)*thresholds.LatencySpikeMultiplier)
+	if latencyCount >= 3 && event.LatencyMs > 0 {
+		threshold := math.Max(thresholds.LatencySpikeMinimumMs, (latencyTotal/float64(latencyCount))*thresholds.LatencySpikeMultiplier)
 		observed := float64(event.LatencyMs)
 		if observed > threshold {
 			signals = append(signals, signal(event, now, domain.AnomalyLatencySpike, domain.SeverityMed,
@@ -109,12 +120,24 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 		failures := 1
 		checked := 0
 		for _, item := range prior {
+			// Early exit if it's mathematically impossible to reach the minimum failures threshold
+			// given the remaining items allowed to be checked in the window.
+			if failures+(thresholds.RepeatedFailureWindow-checked) < thresholds.RepeatedFailureMinimum {
+				break
+			}
+
 			if item.WorkerID != event.WorkerID {
 				continue
 			}
 			checked++
 			if isFailure(item.OutputStatus) {
 				failures++
+			}
+			if failures >= thresholds.RepeatedFailureMinimum {
+				break
+			}
+			if failures+(thresholds.RepeatedFailureWindow-checked) < thresholds.RepeatedFailureMinimum {
+				break
 			}
 			if checked >= thresholds.RepeatedFailureWindow {
 				break
@@ -129,14 +152,8 @@ func Detect(event domain.TokenEvent, prior []domain.TokenEvent, now time.Time, t
 	}
 
 	if isAccepted(event.OutputStatus) && event.ReviewScore != nil && event.CostEstimateUSD != nil {
-		acceptedCosts := numericPrior(prior, func(item domain.TokenEvent) (float64, bool) {
-			if !isAccepted(item.OutputStatus) || item.ReviewScore == nil || item.CostEstimateUSD == nil {
-				return 0, false
-			}
-			return *item.CostEstimateUSD, true
-		})
-		if len(acceptedCosts) >= 3 {
-			threshold := math.Max(thresholds.HighCostAcceptedMinimumUSD, mean(acceptedCosts)*thresholds.HighCostAcceptedMultiplier)
+		if acceptedCostCount >= 3 {
+			threshold := math.Max(thresholds.HighCostAcceptedMinimumUSD, (acceptedCostTotal/float64(acceptedCostCount))*thresholds.HighCostAcceptedMultiplier)
 			if *event.CostEstimateUSD > threshold {
 				signals = append(signals, signal(event, now, domain.AnomalyHighCostPerAcceptedOutput, domain.SeverityHigh,
 					"Accepted reviewed output cost exceeded the deterministic high-cost threshold.", event.CostEstimateUSD, &threshold))
@@ -170,28 +187,6 @@ func signal(event domain.TokenEvent, now time.Time, signalType domain.AnomalyTyp
 			"output_status": string(event.OutputStatus),
 		},
 	}
-}
-
-func numericPrior(items []domain.TokenEvent, value func(domain.TokenEvent) (float64, bool)) []float64 {
-	values := make([]float64, 0, len(items))
-	for _, item := range items {
-		next, ok := value(item)
-		if ok {
-			values = append(values, next)
-		}
-	}
-	return values
-}
-
-func mean(values []float64) float64 {
-	if len(values) == 0 {
-		return 0
-	}
-	var total float64
-	for _, value := range values {
-		total += value
-	}
-	return total / float64(len(values))
 }
 
 func isFailure(status domain.OutputStatus) bool {
