@@ -24,6 +24,7 @@ func main() {
 	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv())).WithClock(func() time.Time {
 		return base
 	})
+	service.StartWorker(ctx)
 
 	tenantID := os.Getenv("TG_DEMO_TENANT_ID")
 	if tenantID == "" {
