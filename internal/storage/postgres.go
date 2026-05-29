@@ -732,7 +732,7 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 		if workerID != nil {
 			signal.WorkerID = *workerID
 		}
-		if details != nil && *details != "" {
+		if details != nil && *details != "" && *details != "{}" {
 			_ = json.Unmarshal([]byte(*details), &signal.Details)
 		}
 		signals = append(signals, signal)
@@ -740,20 +740,6 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
-func (r *PostgresRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return wrapDBErr(err)
-	}
-	defer tx.Rollback(ctx)
-
-	// Using ON DELETE CASCADE configured in the schema,
-	// deleting from the tenants table automatically cleans up related records.
-	if _, err := tx.Exec(ctx, `DELETE FROM tenants WHERE tenant_id = $1`, tenantID); err != nil {
-		return wrapDBErr(err)
-	}
-	return wrapDBErr(tx.Commit(ctx))
-}
 
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
@@ -814,8 +800,8 @@ func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 				event.ExternalEstimate.Currency = *externalCurrency
 			}
 		}
-		if tags != nil && *tags != "" {
-			event.TagsJSON = json.RawMessage(*tags)
+		if tags != nil && *tags != "" && *tags != "{}" {
+			_ = json.Unmarshal([]byte(*tags), &event.Tags)
 		}
 		if idempotencyKey != nil {
 			event.IdempotencyKey = *idempotencyKey

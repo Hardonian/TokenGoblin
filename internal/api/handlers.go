@@ -973,26 +973,9 @@ func limitFromRequest(r *http.Request) int {
 }
 
 func (h *IngestionHandler) HandleDeleteTenant(w http.ResponseWriter, r *http.Request) {
-	tenantID, ok := tenantFromRequest(w, r)
-	if !ok {
-		return
-	}
-	if r.Method != http.MethodDelete {
-		writeMethodError(w)
-		return
-	}
-
-	if err := h.Service.DeleteTenantData(r.Context(), tenantID); err != nil {
-		writeServiceError(w, err, false)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+    w.WriteHeader(http.StatusNotImplemented)
 }
 
 func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeMethodError(w)
-		return
-	}
-	w.WriteHeader(http.StatusNotImplemented)
+    w.WriteHeader(http.StatusNotImplemented)
 }
