@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TokenGoblin — Pricing</title>
+  <meta name="description" content="Free tier + affordable Pro plan for AI token cost tracking. Start free, upgrade when you need more.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f7f8f3; color: #171915; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    header { padding: 48px 0 24px; text-align: center; }
+    h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .subtitle { color: #52604e; margin-top: 8px; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .free-badge { display: inline-block; background: #d7dccf; color: #2d4a3e; padding: 4px 12px; font-size: 0.75rem; font-weight: 600; border-radius: 4px; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin: 40px 0; max-width: 900px; margin-left: auto; margin-right: auto; }
+    .card { border: 1px solid #d7dccf; background: white; padding: 32px; border-radius: 8px; }
+    .card.featured { border: 2px solid #426b51; position: relative; }
+    .card.featured::before { content: 'BEST VALUE'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #426b51; color: white; padding: 4px 16px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; border-radius: 4px; }
+    .card h3 { font-size: 1.3rem; font-weight: 600; }
+    .card .price { font-size: 2.5rem; font-weight: 700; margin: 16px 0 4px; }
+    .card .price span { font-size: 1rem; font-weight: 400; color: #61705a; }
+    .card .price .free { font-size: 2rem; }
+    .card .description { color: #52604e; font-size: 0.9rem; min-height: 48px; }
+    .card ul { list-style: none; margin: 24px 0; }
+    .card li { padding: 8px 0; border-bottom: 1px solid #edf0e8; font-size: 0.9rem; }
+    .card li::before { content: '✓ '; color: #426b51; font-weight: 700; }
+    .btn { display: block; width: 100%; padding: 14px; text-align: center; font-size: 1rem; font-weight: 600; border-radius: 6px; cursor: pointer; text-decoration: none; }
+    .btn-primary { background: #426b51; color: white; border: none; }
+    .btn-primary:hover { background: #2d6a4f; }
+    .btn-outline { background: white; color: #171915; border: 1px solid #c5cdbb; }
+    .btn-outline:hover { background: #f5f7f0; }
+    .compare { background: white; border: 1px solid #d7dccf; margin: 40px 0; overflow-x: auto; }
+    .compare table { width: 100%; border-collapse: collapse; }
+    .compare th, .compare td { padding: 16px; text-align: left; border-bottom: 1px solid #edf0e8; font-size: 0.9rem; }
+    .compare th { background: #fbfcf8; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #61705a; }
+    .faq { margin: 48px 0 80px; }
+    .faq h2 { margin-bottom: 24px; }
+    .faq-item { border-bottom: 1px solid #d7dccf; padding: 20px 0; }
+    .faq-item h4 { font-weight: 600; margin-bottom: 4px; }
+    .faq-item p { color: #52604e; font-size: 0.9rem; }
+    footer { border-top: 1px solid #d7dccf; padding: 24px 0; text-align: center; color: #61705a; font-size: 0.85rem; }
+    a { color: #426b51; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <p style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.12em;color:#61705a;font-weight:600;">TokenGoblin</p>
+      <h1>Start free, scale when you grow</h1>
+      <p class="subtitle">Free tier includes 50K tokens/month. Pro tier for teams that need full visibility across all workers and models.</p>
+    </header>
+
+    <div class="pricing-grid">
+      <div class="card">
+        <span class="free-badge">FREE</span>
+        <h3>Starter</h3>
+        <div class="price"><span class="free">$0</span><span>/month</span></div>
+        <p class="description">For individual developers and small projects getting started with token tracking.</p>
+        <ul>
+          <li>Up to 50K tokens/month</li>
+          <li>Basic dashboard</li>
+          <li>Worker-level cost breakdown</li>
+          <li>Email reports</li>
+          <li>Community support</li>
+          <li>One tenant</li>
+        </ul>
+        <a href="https://github.com/Hardonian/TokenGoblin" class="btn btn-outline" target="_blank">Start Free on GitHub</a>
+      </div>
+
+      <div class="card featured">
+        <h3>Pro</h3>
+        <div class="price">$49<span>/month</span></div>
+        <p class="description">For AI teams that need full cost visibility across all workers, models, and features.</p>
+        <ul>
+          <li><strong>500K tokens/month</strong></li>
+          <li>Full dashboard + analytics</li>
+          <li>Per-worker, per-model cost tracking</li>
+          <li>Output analysis + bloat detection</li>
+          <li>Routing optimization recommendations</li>
+          <li>API access</li>
+          <li>Up to 5 tenants</li>
+          <li>Email + chat support</li>
+        </ul>
+        <a href="https://buy.stripe.com/6oUbJ0arK21CcFc42lb3q06" class="btn btn-primary" target="_blank">Subscribe — $49/mo</a>
+      </div>
+
+      <div class="card">
+        <h3>Enterprise</h3>
+        <div class="price">$499<span>/month</span></div>
+        <p class="description">For organizations managing token spend across multiple teams and deployments.</p>
+        <ul>
+          <li><strong>Unlimited tokens</strong></li>
+          <li>Everything in Pro, plus:</li>
+          <li>Unlimited tenants</li>
+          <li>Custom model pricing tables</li>
+          <li>Usage-based billing integration</li>
+          <li>Stripe webhook lifecycle</li>
+          <li>SSO/SAML</li>
+          <li>Self-hosted option</li>
+          <li>Dedicated support + SLA</li>
+        </ul>
+        <a href="https://buy.stripe.com/5kQaEW6bu21C7kS2Yhb3q07" class="btn btn-primary" target="_blank">Subscribe — $499/mo</a>
+      </div>
+    </div>
+
+    <div class="faq">
+      <h2>Frequently asked questions</h2>
+      <div class="faq-item">
+        <h4>What counts as a token?</h4>
+        <p>All input and output tokens processed by LLM providers (OpenAI, Anthropic, Google, open-source models, etc.). We track per-call token counts from your usage data.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Can I start free and upgrade later?</h4>
+        <p>Absolutely. Start with the free tier, and when you need more capacity or features, upgrade to Pro or Enterprise seamlessly via Stripe.</p>
+      </div>
+      <div class="faq-item">
+        <h4>How is pricing calculated for overages?</h4>
+        <p>Pro includes 500K tokens/month. Additional tokens are billed at $0.10/1K tokens. Enterprise includes unlimited tokens.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Do you offer annual plans at a discount?</h4>
+        <p>Yes — annual billing is available at 2 months free. Contact us to set it up.</p>
+      </div>
+    </div>
+
+    <footer>
+      <p><a href="https://github.com/Hardonian/TokenGoblin">GitHub</a> &middot; Questions? <a href="mailto:scott@hardonian.com">scott@hardonian.com</a></p>
+    </footer>
+  </div>
+</body>
+</html>

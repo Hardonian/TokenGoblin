@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TokenGoblin — AI Token Cost Optimization</title>
+  <meta name="description" content="Track and optimize your LLM token spend. Per-worker, per-model, per-feature cost visibility.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f7f8f3; color: #171915; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    nav { padding: 20px 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d7dccf; }
+    nav .logo { font-weight: 700; font-size: 1.1rem; }
+    nav a { color: #426b51; text-decoration: none; font-size: 0.9rem; margin-left: 24px; }
+    nav a:hover { text-decoration: underline; }
+    .hero { padding: 80px 0 60px; text-align: center; }
+    .hero h1 { font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; max-width: 700px; margin: 0 auto; }
+    .hero p { font-size: 1.15rem; color: #52604e; max-width: 550px; margin: 16px auto 32px; }
+    .hero .btn { display: inline-block; background: #426b51; color: white; padding: 14px 32px; font-weight: 600; border-radius: 6px; text-decoration: none; margin: 0 8px; }
+    .hero .btn-outline { background: white; color: #171915; border: 1px solid #c5cdbb; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin: 60px 0; }
+    .feature { background: white; border: 1px solid #d7dccf; padding: 28px; border-radius: 8px; }
+    .feature h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .feature p { font-size: 0.9rem; color: #52604e; }
+    .cta { background: #2d6a4f; color: white; padding: 48px 24px; text-align: center; border-radius: 8px; margin: 60px 0; }
+    .cta h2 { font-size: 1.8rem; font-weight: 700; }
+    .cta p { margin: 12px 0 24px; opacity: 0.9; }
+    .cta .btn { display: inline-block; background: white; color: #2d6a4f; padding: 14px 32px; font-weight: 600; border-radius: 6px; text-decoration: none; margin: 0 8px; }
+    footer { border-top: 1px solid #d7dccf; padding: 24px 0; text-align: center; color: #61705a; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <span class="logo">TokenGoblin</span>
+      <div>
+        <a href="pricing.html">Pricing</a>
+        <a href="https://github.com/Hardonian/TokenGoblin">GitHub</a>
+      </div>
+    </nav>
+    
+    <section class="hero">
+      <h1>Know where every token goes</h1>
+      <p>Per-worker, per-model, per-feature cost attribution for your LLM usage. Stop guessing, start optimizing.</p>
+      <div>
+        <a href="pricing.html" class="btn">See Pricing</a>
+        <a href="https://github.com/Hardonian/TokenGoblin" class="btn btn-outline">View on GitHub</a>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="feature">
+        <h3>Per-Worker Cost</h3>
+        <p>See exactly how much each AI worker, agent, or pipeline costs you. Identify the biggest spenders in your stack.</p>
+      </div>
+      <div class="feature">
+        <h3>Output Quality Analysis</h3>
+        <p>Flag bloat, repetition, weak structure, and missing verification in LLM outputs. Get a deterministic quality score.</p>
+      </div>
+      <div class="feature">
+        <h3>Routing Optimization</h3>
+        <p>Discover which tasks belong on cheaper models. Get routing recommendations with estimated savings.</p>
+      </div>
+      <div class="feature">
+        <h3>Persistent Recommendations</h3>
+        <p>Track accept/reject/implement decisions for every optimization. Build a deterministic cost reduction history.</p>
+      </div>
+    </div>
+
+    <div class="cta">
+      <h2>Start tracking your token spend</h2>
+      <p>Free tier includes 50K tokens/month. No credit card required.</p>
+      <a href="https://buy.stripe.com/6oUbJ0arK21CcFc42lb3q06" class="btn">Subscribe — Free → Pro $49/mo</a>
+    </div>
+
+    <footer>
+      <p>TokenGoblin by Hardonian &middot; <a href="mailto:scott@hardonian.com" style="color:#426b51;">Contact</a></p>
+    </footer>
+  </div>
+</body>
+</html>
