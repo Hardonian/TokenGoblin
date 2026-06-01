@@ -51,6 +51,10 @@ type TokenEvent struct {
 	TaskCategory     string            `json:"task_category,omitempty"`
 	OutputStatus     OutputStatus      `json:"output_status"`
 	ReviewScore      *float64          `json:"review_score,omitempty"`
+	PromptExcerpt    string            `json:"prompt_excerpt,omitempty"`
+	OutputExcerpt    string            `json:"output_excerpt,omitempty"`
+	PromptReference  string            `json:"prompt_reference,omitempty"`
+	OutputReference  string            `json:"output_reference,omitempty"`
 	Tags             map[string]string `json:"-"`
 	TagsJSON         json.RawMessage   `json:"tags,omitempty"`
 	IdempotencyKey   string            `json:"idempotency_key,omitempty"`

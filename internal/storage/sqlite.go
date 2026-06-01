@@ -391,6 +391,58 @@ func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*dom
 	return &t, nil
 }
 
+func (r *SQLiteRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
+	var t domain.Tenant
+	var stripeCust, stripeSub sql.NullString
+	var createdAt, updatedAt string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_customer_id = ?
+	`, stripeCustomerID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCust.Valid {
+		t.StripeCustomerID = stripeCust.String
+	}
+	if stripeSub.Valid {
+		t.StripeSubscriptionID = stripeSub.String
+	}
+	t.CreatedAt = parseTime(createdAt)
+	t.UpdatedAt = parseTime(updatedAt)
+	return &t, nil
+}
+
+func (r *SQLiteRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
+	var t domain.Tenant
+	var stripeCust, stripeSub sql.NullString
+	var createdAt, updatedAt string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at
+		FROM tenants
+		WHERE stripe_subscription_id = ?
+	`, stripeSubscriptionID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapDBErr(err)
+	}
+	if stripeCust.Valid {
+		t.StripeCustomerID = stripeCust.String
+	}
+	if stripeSub.Valid {
+		t.StripeSubscriptionID = stripeSub.String
+	}
+	t.CreatedAt = parseTime(createdAt)
+	t.UpdatedAt = parseTime(updatedAt)
+	return &t, nil
+}
+
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -446,6 +498,37 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	return wrapDBErr(err)
 }
 
+func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
+		FROM tenant_pricing_overrides
+		WHERE tenant_id = ?
+		ORDER BY provider, model_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var points []domain.PricePoint
+	for rows.Next() {
+		var point domain.PricePoint
+		var created string
+		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		point.Currency = "USD"
+		point.Source = "override"
+		point.EffectiveFrom = parseTime(created)
+		point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
+		points = append(points, point)
+	}
+	return points, wrapDBErr(rows.Err())
+}
+
+func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
+	return wrapDBErr(err)
+}
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	role := normalizeRole(key.Role)
@@ -1000,6 +1083,60 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	return signals, wrapDBErr(rows.Err())
 }
 
+const outputAnalysisSelect = `
+	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+		efficiency_score, goblin_score, issues_json, recommendations_json,
+		evidence_json, degraded_json
+	FROM output_analyses
+`
+
+func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
+	var analyses []domain.OutputAnalysis
+	for rows.Next() {
+		var analysis domain.OutputAnalysis
+		var analyzedAt string
+		var issuesJSON, recommendationsJSON, evidenceJSON string
+		var degradedJSON sql.NullString
+		if err := rows.Scan(
+			&analysis.TenantID,
+			&analysis.AnalysisID,
+			&analysis.EventID,
+			&analysis.WorkerID,
+			&analyzedAt,
+			&analysis.EfficiencyScore,
+			&analysis.GoblinScore,
+			&issuesJSON,
+			&recommendationsJSON,
+			&evidenceJSON,
+			&degradedJSON,
+		); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		analysis.AnalyzedAt = parseTime(analyzedAt)
+		if issuesJSON != "" {
+			if err := json.Unmarshal([]byte(issuesJSON), &analysis.Issues); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if recommendationsJSON != "" {
+			if err := json.Unmarshal([]byte(recommendationsJSON), &analysis.Recommendations); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if evidenceJSON != "" {
+			if err := json.Unmarshal([]byte(evidenceJSON), &analysis.Evidence); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if degradedJSON.Valid && degradedJSON.String != "" && degradedJSON.String != "[]" && degradedJSON.String != "null" {
+			if err := json.Unmarshal([]byte(degradedJSON.String), &analysis.Degraded); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		analyses = append(analyses, analysis)
+	}
+	return analyses, wrapDBErr(rows.Err())
+}
 
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,

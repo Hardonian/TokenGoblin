@@ -56,31 +56,16 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 					return
 				}
 
-				// Update last used (async to not block)
 				go func() {
 					_ = repo.UpdateAPIKeyLastUsed(context.Background(), keyID)
 				}()
 
 				ctx := context.WithValue(r.Context(), tenantIDKey, apiKey.TenantID)
 				ctx = context.WithValue(ctx, apiKeyIDKey, keyID)
+				ctx = context.WithValue(ctx, roleKey, apiKey.Role)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-
-			if !moat.VerifyAPIKey(secret, apiKey.KeyHash) {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			// Update last used (async to not block)
-			go func() {
-				_ = repo.UpdateAPIKeyLastUsed(context.Background(), keyID)
-			}()
-
-			ctx := context.WithValue(r.Context(), tenantIDKey, apiKey.TenantID)
-			ctx = context.WithValue(ctx, apiKeyIDKey, keyID)
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
 		}
 
 		tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))

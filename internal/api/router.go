@@ -26,7 +26,20 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/events/batch", batchIngestHandler)
 
 	pricingHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleSetPricingOverride))
+	pricingReadHandler := AuthMiddleware(repo, http.HandlerFunc(handler.HandleGetPricing))
+	seedHandler := AuthMiddleware(repo, RequireRole("admin")(http.HandlerFunc(handler.HandleSeedDemoData)))
+	resetHandler := AuthMiddleware(repo, RequireRole("admin")(http.HandlerFunc(handler.HandleResetTenantData)))
+	stripeWebhookHandler := http.HandlerFunc(handler.HandleStripeWebhook)
+	verifiedStripeHandler := http.HandlerFunc(handler.HandleVerifiedStripeEvent)
 	mux.Handle("/v1/pricing/overrides", pricingHandler)
+	mux.Handle("/v1/pricing", pricingReadHandler)
+	mux.Handle("/api/pricing", pricingReadHandler)
+	mux.Handle("/v1/dashboard/seed", seedHandler)
+	mux.Handle("/api/dashboard/seed", seedHandler)
+	mux.Handle("/v1/dashboard/reset", resetHandler)
+	mux.Handle("/api/dashboard/reset", resetHandler)
+	mux.Handle("/api/v1/webhooks/stripe", stripeWebhookHandler)
+	mux.Handle("/internal/billing/stripe-event", verifiedStripeHandler)
 
 	mux.Handle("/api/ingest/token-usage", ingestHandler)
 	mux.Handle("/api/ingest/token-usage/batch", batchIngestHandler)
@@ -56,7 +69,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/dashboard/export.csv", wrap(handler.HandleExportCSV))
 	mux.Handle("/v1/dashboard/report.md", wrap(handler.HandleReportMarkdown))
 	mux.Handle("/v1/audit/events", wrap(handler.HandleAuditEvents))
-	mux.Handle("/v1/tenant/members", wrap(handler.HandleTenantMembers))
+	mux.Handle("/v1/tenant/members", wrapAdmin(handler.HandleTenantMembers))
 
 	mux.Handle("/api/dashboard/overview", wrap(handler.HandleOverview))
 	mux.Handle("/api/dashboard/workers", wrap(handler.HandleWorkers))
@@ -69,7 +82,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/api/dashboard/export.csv", wrap(handler.HandleExportCSV))
 	mux.Handle("/api/dashboard/report.md", wrap(handler.HandleReportMarkdown))
 	mux.Handle("/api/audit/events", wrap(handler.HandleAuditEvents))
-	mux.Handle("/api/tenant/members", wrap(handler.HandleTenantMembers))
+	mux.Handle("/api/tenant/members", wrapAdmin(handler.HandleTenantMembers))
 
 	handlerWithMiddleware := TimeoutMiddleware(15*time.Second, CORSMiddleware(LoggingMiddleware(RecoverMiddleware(mux))))
 	return handlerWithMiddleware

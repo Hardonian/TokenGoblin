@@ -772,6 +772,19 @@ func (h *IngestionHandler) HandleVerifiedStripeEvent(w http.ResponseWriter, r *h
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: status, Data: result})
 }
 
+func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+	writeJSON(w, http.StatusNotImplemented, Envelope{
+		OK:     false,
+		Status: "degraded",
+		Error:  issue("not_implemented", "Stripe signature verification webhook is not implemented in the Go server yet."),
+		Degraded: []domain.Issue{{Code: "not_implemented", Message: "Use the internal verified billing route until Stripe webhook verification is implemented."}},
+	})
+}
+
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if val := r.Context().Value(tenantIDKey); val != nil {
 		if tenantID, ok := val.(string); ok && tenantID != "" {

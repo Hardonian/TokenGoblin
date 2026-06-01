@@ -17,6 +17,10 @@ type Repository interface {
 	GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error)
 	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
+	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
+	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
+	DeleteTenantData(ctx context.Context, tenantID string) error
 	DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error)
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
 	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
@@ -32,6 +36,8 @@ type Repository interface {
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
 	SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error
 	SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error
+	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
+	ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error)
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
@@ -58,6 +64,14 @@ func (r *UnavailableRepository) UpsertTenant(context.Context, domain.Tenant) err
 }
 
 func (r *UnavailableRepository) GetTenant(context.Context, string) (*domain.Tenant, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) GetTenantByStripeCustomerID(context.Context, string) (*domain.Tenant, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) GetTenantByStripeSubscriptionID(context.Context, string) (*domain.Tenant, error) {
 	return nil, r.err()
 }
 
@@ -139,6 +153,14 @@ func (r *UnavailableRepository) SaveOutputAnalysis(context.Context, domain.Outpu
 
 func (r *UnavailableRepository) SaveProductivitySummary(context.Context, domain.ProductivitySummary) error {
 	return r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalyses(context.Context, string, int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalysesByWorker(context.Context, string, string, int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) ListTokenEvents(context.Context, string, int) ([]domain.TokenEvent, error) {

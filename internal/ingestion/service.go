@@ -452,6 +452,85 @@ func (s *ExecutionService) DeleteTenantData(ctx context.Context, tenantID string
 	return s.repo.DeleteTenantData(ctx, tenantID)
 }
 
+func (s *ExecutionService) SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.RecommendationState{}, err
+	}
+	recommendationID = strings.TrimSpace(recommendationID)
+	if recommendationID == "" {
+		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "recommendation_id is required.", Field: "recommendation_id"}}}
+	}
+	status := strings.ToLower(strings.TrimSpace(update.Status))
+	if !validRecommendationStatus(status) {
+		return domain.RecommendationState{}, ValidationError{Issues: []domain.Issue{{Code: "invalid_status", Message: "recommendation status is not supported.", Field: "status"}}}
+	}
+	states, err := s.repo.ListRecommendationStates(ctx, tenantID)
+	if err != nil {
+		return domain.RecommendationState{}, err
+	}
+	now := s.now().UTC()
+	state := domain.RecommendationState{
+		TenantID:         tenantID,
+		RecommendationID: recommendationID,
+		Status:           status,
+		Actor:            strings.TrimSpace(actor),
+		Note:             strings.TrimSpace(update.Note),
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	for _, existing := range states {
+		if existing.RecommendationID == recommendationID {
+			if !existing.CreatedAt.IsZero() {
+				state.CreatedAt = existing.CreatedAt
+			}
+			break
+		}
+	}
+	if err := s.repo.SetRecommendationState(ctx, state); err != nil {
+		return domain.RecommendationState{}, err
+	}
+	return state, nil
+}
+
+func (s *ExecutionService) AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListAuditEvents(ctx, tenantID, limit)
+}
+
+func (s *ExecutionService) TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListTenantMembers(ctx, tenantID)
+}
+
+func (s *ExecutionService) UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error) {
+	if err := validateTenantID(tenantID); err != nil {
+		return domain.TenantMember{}, err
+	}
+	member.SubjectID = strings.TrimSpace(member.SubjectID)
+	if member.SubjectID == "" {
+		return domain.TenantMember{}, ValidationError{Issues: []domain.Issue{{Code: "required", Message: "subject_id is required.", Field: "subject_id"}}}
+	}
+	if err := s.ensureTenant(ctx, tenantID); err != nil {
+		return domain.TenantMember{}, err
+	}
+	now := s.now().UTC()
+	member.TenantID = tenantID
+	member.Email = strings.TrimSpace(member.Email)
+	member.Role = normalizeRole(member.Role)
+	if member.CreatedAt.IsZero() {
+		member.CreatedAt = now
+	}
+	member.UpdatedAt = now
+	if err := s.repo.UpsertTenantMember(ctx, member); err != nil {
+		return domain.TenantMember{}, err
+	}
+	return member, nil
+}
+
 func (s *ExecutionService) ensureTenant(ctx context.Context, tenantID string) error {
 	existing, err := s.repo.GetTenant(ctx, tenantID)
 	if err != nil {

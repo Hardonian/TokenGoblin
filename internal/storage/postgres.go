@@ -193,6 +193,32 @@ func (r *PostgresRepository) SetPricingOverride(ctx context.Context, tenantID st
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
+		FROM tenant_pricing_overrides
+		WHERE tenant_id = $1
+		ORDER BY provider, model_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var points []domain.PricePoint
+	for rows.Next() {
+		var point domain.PricePoint
+		var created time.Time
+		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		point.Currency = "USD"
+		point.Source = "override"
+		point.EffectiveFrom = created
+		point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
+		points = append(points, point)
+	}
+	return points, wrapDBErr(rows.Err())
+}
 
 func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
@@ -740,6 +766,58 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	return signals, wrapDBErr(rows.Err())
 }
 
+const outputAnalysisSelectPostgres = `
+	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+		efficiency_score, goblin_score, issues_json, recommendations_json,
+		evidence_json, degraded_json
+	FROM output_analyses
+`
+
+func scanOutputAnalysesPostgres(rows pgx.Rows) ([]domain.OutputAnalysis, error) {
+	var analyses []domain.OutputAnalysis
+	for rows.Next() {
+		var analysis domain.OutputAnalysis
+		var issuesJSON, recommendationsJSON, evidenceJSON string
+		var degradedJSON *string
+		if err := rows.Scan(
+			&analysis.TenantID,
+			&analysis.AnalysisID,
+			&analysis.EventID,
+			&analysis.WorkerID,
+			&analysis.AnalyzedAt,
+			&analysis.EfficiencyScore,
+			&analysis.GoblinScore,
+			&issuesJSON,
+			&recommendationsJSON,
+			&evidenceJSON,
+			&degradedJSON,
+		); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if issuesJSON != "" {
+			if err := json.Unmarshal([]byte(issuesJSON), &analysis.Issues); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if recommendationsJSON != "" {
+			if err := json.Unmarshal([]byte(recommendationsJSON), &analysis.Recommendations); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if evidenceJSON != "" {
+			if err := json.Unmarshal([]byte(evidenceJSON), &analysis.Evidence); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		if degradedJSON != nil && *degradedJSON != "" && *degradedJSON != "[]" && *degradedJSON != "null" {
+			if err := json.Unmarshal([]byte(*degradedJSON), &analysis.Degraded); err != nil {
+				return nil, wrapDBErr(err)
+			}
+		}
+		analyses = append(analyses, analysis)
+	}
+	return analyses, wrapDBErr(rows.Err())
+}
 
 const tokenEventSelectPostgres = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
