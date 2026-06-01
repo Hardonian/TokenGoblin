@@ -324,7 +324,7 @@ func (r *SQLiteRepository) sqliteColumnExists(ctx context.Context, table, column
 	if err != nil {
 		return false, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var cid int
 		var name, colType string
@@ -508,7 +508,7 @@ func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID st
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var points []domain.PricePoint
 	for rows.Next() {
 		var point domain.PricePoint
@@ -595,7 +595,7 @@ func (r *SQLiteRepository) ListTenantMembers(ctx context.Context, tenantID strin
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var members []domain.TenantMember
 	for rows.Next() {
 		var member domain.TenantMember
@@ -642,7 +642,7 @@ func (r *SQLiteRepository) ListAuditEvents(ctx context.Context, tenantID string,
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var events []domain.AuditEvent
 	for rows.Next() {
 		var event domain.AuditEvent
@@ -690,7 +690,7 @@ func (r *SQLiteRepository) ListRecommendationStates(ctx context.Context, tenantI
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var states []domain.RecommendationState
 	for rows.Next() {
 		var state domain.RecommendationState
@@ -986,7 +986,7 @@ func (r *SQLiteRepository) ListOutputAnalyses(ctx context.Context, tenantID stri
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanOutputAnalyses(rows)
 }
 
@@ -1002,7 +1002,7 @@ func (r *SQLiteRepository) ListOutputAnalysesByWorker(ctx context.Context, tenan
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanOutputAnalyses(rows)
 }
 
@@ -1018,7 +1018,7 @@ func (r *SQLiteRepository) ListTokenEvents(ctx context.Context, tenantID string,
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanTokenEvents(rows)
 }
 
@@ -1034,7 +1034,7 @@ func (r *SQLiteRepository) ListTokenEventsBefore(ctx context.Context, tenantID s
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanTokenEvents(rows)
 }
 
@@ -1053,7 +1053,7 @@ func (r *SQLiteRepository) ListAnomalySignals(ctx context.Context, tenantID stri
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var signals []domain.AnomalySignal
 	for rows.Next() {

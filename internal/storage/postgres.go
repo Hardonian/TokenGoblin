@@ -418,7 +418,7 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 	if err != nil {
 		return wrapDBErr(err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := event.CreatedAt
 	if now.IsZero() {

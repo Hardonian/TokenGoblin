@@ -485,14 +485,16 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 
 	writer := csv.NewWriter(w)
-	writer.Write([]string{"event_id", "timestamp", "worker_id", "job_id", "provider", "model_id", "total_tokens", "cost_usd", "task_category", "output_status"})
+	if err := writer.Write([]string{"event_id", "timestamp", "worker_id", "job_id", "provider", "model_id", "total_tokens", "cost_usd", "task_category", "output_status"}); err != nil {
+		return
+	}
 
 	for _, event := range events {
 		costStr := ""
 		if event.CostEstimateUSD != nil {
 			costStr = fmt.Sprintf("%.6f", *event.CostEstimateUSD)
 		}
-		writer.Write([]string{
+		if err := writer.Write([]string{
 			event.EventID,
 			event.Timestamp.Format(time.RFC3339),
 			event.WorkerID,
@@ -503,7 +505,9 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 			costStr,
 			event.TaskCategory,
 			string(event.OutputStatus),
-		})
+		}); err != nil {
+			return
+		}
 	}
 	writer.Flush()
 	h.audit(r, tenantID, "export.csv", "tenant_export", map[string]interface{}{"format": "csv"})

@@ -16,7 +16,7 @@ func BenchmarkDeleteTenantData(b *testing.B) {
 	if err != nil {
 		b.Fatalf("failed to open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	ctx := context.Background()
 
@@ -28,10 +28,12 @@ func BenchmarkDeleteTenantData(b *testing.B) {
 		tenantID := fmt.Sprintf("test-tenant-%d", i)
 
 		// Setup a bunch of data that will be deleted
-		repo.UpsertTenant(ctx, domain.Tenant{TenantID: tenantID, Name: "Test Tenant"})
+		if err := repo.UpsertTenant(ctx, domain.Tenant{TenantID: tenantID, Name: "Test Tenant"}); err != nil {
+			b.Fatalf("failed to upsert tenant: %v", err)
+		}
 
 		for j := 0; j < 100; j++ {
-			repo.SaveTokenEvent(ctx, domain.TokenEvent{
+			if err := repo.SaveTokenEvent(ctx, domain.TokenEvent{
 				TenantID:     tenantID,
 				EventID:      fmt.Sprintf("event-%d-%d", i, j),
 				Provider:     "test",
@@ -41,7 +43,9 @@ func BenchmarkDeleteTenantData(b *testing.B) {
 				InputTokens:  10,
 				OutputTokens: 10,
 				Timestamp:    time.Now(),
-			})
+			}); err != nil {
+				b.Fatalf("failed to save token event: %v", err)
+			}
 		}
 
 		b.StartTimer()

@@ -16,7 +16,7 @@ import (
 func TestIngestTokenEventComputesInternalCostAndStoresExternalEstimate(t *testing.T) {
 	ctx := context.Background()
 	service, repo := testService(t)
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	clientCost := 999.0
 	result, err := service.IngestTokenEvent(ctx, "tenant-a", domain.TokenEvent{
@@ -61,7 +61,7 @@ func TestIngestTokenEventComputesInternalCostAndStoresExternalEstimate(t *testin
 func TestIngestRejectsCrossTenantPayload(t *testing.T) {
 	ctx := context.Background()
 	service, repo := testService(t)
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	_, err := service.IngestTokenEvent(ctx, "tenant-a", domain.TokenEvent{
 		EventID:      "evt-tenant-mismatch",
@@ -80,7 +80,7 @@ func TestIngestRejectsCrossTenantPayload(t *testing.T) {
 func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 	ctx := context.Background()
 	service, repo := testService(t)
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	result, err := service.IngestTokenEvent(ctx, "tenant-a", domain.TokenEvent{
 		EventID:          "evt-unknown",
@@ -110,7 +110,7 @@ func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 func TestIngestPersistsOutputAnalysis(t *testing.T) {
 	ctx := context.Background()
 	service, repo := testService(t)
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	_, err := service.IngestTokenEvent(ctx, "tenant-a", domain.TokenEvent{
 		EventID:       "evt-analysis",
@@ -145,7 +145,7 @@ func TestIngestTokenEventReusesQueuedCostCalculation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer baseRepo.Close()
+	defer func() { _ = baseRepo.Close() }()
 
 	repo := &pricingCountRepo{Repository: baseRepo}
 	service := NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {

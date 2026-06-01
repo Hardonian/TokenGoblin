@@ -237,7 +237,7 @@ func TestViewerAPIKeyCannotMutateTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	// Seed tenant-a
 	tenant := domain.Tenant{
@@ -303,7 +303,7 @@ func TestStripeWebhookHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	// Seed target tenant
 	tenant := domain.Tenant{
@@ -347,7 +347,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	now := time.Now().UTC()
 	if err := repo.UpsertTenant(context.Background(), domain.Tenant{

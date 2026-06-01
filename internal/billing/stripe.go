@@ -345,9 +345,10 @@ func VerifySignature(payload []byte, sigHeader string, secret string, tolerance 
 		}
 		key := parts[0]
 		val := parts[1]
-		if key == "t" {
+		switch key {
+		case "t":
 			timestampStr = val
-		} else if key == "v1" {
+		case "v1":
 			signatures = append(signatures, val)
 		}
 	}

@@ -53,7 +53,7 @@ func TestAllowIngestion(t *testing.T) {
 		client := redis.NewClient(&redis.Options{
 			Addr: mr.Addr(),
 		})
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		rl := NewRateLimiter(client)
 		if rl == nil {
@@ -105,7 +105,7 @@ func TestAllowIngestion(t *testing.T) {
 			DialTimeout: 10 * time.Millisecond,
 			ReadTimeout: 10 * time.Millisecond,
 		})
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		rl := NewRateLimiter(client)
 

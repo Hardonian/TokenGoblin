@@ -54,7 +54,7 @@ func (w *WebhookAlerter) Alert(ctx context.Context, tenantID string, anomalies [
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)

@@ -73,7 +73,7 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open repaired sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	if err := repo.SaveTokenEvent(context.Background(), domain.TokenEvent{
 		TenantID:       "tenant-a",

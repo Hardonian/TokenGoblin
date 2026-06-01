@@ -16,7 +16,7 @@ func TestProcessVerifiedStripeEventUpdatesTenantPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	now := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	if err := repo.UpsertTenant(ctx, domain.Tenant{
@@ -60,7 +60,7 @@ func TestProcessVerifiedStripeEventDeletesSubscription(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	now := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	if err := repo.UpsertTenant(ctx, domain.Tenant{
@@ -96,7 +96,7 @@ func TestProcessVerifiedStripeEventRejectsCustomerMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	now := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	if err := repo.UpsertTenant(ctx, domain.Tenant{

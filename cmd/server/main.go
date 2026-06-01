@@ -86,7 +86,7 @@ func main() {
 			slog.Info("connected to sqlite database")
 		}
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	var redisClient *redis.Client
 	if redisAddr := os.Getenv("TG_REDIS_ADDR"); redisAddr != "" {

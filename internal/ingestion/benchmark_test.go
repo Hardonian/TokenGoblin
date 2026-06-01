@@ -17,7 +17,7 @@ func BenchmarkIngestTokenEventBatch(b *testing.B) {
 	if err != nil {
 		b.Fatalf("open sqlite: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	registry := cost.LoadRegistry(ctx, cost.RegistryConfig{DisableDefaults: true})
 	service := NewService(repo, registry)

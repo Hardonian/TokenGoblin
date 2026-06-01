@@ -18,7 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("open storage: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv())).WithClock(func() time.Time {
