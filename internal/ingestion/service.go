@@ -628,37 +628,6 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 	return event, issues, nil
 }
 
-func (s *ExecutionService) SetRecommendationState(ctx context.Context, tenantID, recommendationID, actor string, update domain.RecommendationStateUpdate) (domain.RecommendationState, error) {
-	state := domain.RecommendationState{
-		TenantID:          tenantID,
-		RecommendationID:  recommendationID,
-		Actor:             actor,
-		Status:            update.Status,
-		Note:              update.Note,
-		UpdatedAt:         time.Now().UTC(),
-		CreatedAt:         time.Now().UTC(),
-	}
-	if err := s.repo.SetRecommendationState(ctx, state); err != nil {
-		return state, err
-	}
-	return state, nil
-}
-
-func (s *ExecutionService) AuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error) {
-	return s.repo.ListAuditEvents(ctx, tenantID, limit)
-}
-
-func (s *ExecutionService) TenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error) {
-	return s.repo.ListTenantMembers(ctx, tenantID)
-}
-
-func (s *ExecutionService) UpsertTenantMember(ctx context.Context, tenantID string, member domain.TenantMember) (domain.TenantMember, error) {
-	member.TenantID = tenantID
-	if err := s.repo.UpsertTenantMember(ctx, member); err != nil {
-		return member, err
-	}
-	return member, nil
-}
 
 func validateEvent(event domain.TokenEvent) []domain.Issue {
 	var issues []domain.Issue

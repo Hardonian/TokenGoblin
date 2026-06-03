@@ -1,130 +1,117 @@
-# TokenGoblin
+# TokenGoblin — AI Spend & Token-Efficiency Observability
 
-TokenGoblin is a deterministic token-efficiency review service for teams tracking
-worker/agent token usage, output bloat, cost leaks, anomalies, and routing
-opportunities.
-
-It does not perform AI quality grading. Every visible score or recommendation is
-derived from persisted usage events, configured pricing, optional bounded
-prompt/output excerpts, and deterministic rules.
+Track, analyze, and optimize AI token spending across your autonomous agent workforce.
 
 ## Quick Start
 
+### Prerequisites
+- Go 1.25+
+- Node.js 20+
+- Stripe account (for billing features)
+
+### 1. Clone & configure
+
 ```bash
-npm install
-npm run db:seed
-npm run smoke
-npm run dev
+git clone https://github.com/Hardonian/TokenGoblin.git
+cd TokenGoblin
+cp .env.example .env
+# Edit .env with your Stripe keys
 ```
 
-The Go API listens on `:8080` by default. The Next dashboard is in `frontend/`.
+### 2. Run with Docker (recommended)
 
+```bash
+docker-compose up --build
+```
+
+API: http://localhost:8080  
+Dashboard: http://localhost:3000
+
+### 3. Run locally (development)
+
+**Backend:**
+```bash
+go run ./cmd/server
+```
+
+**Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-All API requests require either:
+## Environment Variables
 
-- `Authorization: Bearer key_id.secret`, for stored API keys
-- `x-tenant-id: demo-tenant`, retained for local/demo compatibility
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | No | SQLite path (default: `file:token_goblin.db`) or Postgres DSN |
+| `STRIPE_SECRET_KEY` | For billing | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | For billing | Stripe webhook signing secret |
+| `STRIPE_PRICE_PRO` | For billing | Stripe Price ID for Pro plan |
+| `STRIPE_PRICE_ENTERPRISE` | For billing | Stripe Price ID for Enterprise plan |
+| `TG_INTERNAL_WEBHOOK_SECRET` | For billing | Internal secret for Stripe webhook forwarding |
+| `PORT` | No | API server port (default: 8080) |
+| `NEXT_PUBLIC_TG_API_BASE` | Yes (frontend) | API base URL |
+| `NEXT_PUBLIC_STRIPE_PRICE_PRO` | For billing | Stripe Price ID for Pro (frontend) |
+| `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` | For billing | Stripe Price ID for Enterprise (frontend) |
 
-## Core Routes
+## API Reference
 
-- `POST /api/ingest/token-usage`
-- `POST /api/ingest/token-usage/batch`
-- `GET /api/dashboard/overview`
-- `GET /api/dashboard/workers`
-- `GET /api/dashboard/workers/{worker_id}`
-- `GET /api/dashboard/events`
-- `GET /api/dashboard/output-analysis`
-- `GET /api/dashboard/recommendations`
-- `POST /api/dashboard/recommendations/{recommendation_id}/status`
-- `GET /api/audit/events`
-- `GET /api/tenant/members`
-- `POST /api/tenant/members`
-- `GET /api/dashboard/export.csv`
-- `GET /api/dashboard/report.md`
-- `GET /api/pricing`
-- `POST /api/pricing/overrides`
+### Authentication
+All API routes (except `/api/tenant/register`) require either:
+- `x-tenant-id` header (for development/demo)
+- `Authorization: Bearer <api_key>` (for production)
 
-Example:
-
-```bash
-curl -H "x-tenant-id: demo-tenant" \
-  http://localhost:8080/api/dashboard/overview
+### Ingestion
+```
+POST /api/ingest/token-usage
+POST /api/ingest/token-usage/batch
 ```
 
-## Data And Analysis
+### Dashboard
+```
+GET /api/dashboard/overview
+GET /api/dashboard/workers
+GET /api/dashboard/workers/{worker_id}
+GET /api/dashboard/events?limit=12
+GET /api/dashboard/anomalies
+GET /api/dashboard/output-analysis
+GET /api/dashboard/recommendations
+GET /api/dashboard/export.csv
+GET /api/dashboard/report.md
+```
 
-Token usage events normalize provider/model, worker, run/job/session, input and
-output tokens, cached tokens, latency, output status, review score, optional
-bounded prompt/output excerpts, and optional external reference IDs.
+### Billing
+```
+POST /api/tenant/register          — Create account (public)
+POST /api/billing/checkout         — Create Stripe Checkout session
+POST /api/billing/portal           — Create Stripe Customer Portal session
+GET  /api/billing/status           — Get current billing status
+POST /api/stripe/webhook           — Stripe webhook (server-side)
+```
 
-Cost estimates use a configurable model pricing table with input/output/cached
-token separation. Unknown model pricing is explicitly degraded and excluded from
-cost totals.
+### Tenant Management
+```
+GET    /api/tenant/members
+POST   /api/tenant/members
+POST   /api/dashboard/recommendations/{id}/status
+DELETE /api/dashboard/reset
+```
 
-Output analysis is deterministic. It can flag output bloat, repetition, weak
-structure, missing verification markers, missing prompt constraints, duplicate
-context risk, unnecessary tool-use evidence, and high-cost events. If text
-evidence is absent, text checks are skipped and marked degraded.
+## Pricing
 
-## Scripts
+| Plan | Price | Events/mo | Features |
+|------|-------|-----------|----------|
+| Free | $0 | 10K | Dashboard, CSV export |
+| Pro | $29 | 100K | + Output analysis, Goblin Score, recommendations |
+| Enterprise | $99 | Unlimited | + Audit trail, RBAC, custom pricing, SLA |
 
-- `npm run lint` runs `go vet ./...`
-- `npm run typecheck` runs compile-only Go tests
-- `npm run test` runs all Go tests
-- `npm run build` builds the Go server
-- `npm run db:seed` creates deterministic demo data
-- `npm run smoke` seeds and verifies the execution layer
-- `npm run lint --prefix frontend` lints the dashboard
-- `npm run build --prefix frontend` builds the dashboard
+## Architecture
 
-## Environment
+- **Backend:** Go 1.25, SQLite (dev) / Postgres (prod), Stripe integration
+- **Frontend:** Next.js 16, React 19, Tailwind CSS 4
+- **Deployment:** Docker multi-stage build, single container
 
-- `TG_ADDR`: API listen address, default `:8080`
-- `TG_DB_PATH`: SQLite path, default `./data/tokengoblin.sqlite`
-- `TG_DB_DSN`: Postgres DSN; when set, Postgres migrations run from `data/migrations`
-- `TG_PRICING_TABLE_JSON`: JSON pricing overrides keyed by `provider:model`
-- `TG_DISABLE_DEFAULT_PRICING=1`: disables bundled default pricing
-- `TG_REDIS_ADDR`: optional Redis address for rate limiting/cache diagnostics
-- `TG_DEMO_TENANT_ID`: tenant used by seed/smoke, default `demo-tenant`
-- `NEXT_PUBLIC_TG_API_BASE`: dashboard API base, default `http://localhost:8080`
-- `TG_API_BASE`: server-side API base used by the Next.js Stripe webhook forwarder
-- `STRIPE_WEBHOOK_SECRET`: Stripe signing secret for the Next.js Node runtime route at `/api/stripe/webhook`
-- `TG_INTERNAL_WEBHOOK_SECRET`: shared internal secret for forwarding verified Stripe events into the Go billing lifecycle endpoint
-- `TG_ENV=production`: enables fail-closed deployment checks
-- `TG_ALLOW_DEMO_AUTH=1`: allows `x-tenant-id` demo auth outside production only
-- `TG_PLAN_FREE_LIMIT_USD`, `TG_PLAN_PREMIUM_LIMIT_USD`: deterministic quota limits applied by Stripe lifecycle events, defaults `$10` and `$100`
-
-## Production Notes
-
-Implemented:
-
-- Tenant-scoped repository reads/writes
-- API-key authentication with hashed secrets
-- API-key roles and route-level RBAC for ingestion, pricing, reset/seed, and recommendation decisions
-- Deterministic pricing, anomaly, productivity, output-analysis, and routing rules
-- Persisted recommendation acceptance/rejection/implementation state
-- Tenant member registry and audit/event log foundation
-- CSV and Markdown tenant exports
-- Verified Stripe webhook route in the Next.js Node runtime using raw request bodies
-- Stripe subscription lifecycle forwarding into tenant tier, quota, customer, and subscription state
-- Production fail-closed checks for Postgres DSN, internal webhook secret, and demo-auth disablement
-- Supabase/Postgres RLS migration pack using `app.tenant_id` tenant policies
-- SQLite schema repair for older local/demo databases
-- Graceful degraded responses for unavailable storage and missing evidence
-
-Partially implemented:
-
-- Stripe checkout linking supports tenant metadata/client reference IDs; full hosted billing portal and checkout creation are not implemented
-- RLS policies are present for Supabase/Postgres; direct client sessions must set `app.tenant_id` or use service-role/server-side access
-- Tenant members are persisted for access-review and admin workflows; full SSO/identity-provider sync is not configured
-
-Planned:
-
-- Stripe checkout and billing portal creation
-- SSO admin surfaces and identity-provider group sync
-- Recurring review scheduling and report delivery
+## License
+MIT

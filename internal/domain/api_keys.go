@@ -8,7 +8,6 @@ type APIKey struct {
 	Name       string     `json:"name"`
 	Role       string     `json:"role"`
 	KeyHash    string     `json:"-"`
-	Role       string     `json:"role"`
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	IsRevoked  bool       `json:"is_revoked"`

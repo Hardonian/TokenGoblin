@@ -443,15 +443,12 @@ func (r *SQLiteRepository) GetTenantByStripeSubscriptionID(ctx context.Context, 
 	return &t, nil
 }
 
-<<<<<<< Updated upstream
-=======
 func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
 	return nil, nil
 }
 
 
 
->>>>>>> Stashed changes
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -512,37 +509,6 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	return wrapDBErr(err)
 }
 
-func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
-		FROM tenant_pricing_overrides
-		WHERE tenant_id = ?
-		ORDER BY provider, model_id
-	`, tenantID)
-	if err != nil {
-		return nil, wrapDBErr(err)
-	}
-	defer func() { _ = rows.Close() }()
-	var points []domain.PricePoint
-	for rows.Next() {
-		var point domain.PricePoint
-		var created string
-		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		point.Currency = "USD"
-		point.Source = "override"
-		point.EffectiveFrom = parseTime(created)
-		point.CachedInputCostPerMillion = point.InputCostPerMillion / 2.0
-		points = append(points, point)
-	}
-	return points, wrapDBErr(rows.Err())
-}
-
-func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
-	return wrapDBErr(err)
-}
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	role := normalizeRole(key.Role)
@@ -1020,6 +986,67 @@ func (r *SQLiteRepository) ListOutputAnalysesByWorker(ctx context.Context, tenan
 	return scanOutputAnalyses(rows)
 }
 
+const tokenEventSelect = `
+	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
+		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
+		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
+		cost_is_degraded, cost_degraded_code, external_estimate_usd,
+		external_estimate_currency, latency_ms, task_category, output_status,
+		review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
+		prompt_reference, output_reference, tags_json, idempotency_key
+	FROM token_usage_events
+`
+
+func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
+	var events []domain.TokenEvent
+	for rows.Next() {
+		var event domain.TokenEvent
+		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey sql.NullString
+		var cost, externalCost, reviewScore sql.NullFloat64
+		var costIsDegraded int
+		var occurredAt, createdAt string
+		if err := rows.Scan(&event.TenantID, &event.EventID, &event.WorkerID, &event.WorkerName,
+			&jobID, &sessionID, &runID, &event.Provider, &event.ModelID, &event.PromptTokens,
+			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
+			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
+			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
+			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		event.JobID = jobID.String
+		event.SessionID = sessionID.String
+		event.RunID = runID.String
+		if cost.Valid {
+			costCopy := cost.Float64
+			event.CostEstimateUSD = &costCopy
+		}
+		event.CostDegradedCode = costCode.String
+		event.CostIsDegraded = costIsDegraded != 0
+		if externalCost.Valid {
+			event.ExternalEstimate = &domain.ExternalEstimate{
+				CostUSD:  externalCost.Float64,
+				Currency: externalCurrency.String,
+			}
+		}
+		event.Timestamp = parseTime(occurredAt)
+		event.CreatedAt = parseTime(createdAt)
+		event.PromptExcerpt = promptExcerpt.String
+		event.OutputExcerpt = outputExcerpt.String
+		event.PromptReference = promptReference.String
+		event.OutputReference = outputReference.String
+		if reviewScore.Valid {
+			event.ReviewScore = &reviewScore.Float64
+		}
+		if tags.Valid && tags.String != "" && tags.String != "{}" {
+			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
+		}
+		event.IdempotencyKey = idempotencyKey.String
+		events = append(events, event)
+	}
+	return events, wrapDBErr(rows.Err())
+}
+
 func (r *SQLiteRepository) ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -1152,97 +1179,6 @@ func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
 	return analyses, wrapDBErr(rows.Err())
 }
 
-const outputAnalysisSelect = `
-	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
-		efficiency_score, goblin_score, issues_json, recommendations_json,
-		evidence_json, degraded_json, created_at
-	FROM output_analyses
-`
-
-const tokenEventSelect = `
-	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
-		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
-		input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency,
-		cost_is_degraded, cost_degraded_code, external_estimate_usd,
-		external_estimate_currency, latency_ms, task_category, output_status,
-		review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
-		prompt_reference, output_reference, tags_json, idempotency_key
-	FROM token_usage_events
-`
-
-func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
-	var events []domain.TokenEvent
-	for rows.Next() {
-		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey sql.NullString
-		var cost, externalCost, reviewScore sql.NullFloat64
-		var costIsDegraded int
-		var occurredAt, createdAt string
-		if err := rows.Scan(&event.TenantID, &event.EventID, &event.WorkerID, &event.WorkerName,
-			&jobID, &sessionID, &runID, &event.Provider, &event.ModelID, &event.PromptTokens,
-			&event.CompletionTokens, &event.CachedTokens, &event.InputTokens, &event.OutputTokens,
-			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
-			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
-			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
-			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		event.JobID = jobID.String
-		event.SessionID = sessionID.String
-		event.RunID = runID.String
-		event.CostIsDegraded = costIsDegraded == 1
-		event.CostDegradedCode = costCode.String
-		event.PromptExcerpt = promptExcerpt.String
-		event.OutputExcerpt = outputExcerpt.String
-		event.PromptReference = promptReference.String
-		event.OutputReference = outputReference.String
-		event.Timestamp = parseTime(occurredAt)
-		event.CreatedAt = parseTime(createdAt)
-		event.TaskType = event.TaskCategory
-		if cost.Valid {
-			event.CostEstimateUSD = &cost.Float64
-		}
-		if externalCost.Valid {
-			event.ExternalEstimate = &domain.ExternalEstimate{
-				CostUSD:  externalCost.Float64,
-				Currency: externalCurrency.String,
-			}
-		}
-		if reviewScore.Valid {
-			event.ReviewScore = &reviewScore.Float64
-		}
-		if tags.Valid && tags.String != "" && tags.String != "{}" {
-			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
-		}
-		if idempotencyKey.Valid {
-			event.IdempotencyKey = idempotencyKey.String
-		}
-		events = append(events, event)
-	}
-	return events, wrapDBErr(rows.Err())
-}
-
-func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
-	var analyses []domain.OutputAnalysis
-	for rows.Next() {
-		var a domain.OutputAnalysis
-		var issuesJSON, recsJSON, evJSON, degJSON string
-		var analyzedAt, createdAt string
-		if err := rows.Scan(&a.TenantID, &a.AnalysisID, &a.EventID, &a.WorkerID, &analyzedAt,
-			&a.EfficiencyScore, &a.GoblinScore, &issuesJSON, &recsJSON, &evJSON, &degJSON, &createdAt); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		a.AnalyzedAt = parseTime(analyzedAt)
-		_ = json.Unmarshal([]byte(issuesJSON), &a.Issues)
-		_ = json.Unmarshal([]byte(recsJSON), &a.Recommendations)
-		_ = json.Unmarshal([]byte(evJSON), &a.Evidence)
-		if degJSON != "" {
-			_ = json.Unmarshal([]byte(degJSON), &a.Degraded)
-		}
-		analyses = append(analyses, a)
-	}
-	return analyses, wrapDBErr(rows.Err())
-}
 func marshalNullable(v interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil

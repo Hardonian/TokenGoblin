@@ -57,11 +57,6 @@ type TokenEvent struct {
 	Tags             map[string]string `json:"-"`
 	TagsJSON         json.RawMessage   `json:"tags,omitempty"`
 	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
-	// Fields used by postgres and analyzer
-	OutputExcerpt   string `json:"output_excerpt,omitempty"`
-	PromptExcerpt   string `json:"prompt_excerpt,omitempty"`
-	PromptReference string `json:"prompt_reference,omitempty"`
-	OutputReference string `json:"output_reference,omitempty"`
 }
 
 func (e TokenEvent) MarshalJSON() ([]byte, error) {

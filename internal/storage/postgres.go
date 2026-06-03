@@ -198,11 +198,8 @@ func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID 
 		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = $1
-<<<<<<< Updated upstream
 		ORDER BY provider, model_id
-=======
 		ORDER BY created_at DESC
->>>>>>> Stashed changes
 	`, tenantID)
 	if err != nil {
 		return nil, wrapDBErr(err)
@@ -210,7 +207,6 @@ func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID 
 	defer rows.Close()
 	var points []domain.PricePoint
 	for rows.Next() {
-<<<<<<< Updated upstream
 		var point domain.PricePoint
 		var created time.Time
 		if err := rows.Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created); err != nil {
@@ -224,21 +220,6 @@ func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID 
 	}
 	return points, wrapDBErr(rows.Err())
 }
-=======
-		var p domain.PricePoint
-		var created time.Time
-		if err := rows.Scan(&p.Provider, &p.ModelID, &p.InputCostPerMillion, &p.OutputCostPerMillion, &created); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		p.EffectiveFrom = created
-		points = append(points, p)
-	}
-	return points, wrapDBErr(rows.Err())
-}
-
-
-
->>>>>>> Stashed changes
 
 func (r *PostgresRepository) DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -retentionDays).UTC()
@@ -850,12 +831,6 @@ const tokenEventSelectPostgres = `
 	FROM token_usage_events
 `
 
-const outputAnalysisSelectPostgres = `
-	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
-		efficiency_score, goblin_score, issues_json, recommendations_json,
-		evidence_json, degraded_json, created_at
-	FROM output_analyses
-`
 
 func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
@@ -995,25 +970,4 @@ func (r *PostgresRepository) GetTenantByStripeSubscriptionID(ctx context.Context
 	return &tenant, nil
 }
 
-func scanOutputAnalysesPostgres(rows pgx.Rows) ([]domain.OutputAnalysis, error) {
-	var analyses []domain.OutputAnalysis
-	for rows.Next() {
-		var a domain.OutputAnalysis
-		var issuesJSON, recsJSON, evJSON, degJSON string
-		var analyzedAt, createdAt string
-		if err := rows.Scan(&a.TenantID, &a.AnalysisID, &a.EventID, &a.WorkerID, &analyzedAt,
-			&a.EfficiencyScore, &a.GoblinScore, &issuesJSON, &recsJSON, &evJSON, &degJSON, &createdAt); err != nil {
-			return nil, wrapDBErr(err)
-		}
-		a.AnalyzedAt = parseTime(analyzedAt)
-		_ = json.Unmarshal([]byte(issuesJSON), &a.Issues)
-		_ = json.Unmarshal([]byte(recsJSON), &a.Recommendations)
-		_ = json.Unmarshal([]byte(evJSON), &a.Evidence)
-		if degJSON != "" {
-			_ = json.Unmarshal([]byte(degJSON), &a.Degraded)
-		}
-		analyses = append(analyses, a)
-	}
-	return analyses, wrapDBErr(rows.Err())
-}
 

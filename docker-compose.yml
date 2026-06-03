@@ -1,41 +1,36 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: tokengoblin_postgres
+  token-goblin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "3000:3000"
     environment:
-      POSTGRES_USER: tokengoblin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: tokengoblin
-    ports:
-      - "5432:5432"
+      - PORT=8080
+      - FRONTEND_PORT=3000
+      - DATABASE_URL=sqlite:///data/token_goblin.db
+      # Stripe (required for billing)
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
+      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
+      # Internal webhook secret (for Stripe webhook → Go API)
+      - TG_INTERNAL_WEBHOOK_SECRET=${TG_INTERNAL_WEBHOOK_SECRET:-change-me-in-production}
+      # Frontend
+      - NEXT_PUBLIC_TG_API_BASE=http://localhost:8080
+      - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
+      - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - token-goblin-data:/data
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tokengoblin -d tokengoblin"]
-      interval: 5s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/dashboard/overview", "-H", "x-tenant-id: health"]
+      interval: 30s
       timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: tokengoblin_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-
-  prometheus:
-    image: prom/prometheus:v2.44.0
-    container_name: tokengoblin_prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./data/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      retries: 3
 
 volumes:
-  pgdata:
-  redisdata:
+  token-goblin-data:
