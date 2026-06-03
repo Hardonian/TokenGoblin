@@ -14,6 +14,7 @@ import (
 func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter) http.Handler {
 	mux := http.NewServeMux()
 	handler := NewIngestionHandler(service, repo)
+	billingHandler := NewBillingHandler(repo)
 
 	// Prometheus Metrics
 	mux.Handle("/metrics", promhttp.Handler())
@@ -83,6 +84,14 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/api/dashboard/report.md", wrap(handler.HandleReportMarkdown))
 	mux.Handle("/api/audit/events", wrap(handler.HandleAuditEvents))
 	mux.Handle("/api/tenant/members", wrapAdmin(handler.HandleTenantMembers))
+
+	// Billing routes
+	mux.Handle("/api/billing/checkout", wrapAdmin(http.HandlerFunc(billingHandler.HandleCreateCheckout)))
+	mux.Handle("/api/billing/portal", wrapAdmin(http.HandlerFunc(billingHandler.HandleCreatePortal)))
+	mux.Handle("/api/billing/status", wrap(billingHandler.HandleBillingStatus))
+
+	// Public tenant registration (no auth)
+	mux.Handle("/api/tenant/register", http.HandlerFunc(billingHandler.HandleRegisterTenant))
 
 	handlerWithMiddleware := TimeoutMiddleware(15*time.Second, CORSMiddleware(LoggingMiddleware(RecoverMiddleware(mux))))
 	return handlerWithMiddleware

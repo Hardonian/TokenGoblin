@@ -14,12 +14,17 @@ var ErrUnavailable = errors.New("database unavailable")
 type Repository interface {
 	UpsertTenant(ctx context.Context, tenant domain.Tenant) error
 	GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error)
+	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
+	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
 	GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error)
 	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
 	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
 	ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
+<<<<<<< Updated upstream
 	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
 	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
+=======
+>>>>>>> Stashed changes
 	DeleteTenantData(ctx context.Context, tenantID string) error
 	DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error)
 	SaveAPIKey(ctx context.Context, key domain.APIKey) error
@@ -41,6 +46,8 @@ type Repository interface {
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
+	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
+	ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error)
 	Close() error
 }
 
@@ -179,3 +186,21 @@ func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int)
 func (r *UnavailableRepository) Close() error {
 	return nil
 }
+
+func (r *UnavailableRepository) GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) ListOutputAnalysesByWorker(ctx context.Context, tenantID, workerID string, limit int) ([]domain.OutputAnalysis, error) {
+	return nil, r.err()
+}
+
+

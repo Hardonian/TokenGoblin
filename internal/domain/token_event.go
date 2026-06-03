@@ -16,7 +16,6 @@ const (
 )
 
 // ExternalEstimate records caller-provided cost as untrusted reference data.
-// The service never uses it as the internal cost estimate.
 type ExternalEstimate struct {
 	CostUSD  float64 `json:"cost_usd"`
 	Currency string  `json:"currency"`
@@ -58,6 +57,11 @@ type TokenEvent struct {
 	Tags             map[string]string `json:"-"`
 	TagsJSON         json.RawMessage   `json:"tags,omitempty"`
 	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
+	// Fields used by postgres and analyzer
+	OutputExcerpt   string `json:"output_excerpt,omitempty"`
+	PromptExcerpt   string `json:"prompt_excerpt,omitempty"`
+	PromptReference string `json:"prompt_reference,omitempty"`
+	OutputReference string `json:"output_reference,omitempty"`
 }
 
 func (e TokenEvent) MarshalJSON() ([]byte, error) {

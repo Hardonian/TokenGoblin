@@ -443,6 +443,15 @@ func (r *SQLiteRepository) GetTenantByStripeSubscriptionID(ctx context.Context, 
 	return &t, nil
 }
 
+<<<<<<< Updated upstream
+=======
+func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error) {
+	return nil, nil
+}
+
+
+
+>>>>>>> Stashed changes
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -461,6 +470,11 @@ func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenant
 		return 0, nil
 	}
 	return total.Float64, nil
+}
+
+func (r *SQLiteRepository) DeleteTenantData(ctx context.Context, tenantID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM tenants WHERE tenant_id = ?`, tenantID)
+	return wrapDBErr(err)
 }
 
 func (r *SQLiteRepository) GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error) {
@@ -1138,6 +1152,13 @@ func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
 	return analyses, wrapDBErr(rows.Err())
 }
 
+const outputAnalysisSelect = `
+	SELECT tenant_id, analysis_id, event_id, worker_id, analyzed_at,
+		efficiency_score, goblin_score, issues_json, recommendations_json,
+		evidence_json, degraded_json, created_at
+	FROM output_analyses
+`
+
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -1201,6 +1222,27 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 	return events, wrapDBErr(rows.Err())
 }
 
+func scanOutputAnalyses(rows *sql.Rows) ([]domain.OutputAnalysis, error) {
+	var analyses []domain.OutputAnalysis
+	for rows.Next() {
+		var a domain.OutputAnalysis
+		var issuesJSON, recsJSON, evJSON, degJSON string
+		var analyzedAt, createdAt string
+		if err := rows.Scan(&a.TenantID, &a.AnalysisID, &a.EventID, &a.WorkerID, &analyzedAt,
+			&a.EfficiencyScore, &a.GoblinScore, &issuesJSON, &recsJSON, &evJSON, &degJSON, &createdAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		a.AnalyzedAt = parseTime(analyzedAt)
+		_ = json.Unmarshal([]byte(issuesJSON), &a.Issues)
+		_ = json.Unmarshal([]byte(recsJSON), &a.Recommendations)
+		_ = json.Unmarshal([]byte(evJSON), &a.Evidence)
+		if degJSON != "" {
+			_ = json.Unmarshal([]byte(degJSON), &a.Degraded)
+		}
+		analyses = append(analyses, a)
+	}
+	return analyses, wrapDBErr(rows.Err())
+}
 func marshalNullable(v interface{}) (interface{}, error) {
 	if v == nil {
 		return nil, nil

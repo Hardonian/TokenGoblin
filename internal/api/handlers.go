@@ -990,9 +990,105 @@ func limitFromRequest(r *http.Request) int {
 }
 
 func (h *IngestionHandler) HandleDeleteTenant(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusNotImplemented)
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+	if err := h.Service.DeleteTenantData(r.Context(), tenantID); err != nil {
+		writeServiceError(w, err, false)
+		return
+	}
+	h.audit(r, tenantID, "tenant.deleted", "tenant:"+tenantID, nil)
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   "Tenant and all associated data deleted successfully.",
+	})
 }
 
 func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusNotImplemented)
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	// Gather all tenant data for export
+	export := map[string]interface{}{
+		"tenant_id": tenantID,
+		"exported_at": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Get overview/summary
+	summary, err := h.Service.Overview(r.Context(), tenantID)
+	if err == nil {
+		export["overview"] = summary
+	} else {
+		export["overview_error"] = err.Error()
+	}
+
+	// Get recent events
+	events, err := h.Service.RecentEvents(r.Context(), tenantID, 10000)
+	if err == nil {
+		export["events"] = events
+	}
+
+	// Get workers
+	workers, err := h.Service.Workers(r.Context(), tenantID)
+	if err == nil {
+		export["workers"] = workers
+	}
+
+	// Get anomalies
+	anomalies, err := h.Service.Anomalies(r.Context(), tenantID, 100)
+	if err == nil {
+		export["anomalies"] = anomalies
+	}
+
+	// Get audit events
+	auditEvents, err := h.Service.AuditEvents(r.Context(), tenantID, 1000)
+	if err == nil {
+		export["audit_events"] = auditEvents
+	}
+
+	// Get tenant members
+	members, err := h.Service.TenantMembers(r.Context(), tenantID)
+	if err == nil {
+		export["tenant_members"] = members
+	}
+
+	// Get pricing
+	pricing, err := h.Service.GetActivePricing(r.Context(), tenantID)
+	if err == nil {
+		export["pricing"] = pricing
+	}
+
+	// Get output analyses
+	analyses, err := h.Service.OutputAnalyses(r.Context(), tenantID, 100)
+	if err == nil {
+		export["output_analyses"] = analyses
+	}
+
+	// Get recommendations
+	recs, err := h.Service.Recommendations(r.Context(), tenantID)
+	if err == nil {
+		export["recommendations"] = recs
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=tenant_export_"+tenantID+".json")
+	w.WriteHeader(http.StatusOK)
+
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	_ = encoder.Encode(export)
+
+	h.audit(r, tenantID, "export.tenant_json", "tenant:"+tenantID, map[string]interface{}{"format": "json"})
 }
