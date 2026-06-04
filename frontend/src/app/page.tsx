@@ -313,7 +313,7 @@ export default function CommandCenter() {
                           <span className="text-red-400 font-mono text-sm">${formatMoney(zombie.total_cost_usd)}</span>
                         </div>
                         <div className="w-full bg-[#222] rounded-full h-1.5 mb-1 mt-3">
-                          <div className="bg-[#00FF41] h-1.5 rounded-full" style={{ width: `${zombie.acceptance_rate * 100}%` }}></div>
+                          <div className="bg-[#00FF41] h-1.5 rounded-full" style={(() => ({ width: `${zombie.acceptance_rate * 100}%` }))()}></div>
                         </div>
                         <div className="flex justify-between text-xs text-gray-500">
                           <span>Acceptance Rate</span>

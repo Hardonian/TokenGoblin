@@ -185,7 +185,7 @@ export default function BillingPage() {
                 <div className="w-full bg-[#222] rounded-full h-2 mb-2 overflow-hidden">
                   <div 
                     className={`h-2 rounded-full transition-all duration-1000 ${status.at_limit ? 'bg-red-500' : status.near_limit ? 'bg-yellow-500' : 'bg-[#00FF41]'}`} 
-                    style={{ width: `${Math.min(status.usage_percent, 100)}%` }}
+                    style={(() => ({ width: `${Math.min(status.usage_percent, 100)}%` }))()}
                   ></div>
                 </div>
                 <div className="flex justify-between items-center text-xs">
