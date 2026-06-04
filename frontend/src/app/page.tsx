@@ -117,7 +117,10 @@ export default function CommandCenter() {
   }, [tenant]);
 
   useEffect(() => {
-    loadAll();
+    const timer = window.setTimeout(() => {
+      void loadAll();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadAll]);
 
   const seedDemo = async () => {
