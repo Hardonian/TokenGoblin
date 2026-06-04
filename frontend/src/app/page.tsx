@@ -151,6 +151,7 @@ export default function CommandCenter() {
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-mono">ID:</span>
               <input
+                aria-label="Tenant ID"
                 className="bg-[#141414] border border-[#2a2a2a] rounded text-white text-sm pl-9 pr-3 py-1.5 focus:outline-none focus:border-[#00FF41] transition-colors font-mono w-48"
                 value={tenant}
                 onChange={(e) => setTenant(e.target.value)}
