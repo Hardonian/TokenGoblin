@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS budgets CASCADE;
+DROP TABLE IF EXISTS policy_violations CASCADE;
+DROP TABLE IF EXISTS governance_policies CASCADE;
+DROP TABLE IF EXISTS agent_performance_reviews CASCADE;
+DROP TABLE IF EXISTS agents CASCADE;
