@@ -43,3 +43,59 @@ class TokenGoblinClient:
         response = self.session.get(f"{self.base_url}/v1/dashboard/anomalies")
         response.raise_for_status()
         return response.json()
+
+    # V2 Endpoints - Founder Mode
+    
+    def get_waste_report(self) -> Dict[str, Any]:
+        """Get a comprehensive waste analysis for the tenant."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/waste")
+        response.raise_for_status()
+        return response.json()
+
+    def get_prompt_graveyard(self) -> Dict[str, Any]:
+        """Get prompts consuming cost with zero value."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/prompt-graveyard")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_zombie_agents(self) -> Dict[str, Any]:
+        """Get agents with high activity but low value."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/zombie-agents")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_duplicate_clusters(self) -> Dict[str, Any]:
+        """Get prompts used identically across multiple workers."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/duplicates")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_cost_leaks(self) -> Dict[str, Any]:
+        """Get patterns of silent invisible spending."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/cost-leaks")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_hallucination_map(self) -> Dict[str, Any]:
+        """Get failure clusters by model and category."""
+        response = self.session.get(f"{self.base_url}/v2/intelligence/hallucination-map")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_spend_forecast(self) -> Dict[str, Any]:
+        """Get a monthly spend forecast with confidence intervals."""
+        response = self.session.get(f"{self.base_url}/v2/forecasts/spend")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_executive_scorecard(self) -> Dict[str, Any]:
+        """Get an AI scorecard for leadership."""
+        response = self.session.get(f"{self.base_url}/v2/executive/scorecard")
+        response.raise_for_status()
+        return response.json()
+        
+    def get_model_comparison(self) -> Dict[str, Any]:
+        """Get side-by-side model cost/quality/latency analysis."""
+        response = self.session.get(f"{self.base_url}/v2/analytics/models")
+        response.raise_for_status()
+        return response.json()
