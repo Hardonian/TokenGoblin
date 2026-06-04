@@ -970,4 +970,21 @@ func (r *PostgresRepository) GetTenantByStripeSubscriptionID(ctx context.Context
 	return &tenant, nil
 }
 
-
+func (r *PostgresRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
+	return errors.New("not implemented")
+}
+func (r *PostgresRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
+	return nil, errors.New("not implemented")
+}
+func (r *PostgresRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
+	return errors.New("not implemented")
+}
+func (r *PostgresRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
+	return nil, errors.New("not implemented")
+}
+func (r *PostgresRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
+	return errors.New("not implemented")
+}
+func (r *PostgresRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
+	return nil, errors.New("not implemented")
+}

@@ -1353,3 +1353,22 @@ func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays in
 	}
 	return res.RowsAffected()
 }
+
+func (r *SQLiteRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
+	return errors.New("not implemented")
+}
+func (r *SQLiteRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
+	return nil, errors.New("not implemented")
+}
+func (r *SQLiteRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
+	return errors.New("not implemented")
+}
+func (r *SQLiteRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
+	return nil, errors.New("not implemented")
+}
+func (r *SQLiteRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
+	return errors.New("not implemented")
+}
+func (r *SQLiteRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
+	return nil, errors.New("not implemented")
+}

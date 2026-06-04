@@ -41,6 +41,15 @@ type Repository interface {
 	ListTokenEvents(ctx context.Context, tenantID string, limit int) ([]domain.TokenEvent, error)
 	ListTokenEventsBefore(ctx context.Context, tenantID string, before time.Time, limit int) ([]domain.TokenEvent, error)
 	ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
+
+	// Founder Mode extensions
+	UpsertAgent(ctx context.Context, agent domain.Agent) error
+	ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error)
+	UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error
+	ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error)
+	UpsertBudget(ctx context.Context, budget domain.Budget) error
+	ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error)
+	
 	Close() error
 }
 
@@ -171,10 +180,34 @@ func (r *UnavailableRepository) ListTokenEventsBefore(context.Context, string, t
 	return nil, r.err()
 }
 
-func (r *UnavailableRepository) ListAnomalySignals(context.Context, string, int) ([]domain.AnomalySignal, error) {
-	return nil, r.err()
+func (r *UnavailableRepository) ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error) {
+	return nil, r.Cause
+}
+
+func (r *UnavailableRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
+	return r.Cause
+}
+
+func (r *UnavailableRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
+	return nil, r.Cause
+}
+
+func (r *UnavailableRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
+	return r.Cause
+}
+
+func (r *UnavailableRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
+	return nil, r.Cause
+}
+
+func (r *UnavailableRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
+	return r.Cause
+}
+
+func (r *UnavailableRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
+	return nil, r.Cause
 }
 
 func (r *UnavailableRepository) Close() error {
-	return nil
+	return r.Cause
 }
