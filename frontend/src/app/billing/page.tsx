@@ -48,7 +48,11 @@ export default function BillingPage() {
   }, [tenant]);
 
   useEffect(() => {
-    if (tenant) load();
+    if (!tenant) return;
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [tenant, load]);
 
   async function handleUpgrade(priceID: string) {
@@ -183,9 +187,9 @@ export default function BillingPage() {
                   </span>
                 </div>
                 <div className="w-full bg-[#222] rounded-full h-2 mb-2 overflow-hidden">
+                  <style>{`.billing-progress { width: ${Math.min(status.usage_percent, 100)}%; }`}</style>
                   <div 
-                    className={`h-2 rounded-full transition-all duration-1000 ${status.at_limit ? 'bg-red-500' : status.near_limit ? 'bg-yellow-500' : 'bg-[#00FF41]'}`} 
-                    style={(() => ({ width: `${Math.min(status.usage_percent, 100)}%` }))()}
+                    className={`h-2 rounded-full transition-all duration-1000 billing-progress ${status.at_limit ? 'bg-red-500' : status.near_limit ? 'bg-yellow-500' : 'bg-[#00FF41]'}`} 
                   ></div>
                 </div>
                 <div className="flex justify-between items-center text-xs">

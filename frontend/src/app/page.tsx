@@ -84,19 +84,20 @@ export default function CommandCenter() {
   const [models, setModels] = useState<ModelStats[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchV2 = async <T,>(path: string): Promise<T | null> => {
-    try {
-      const res = await fetch(path, { headers: { "x-tenant-id": tenant } });
-      const env: Envelope<T> = await res.json();
-      return env.data || null;
-    } catch (e) {
-      console.error(`Failed to fetch ${path}`, e);
-      return null;
-    }
-  };
-
   const loadAll = useCallback(async () => {
     setLoading(true);
+
+    const fetchV2 = async <T,>(path: string): Promise<T | null> => {
+      try {
+        const res = await fetch(path, { headers: { "x-tenant-id": tenant } });
+        const env: Envelope<T> = await res.json();
+        return env.data || null;
+      } catch (e) {
+        console.error(`Failed to fetch ${path}`, e);
+        return null;
+      }
+    };
+
     const [sc, fc, cl, za, gy, md] = await Promise.all([
       fetchV2<ExecutiveScorecard>("/v2/executive/scorecard"),
       fetchV2<SpendForecast>("/v2/forecasts/spend"),
@@ -313,7 +314,8 @@ export default function CommandCenter() {
                           <span className="text-red-400 font-mono text-sm">${formatMoney(zombie.total_cost_usd)}</span>
                         </div>
                         <div className="w-full bg-[#222] rounded-full h-1.5 mb-1 mt-3">
-                          <div className="bg-[#00FF41] h-1.5 rounded-full" style={(() => ({ width: `${zombie.acceptance_rate * 100}%` }))()}></div>
+                          <style>{`.zombie-bar-${i} { width: ${zombie.acceptance_rate * 100}%; }`}</style>
+                          <div className={`bg-[#00FF41] h-1.5 rounded-full zombie-bar-${i}`}></div>
                         </div>
                         <div className="flex justify-between text-xs text-gray-500">
                           <span>Acceptance Rate</span>
