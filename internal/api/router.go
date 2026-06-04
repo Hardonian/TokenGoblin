@@ -93,6 +93,28 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Public tenant registration (no auth)
 	mux.Handle("/api/tenant/register", http.HandlerFunc(billingHandler.HandleRegisterTenant))
 
+	// ═══════════════════════════════════════════════════
+	// V2 API — Intelligence, Forecasting, Executive
+	// ═══════════════════════════════════════════════════
+	v2 := NewV2Handler(repo)
+
+	// Intelligence Engine endpoints
+	mux.Handle("/v2/intelligence/waste", wrap(v2.HandleWasteReport))
+	mux.Handle("/v2/intelligence/prompt-graveyard", wrap(v2.HandlePromptGraveyard))
+	mux.Handle("/v2/intelligence/zombie-agents", wrap(v2.HandleZombieAgents))
+	mux.Handle("/v2/intelligence/duplicates", wrap(v2.HandleDuplicates))
+	mux.Handle("/v2/intelligence/cost-leaks", wrap(v2.HandleCostLeaks))
+	mux.Handle("/v2/intelligence/hallucination-map", wrap(v2.HandleHallucinationMap))
+
+	// Forecasting Engine endpoints
+	mux.Handle("/v2/forecasts/spend", wrap(v2.HandleSpendForecast))
+
+	// Executive endpoints
+	mux.Handle("/v2/executive/scorecard", wrap(v2.HandleExecutiveScorecard))
+
+	// Analytics endpoints (v2)
+	mux.Handle("/v2/analytics/models", wrap(v2.HandleModelComparison))
+
 	handlerWithMiddleware := TimeoutMiddleware(15*time.Second, CORSMiddleware(LoggingMiddleware(RecoverMiddleware(mux))))
 	return handlerWithMiddleware
 }

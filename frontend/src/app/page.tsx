@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { formatMoney, formatInt } from "@/components/shared";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { MetricsSection } from "@/components/MetricsSection";
+import { LeftPanel } from "@/components/LeftPanel";
+import { RightPanel } from "@/components/RightPanel";
 
 type Envelope<T> = {
   ok: boolean;
@@ -483,10 +488,4 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function formatMoney(value: number) {
-  return value.toFixed(value >= 10 ? 2 : 4);
-}
 
-function formatInt(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
-}
