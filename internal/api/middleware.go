@@ -20,6 +20,20 @@ const (
 	roleKey     contextKey = "role"
 )
 
+// Max upload/body limits (defense-in-depth; Next.js/edge still benefits from backend limits).
+const (
+	MaxHeaderBytes     = 1 << 20 // 1 MiB headers
+	MaxIngestBodyBytes = 2 << 20 // 2 MiB JSON body
+	MaxAdminBodyBytes  = 512 << 10
+)
+
+func enforceMaxHeaderBytes(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, MaxIngestBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := moat.ExtractBearerToken(r.Header.Get("Authorization"))
@@ -148,17 +162,55 @@ func getRole(r *http.Request) string {
 
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id")
+		origin := r.Header.Get("Origin")
+		allowedOrigin := origin
+		if allowedOrigin != "" && !isAllowedOrigin(allowedOrigin) {
+			allowedOrigin = ""
+		}
+
+		w.Header().Add("Vary", "Origin")
+		w.Header().Add("Access-Control-Allow-Origin", allowedOrigin)
+		w.Header().Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id")
+		w.Header().Add("Access-Control-Expose-Headers", "Retry-After, X-Request-ID")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
+		requestID := r.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = strings.TrimSpace(time.Now().UTC().Format("20060102150405.000000000"))
+		}
+		w.Header().Set("X-Request-ID", requestID)
+
+		secureHeaders(w)
+
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isAllowedOrigin(origin string) bool {
+	switch origin {
+	case "https://tokengoblin.com", "https://app.tokengoblin.com", "http://localhost:3000", "http://localhost:8080":
+		return true
+	}
+	return false
+}
+
+func secureHeaders(w http.ResponseWriter) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
+	w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
+
+	if config.IsProduction() {
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+	}
 }
 
 // RecoverMiddleware catches panics and returns a 500 cleanly
@@ -201,6 +253,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", lrw.statusCode,
+			"requestId", r.Header.Get("X-Request-ID"),
 			"latency_ms", duration.Milliseconds(),
 		)
 	})
