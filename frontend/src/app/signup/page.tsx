@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { registerTenant } from "@/lib/billing";
+import { SiteFooter } from "@/components/layout";
 import Link from "next/link";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default function SignupPage() {
-  const [tenantID, setTenantID] = useState("");
+  const router = useRouter();
+  const [tenantId, setTenantId] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState<{
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
     tenant_id: string;
     name: string;
     tier: string;
@@ -16,149 +23,104 @@ export default function SignupPage() {
     created_at: string;
   } | null>(null);
 
-  const apiBase =
-    process.env.NEXT_PUBLIC_TG_API_BASE?.replace(/\/$/, "") ||
-    "http://localhost:8080";
+  useEffect(() => {
+    if (!result) return;
+    const timer = setTimeout(() => {
+      router.push(`/billing?tenant_id=${encodeURIComponent(result.tenant_id)}`);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [result, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError("");
-
+    setError(null);
     try {
-      const res = await fetch(`${apiBase}/api/tenant/register`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tenant_id: tenantID, name }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error?.message || "Registration failed");
-        return;
-      }
-      setSuccess(data.data);
+      const data = await registerTenant(tenantId, name);
+      setResult(data);
     } catch (err) {
-      setError("Could not connect to server");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
   }
 
-  if (success) {
-    return (
-      <main className="flex min-h-[80vh] items-center justify-center bg-[#f7f8f3] px-5">
-        <div className="w-full max-w-md rounded-2xl border border-[#d7dccf] bg-white p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#426b51]/10">
-            <svg className="h-6 w-6 text-[#426b51]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold">Welcome to TokenGoblin!</h1>
-          <p className="mt-2 text-sm text-[#52604e]">
-            Your account has been created. Save your API key — it won't be shown again.
-          </p>
-
-          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-              Your API Key
+  return (
+    <main className="min-h-screen bg-background text-text-primary">
+      <section className="mx-auto flex min-h-[85vh] max-w-md flex-col justify-center px-6">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#00ff9d]">
+              TokenGoblin
             </p>
-            <code className="mt-2 block break-all rounded bg-white px-3 py-2 font-mono text-sm text-[#171915]">
-              {success.api_key}
-            </code>
+            <h1 className="text-3xl font-semibold text-white">
+              Create your workspace
+            </h1>
+            <p className="text-sm text-text-secondary">
+              Start with a free tenant. Upgrade later when you need more
+              capacity, forecasting, or dedicated support.
+            </p>
           </div>
 
-          <div className="mt-4 rounded-lg border border-[#e0e4d8] bg-[#f7f8f3] p-4 text-left text-sm">
-            <p><span className="font-medium">Tenant ID:</span> {success.tenant_id}</p>
-            <p className="mt-1"><span className="font-medium">Plan:</span> {success.tier}</p>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3">
-            <Link
-              href="/"
-              className="rounded-lg bg-[#426b51] py-3 text-center text-sm font-semibold text-white hover:bg-[#365a43]"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-text-secondary">
+                Tenant ID
+              </label>
+              <input
+                value={tenantId}
+                onChange={(e) =>
+                  setTenantId(
+                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                  )
+                }
+                placeholder="my-company"
+                className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-white outline-none transition focus:border-[#00ff9d]"
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                Lowercase letters, numbers, and hyphens only
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text-secondary">
+                Company / project name
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Acme Corp"
+                className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-white outline-none transition focus:border-[#00ff9d]"
+              />
+            </div>
+            {error && (
+              <div className="rounded-lg border border-red-500/40 bg-[#1b0505] p-3 text-sm text-red-300">
+                {error}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading || !tenantId || !name}
+              className="h-11 w-full rounded-lg bg-[#00ff9d] text-sm font-semibold text-black transition hover:bg-[#00e08a] disabled:opacity-60"
             >
-              Go to Dashboard
-            </Link>
+              {loading ? "Creating…" : "Create workspace"}
+            </button>
+          </form>
+
+          <div className="space-y-2">
             <Link
               href="/pricing"
-              className="rounded-lg border border-[#d7dccf] py-3 text-center text-sm font-medium text-[#52604e] hover:bg-[#f7f8f3]"
+              className="flex w-full items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-white transition hover:border-[#00ff9d] hover:text-[#00ff9d]"
             >
-              View Pricing
+              Review plans
             </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="flex min-h-[80vh] items-center justify-center bg-[#f7f8f3] px-5">
-      <div className="w-full max-w-md rounded-2xl border border-[#d7dccf] bg-white p-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Create your account</h1>
-          <p className="mt-2 text-sm text-[#52604e]">
-            Start tracking AI token spend in seconds
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-[#171915]">
-              Tenant ID
-            </label>
-            <input
-              className="mt-1 h-11 w-full rounded-lg border border-[#c5cdbb] bg-white px-3 text-sm outline-none focus:border-[#426b51]"
-              placeholder="my-company"
-              value={tenantID}
-              onChange={(e) =>
-                setTenantID(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
-              }
-              required
-            />
-            <p className="mt-1 text-xs text-[#61705a]">
-              Lowercase letters, numbers, and hyphens only
+            <p className="text-center text-xs text-text-muted">
+              By creating an account you agree to the Terms of Service and
+              Privacy Policy.
             </p>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#171915]">
-              Company / Project Name
-            </label>
-            <input
-              className="mt-1 h-11 w-full rounded-lg border border-[#c5cdbb] bg-white px-3 text-sm outline-none focus:border-[#426b51]"
-              placeholder="Acme Corp"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="h-11 w-full rounded-lg bg-[#426b51] text-sm font-semibold text-white transition-colors hover:bg-[#365a43] disabled:opacity-50"
-          >
-            {loading ? "Creating account…" : "Create Account"}
-          </button>
-        </form>
-
-        <p className="mt-4 text-center text-xs text-[#61705a]">
-          By signing up you agree to our Terms of Service and Privacy Policy.
-        </p>
-
-        <p className="mt-4 text-center text-sm text-[#52604e]">
-          Already have an account?{" "}
-          <Link href="/" className="font-medium text-[#426b51] hover:underline">
-            Go to Dashboard
-          </Link>
-        </p>
-      </div>
+        </div>
+      </section>
+      <SiteFooter />
     </main>
   );
 }

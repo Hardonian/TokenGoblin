@@ -1,267 +1,282 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { createCheckoutSession, getBillingStatus } from "@/lib/billing";
+import { SiteFooter } from "@/components/layout";
 
-type BillingStatus = {
-  tenant_id: string;
-  tier: string;
-  stripe_customer_id?: string;
-  current_month_cost_usd: number;
-  usage_limit_usd: number;
-  usage_percent: number;
-  subscription_id?: string;
-  needs_upgrade: boolean;
-  near_limit: boolean;
-  at_limit: boolean;
-};
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const apiBase =
-  process.env.NEXT_PUBLIC_TG_API_BASE?.replace(/\/$/, "") ||
-  "http://localhost:8080";
-
-export default function BillingPage() {
-  const [tenant, setTenant] = useState("");
-  const [status, setStatus] = useState<BillingStatus | null>(null);
+function BillingInner() {
+  const search = useSearchParams();
+  const tenantParam = search.get("tenant_id");
+  const [tenantId, setTenantId] = useState("");
+  const [effectiveTenant, setEffectiveTenant] = useState("");
+  const [status, setStatus] = useState<{
+    tenant_id: string;
+    tier: string;
+    stripe_customer_id?: string;
+    current_month_cost_usd: number;
+    usage_limit_usd: number;
+    usage_percent: number;
+    subscription_id?: string;
+    needs_upgrade: boolean;
+    near_limit: boolean;
+    at_limit: boolean;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [actionLoading, setActionLoading] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [action, setAction] = useState<string | null>(null);
+  const [successPlan, setSuccessPlan] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!tenant) return;
+  useEffect(() => {
+    if (tenantParam) {
+      setTenantId(tenantParam);
+      setEffectiveTenant(tenantParam);
+    }
+  }, [tenantParam]);
+
+  async function load() {
+    if (!effectiveTenant) return;
     setLoading(true);
-    setError("");
+    setError(null);
     try {
-      const res = await fetch(`${apiBase}/api/billing/status`, {
-        headers: { "x-tenant-id": tenant },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error?.message || "Failed to load billing status");
-        return;
-      }
-      setStatus(data.data);
-    } catch {
-      setError("Could not connect to server");
+      const data = await getBillingStatus(effectiveTenant);
+      setStatus(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Billing status failed");
     } finally {
       setLoading(false);
     }
-  }, [tenant]);
+  }
 
   useEffect(() => {
-    if (!tenant) return;
-    const timer = window.setTimeout(() => {
+    if (!effectiveTenant) return;
+    const timer = setTimeout(() => {
       void load();
     }, 0);
-    return () => window.clearTimeout(timer);
-  }, [tenant, load]);
+    return () => clearTimeout(timer);
+  }, [effectiveTenant]);
 
-  async function handleUpgrade(priceID: string) {
-    setActionLoading(priceID);
+  async function handleUpgrade(priceId?: string, planId?: string) {
+    if (!effectiveTenant || !priceId) return;
+    setAction("upgrade");
+    setError(null);
     try {
-      const res = await fetch(`${apiBase}/api/billing/checkout`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-tenant-id": tenant,
-        },
-        body: JSON.stringify({
-          success_url: `${window.location.origin}/billing?success=true`,
-          cancel_url: `${window.location.origin}/billing`,
-          price_id: priceID,
-        }),
+      const data = await createCheckoutSession({
+        tenantId: effectiveTenant,
+        priceId,
+        successUrl: `${window.location.origin}/billing?plan=${encodeURIComponent(planId || "")}`,
+        cancelUrl: `${window.location.origin}/billing`,
       });
-      const data = await res.json();
-      if (data?.data?.checkout_url) {
-        window.location.href = data.data.checkout_url;
-      } else {
-        setError(data?.error?.message || "Checkout failed");
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
       }
-    } catch {
-      setError("Could not start checkout");
+      setError("Checkout session did not return a URL.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
-      setActionLoading("");
+      setAction(null);
     }
   }
 
   async function handlePortal() {
-    setActionLoading("portal");
+    if (!effectiveTenant) return;
+    setAction("portal");
+    setError(null);
     try {
-      const res = await fetch(`${apiBase}/api/billing/portal`, {
+      const res = await fetch("/api/billing/portal", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-tenant-id": tenant,
+          "x-tenant-id": effectiveTenant,
         },
-        body: JSON.stringify({
-          return_url: `${window.location.origin}/billing`,
-        }),
+        body: JSON.stringify({ return_url: `${window.location.origin}/billing` }),
       });
-      const data = await res.json();
-      if (data?.data?.portal_url) {
-        window.location.href = data.data.portal_url;
-      } else {
-        setError(data?.error?.message || "Portal access failed");
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        throw new Error(payload.error?.message || "Portal failed");
       }
-    } catch {
-      setError("Could not open billing portal");
+      if (payload.data?.portal_url) {
+        window.location.href = payload.data.portal_url;
+        return;
+      }
+      setError("Portal session did not return a URL.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to open billing portal");
     } finally {
-      setActionLoading("");
+      setAction(null);
     }
   }
 
-  const pricePro =
-    process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || "price_pro_placeholder";
-  const priceEnterprise =
-    process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE || "price_enterprise_placeholder";
+  const proPriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO;
+  const enterprisePriceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE;
+  const planFromQuery = search.get("plan");
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-gray-300 font-sans selection:bg-[#00FF41] selection:text-black">
-      {/* HEADER */}
-      <header className="border-b border-[#1f1f1f] bg-black/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-[1000px] mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-[#00FF41] flex items-center justify-center text-black font-black text-xl tracking-tighter">
-              TG
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">TokenGoblin</h1>
-              <p className="text-xs text-[#00FF41] uppercase tracking-[0.2em] font-mono">Billing Center</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-mono">ID:</span>
-              <input
-                aria-label="Tenant ID"
-                className="bg-[#141414] border border-[#2a2a2a] rounded text-white text-sm pl-9 pr-3 py-1.5 focus:outline-none focus:border-[#00FF41] transition-colors font-mono w-48"
-                value={tenant}
-                placeholder="Enter tenant ID"
-                onChange={(e) => setTenant(e.target.value)}
-              />
-            </div>
-            <button 
-              onClick={load}
-              disabled={loading || !tenant}
-              className="bg-[#00FF41] hover:bg-[#00cc33] disabled:bg-[#141414] disabled:text-gray-500 disabled:border-[#2a2a2a] disabled:border border border-[#00FF41] text-black font-medium text-sm px-4 py-1.5 rounded shadow-[0_0_15px_rgba(0,255,65,0.2)] transition-all active:scale-95"
-            >
-              {loading ? "Loading..." : "Load"}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <section className="max-w-[1000px] mx-auto px-6 py-12">
+    <main className="min-h-screen bg-background text-text-primary">
+      <section className="mx-auto max-w-[1000px] px-6 py-12">
         {error && (
-          <div className="mb-6 rounded-lg border border-red-900/50 bg-red-900/10 p-4 text-sm text-red-400">
+          <div className="mb-6 rounded-xl border border-[#ff4d4d]/40 bg-[#1b0505] p-4 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {status && (
-          <div className="space-y-6">
-            
-            {/* CURRENT PLAN AND USAGE */}
-            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-6 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6">
-                {status.tier !== "enterprise" && (
-                  <button
-                    onClick={handlePortal}
-                    disabled={actionLoading !== ""}
-                    className="bg-[#141414] hover:bg-[#1f1f1f] border border-[#2a2a2a] text-gray-300 px-4 py-2 rounded text-sm font-medium transition-all"
-                  >
-                    Manage Billing
-                  </button>
-                )}
-              </div>
-              
-              <div className="mb-8">
-                <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-1">Current Plan</p>
-                <h2 className="text-4xl font-bold text-white capitalize">{status.tier}</h2>
-              </div>
+        {planFromQuery && (
+          <div className="mb-6 rounded-xl border border-[#00ff9d]/30 bg-accent-muted p-4 text-sm text-[#00ff9d]">
+            Selected plan: {planFromQuery}. You can upgrade below or manage your subscription in-place.
+          </div>
+        )}
 
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <span className="text-gray-400 text-sm font-medium">Monthly Usage</span>
-                  <span className="text-white font-mono">
-                    ${status.current_month_cost_usd.toFixed(2)} / ${status.usage_limit_usd.toFixed(0)}
-                  </span>
-                </div>
-                <div className="w-full bg-[#222] rounded-full h-2 mb-2 overflow-hidden">
-                  <style>{`.billing-progress { width: ${Math.min(status.usage_percent, 100)}%; }`}</style>
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-1000 billing-progress ${status.at_limit ? 'bg-red-500' : status.near_limit ? 'bg-yellow-500' : 'bg-[#00FF41]'}`} 
-                  ></div>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-500">{status.usage_percent.toFixed(1)}% consumed</span>
-                  {status.near_limit && !status.at_limit && (
-                    <span className="text-yellow-500">⚠ Approaching limit</span>
-                  )}
-                  {status.at_limit && (
-                    <span className="text-red-500 font-medium">✕ Limit reached</span>
-                  )}
-                </div>
-              </div>
+        <div className="rounded-2xl border border-border bg-surface p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">
+                Tenant
+              </p>
+              <input
+                value={tenantId}
+                onChange={(e) => {
+                  setTenantId(e.target.value);
+                  setEffectiveTenant(e.target.value);
+                }}
+                placeholder="demo-tenant"
+                className="mt-1 h-10 w-full max-w-xs rounded-lg border border-border bg-[#0a0a0a] px-3 text-sm text-white outline-none transition focus:border-[#00ff9d]"
+              />
+              <button
+                onClick={load}
+                disabled={loading || !effectiveTenant}
+                className="mt-2 inline-flex h-9 items-center rounded-lg bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60"
+              >
+                {loading ? "Loading" : "Load billing"}
+              </button>
             </div>
 
-            {/* UPGRADE OPTIONS */}
-            {status.needs_upgrade && (
-              <div className="bg-[#0f0f0f] border border-[#00FF41]/30 rounded-xl p-6 shadow-[0_0_20px_rgba(0,255,65,0.05)]">
-                <h3 className="text-white text-lg font-semibold mb-1">Upgrade Your Plan</h3>
-                <p className="text-gray-400 text-sm mb-6">Increase your limits and unlock full intelligence features.</p>
-                
-                <div className="grid gap-4 md:grid-cols-2">
-                  {status.tier === "free" && (
-                    <button
-                      onClick={() => handleUpgrade(pricePro)}
-                      disabled={actionLoading !== ""}
-                      className="bg-[#141414] hover:bg-[#1a1a1a] border border-[#00FF41]/50 p-5 rounded-lg text-left transition-all hover:border-[#00FF41] group relative overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#00FF41]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <p className="text-white font-semibold text-lg mb-1">Pro — $29/mo</p>
-                      <p className="text-gray-400 text-xs">100K events, AI forecasting, cost leak detection</p>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleUpgrade(priceEnterprise)}
-                    disabled={actionLoading !== ""}
-                    className="bg-[#141414] hover:bg-[#1a1a1a] border border-[#2a2a2a] p-5 rounded-lg text-left transition-all hover:border-gray-500"
-                  >
-                    <p className="text-white font-semibold text-lg mb-1">Enterprise — $99/mo</p>
-                    <p className="text-gray-400 text-xs">Unlimited events, governance, advanced SLAs</p>
-                  </button>
+            <div className="text-right">
+              <p className="text-xs text-text-muted">Stripe</p>
+              <p className="text-sm text-text-secondary">Payments, portal, and invoices are managed securely by Stripe.</p>
+            </div>
+          </div>
+
+          {status && (
+            <div className="mt-6 space-y-6">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-xl border border-border bg-[#0a0a0a] p-4">
+                  <p className="text-xs text-text-muted">Current plan</p>
+                  <p className="mt-1 text-2xl font-semibold text-white capitalize">{status.tier}</p>
+                </div>
+                <div className="rounded-xl border border-border bg-[#0a0a0a] p-4">
+                  <p className="text-xs text-text-muted">Monthly usage</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    ${status.current_month_cost_usd.toFixed(2)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-[#0a0a0a] p-4">
+                  <p className="text-xs text-text-muted">Limit</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    ${status.usage_limit_usd.toFixed(0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-[#0a0a0a] p-4">
+                  <p className="text-xs text-text-muted">Consumed</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    {status.usage_percent.toFixed(1)}%
+                  </p>
                 </div>
               </div>
-            )}
 
-            {/* SUBSCRIPTION DETAILS */}
-            {status.subscription_id && (
-              <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-6">
-                <h3 className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-4">Subscription Details</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center border-b border-[#1f1f1f] pb-2">
-                    <span className="text-gray-400 text-sm">Subscription ID</span>
-                    <span className="text-white font-mono text-xs bg-[#1a1a1a] px-2 py-1 rounded">{status.subscription_id}</span>
-                  </div>
-                  {status.stripe_customer_id && (
-                    <div className="flex justify-between items-center pb-2">
-                      <span className="text-gray-400 text-sm">Stripe Customer ID</span>
-                      <span className="text-white font-mono text-xs bg-[#1a1a1a] px-2 py-1 rounded">{status.stripe_customer_id}</span>
+              <div className="space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[#13151a]">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${
+                      status.at_limit
+                        ? "bg-red-500"
+                        : status.near_limit
+                          ? "bg-amber-400"
+                          : "bg-[#00ff9d]"
+                    }`}
+                    style={{ width: `${Math.min(status.usage_percent, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span>Usage</span>
+                  {status.near_limit && !status.at_limit && (
+                    <span className="text-amber-300">Approaching limit</span>
+                  )}
+                  {status.at_limit && (
+                    <span className="text-red-300">At limit</span>
+                  )}
+                </div>
+              </div>
+
+              {status.tier !== "enterprise" && (
+                <div className="rounded-xl border border-[#00ff9d]/40 bg-accent-muted p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-white">Upgrade capacity or governance</p>
+                      <p className="text-xs text-zinc-400">
+                        Increase usage, unlock forecasts, or move to dedicated support.
+                      </p>
                     </div>
-                  )}
+                    <div className="flex flex-wrap gap-2">
+                      {status.tier === "free" && (
+                        <button
+                          disabled={action !== null || !proPriceId}
+                          onClick={() => handleUpgrade(proPriceId, "pro")}
+                          className="rounded-lg bg-[#00ff9d] px-4 py-2 text-xs font-semibold text-black transition hover:bg-[#00e08a] disabled:opacity-60"
+                        >
+                          {action === "upgrade" ? "Redirecting…" : "Upgrade to Pro"}
+                        </button>
+                      )}
+                      <button
+                        disabled={action !== null || !enterprisePriceId}
+                        onClick={() => handleUpgrade(enterprisePriceId, "enterprise")}
+                        className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-white transition hover:border-[#00ff9d] hover:text-[#00ff9d] disabled:opacity-60"
+                      >
+                        {action === "upgrade" ? "Redirecting…" : "Upgrade to Enterprise"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-          </div>
-        )}
-
-        {!status && !loading && !error && tenant === "" && (
-          <div className="h-64 flex items-center justify-center border border-[#1f1f1f] rounded-xl bg-[#0a0a0a]">
-            <p className="text-gray-500 font-mono text-sm">Enter a tenant ID to view billing status.</p>
-          </div>
-        )}
+              {status.subscription_id && (
+                <div className="rounded-xl border border-border bg-surface p-5">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">
+                    Subscription details
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-zinc-300">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Subscription</span>
+                      <span className="font-mono text-xs text-white">{status.subscription_id}</span>
+                    </div>
+                    {status.stripe_customer_id && (
+                      <div className="flex items-center justify-between gap-4">
+                        <span>Customer</span>
+                        <span className="font-mono text-xs text-white">{status.stripe_customer_id}</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={handlePortal}
+                      disabled={action === "portal"}
+                      className="mt-2 inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs font-semibold text-white transition hover:border-[#00ff9d] hover:text-[#00ff9d] disabled:opacity-60"
+                    >
+                      {action === "portal" ? "Opening portal…" : "Open billing portal"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </section>
+      <SiteFooter />
     </main>
   );
+}
+
+export default function BillingPage() {
+  return <BillingInner />;
 }
