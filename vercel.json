@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "regions": ["iad1"],
+  "framework": "nextjs",
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "outputDirectory": "frontend/.next",
+  "installCommand": "cd frontend && npm ci",
+  "devCommand": "cd frontend && npm run dev",
+  "env": {
+    "NEXT_PUBLIC_TG_API_BASE": "@next_public_tg_api_base",
+    "NEXT_PUBLIC_STRIPE_PRICE_PRO": "@next_public_stripe_price_pro",
+    "NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE": "@next_public_stripe_price_enterprise"
+  }
+}
