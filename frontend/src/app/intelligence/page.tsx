@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Envelope<T> = {
   ok: boolean;
@@ -27,16 +27,13 @@ type Duplicates = {
 export default function IntelligencePage() {
     const [waste, setWaste] = useState<Waste | null>(null);
   const [graveyard, setGraveyard] = useState<{ graveyard_prompts: Waste["wasteful_prompts"]; total_waste_usd: number; count: number } | null>(null);
-  const [zombies, setZombies] = useState<{ zombie_agents: Array<{ worker_id: string; event_count: number; acceptance_rate: number; total_cost_usd: number }>; count: number } | null>(null);
   const [leaks, setLeaks] = useState<{ cost_leaks: Array<{ pattern_type: string; cost_usd: number; event_count: number }>; total_leak_cost: number; count: number } | null>(null);
   const [duplicates, setDuplicates] = useState<Duplicates | null>(null);
   const [heatmap, setHeatmap] = useState<{ heatmap_cells: HallucinationCell[]; count: number } | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const initialized = useRef(false);
 
-  const loadAll = async () => {
-    setStatus("loading");
+  const loadAll = useCallback(async () => {
     setError(null);
     try {
       const fetch2 = async <T,>(path: string) => {
@@ -45,26 +42,22 @@ export default function IntelligencePage() {
         if (!res.ok || !payload?.ok) throw new Error(payload?.error?.message || `Failed ${path}`);
         return payload.data as T;
       };
-      const [w, g, z, l, d, h] = await Promise.all([
+      const [w, g, l, d, h] = await Promise.all([
         fetch2<Waste>("/v2/intelligence/waste"),
         fetch2<typeof graveyard>("/v2/intelligence/prompt-graveyard"),
-        fetch2<typeof zombies>("/v2/intelligence/zombie-agents"),
         fetch2<typeof leaks>("/v2/intelligence/cost-leaks"),
         fetch2<Duplicates>("/v2/intelligence/duplicates"),
         fetch2<typeof heatmap>("/v2/intelligence/hallucination-map"),
       ]);
       setWaste(w);
       setGraveyard(g);
-      setZombies(z);
       setLeaks(l);
       setDuplicates(d);
       setHeatmap(h);
-      setStatus("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
-      setStatus("error");
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!initialized.current) {
@@ -153,7 +146,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <div className="border border-[#333] bg-black group hover:border-zinc-500 transition-colors">
       <div className="border-b border-[#333] px-4 py-3 flex items-center justify-between bg-[#0a0a0a]">
-        <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">{/* {title} */}</h2>
+        <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">{title}</h2>
         <span className="text-[10px] text-zinc-600 uppercase tracking-widest">INTELLIGENCE</span>
       </div>
       <div className="p-0">

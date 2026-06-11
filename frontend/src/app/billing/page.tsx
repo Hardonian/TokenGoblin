@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createCheckoutSession, getBillingStatus } from "@/lib/billing";
 import { SiteFooter } from "@/components/layout";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 function BillingInner() {
   const search = useSearchParams();
   const tenantParam = search.get("tenant_id");
-    const [effectiveTenant, setEffectiveTenant] = useState("");
+  const effectiveTenant = tenantParam || "";
   const [status, setStatus] = useState<{
     tenant_id: string;
     tier: string;
@@ -24,19 +24,14 @@ function BillingInner() {
     near_limit: boolean;
     at_limit: boolean;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (tenantParam) {
-      setEffectiveTenant(tenantParam);
-    }
-  }, [tenantParam]);
+  
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!effectiveTenant) return;
-    setLoading(true);
+    
     setError(null);
     try {
       const data = await getBillingStatus(effectiveTenant);
@@ -44,9 +39,9 @@ function BillingInner() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Billing status failed");
     } finally {
-      setLoading(false);
+      
     }
-  }
+  }, [effectiveTenant]);
 
   useEffect(() => {
     if (!effectiveTenant) return;
@@ -54,7 +49,7 @@ function BillingInner() {
       void load();
     }, 0);
     return () => clearTimeout(timer);
-  }, [effectiveTenant]);
+  }, [effectiveTenant, load]);
 
   async function handleUpgrade(priceId?: string, planId?: string) {
     if (!effectiveTenant || !priceId) return;

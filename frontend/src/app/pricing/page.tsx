@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createCheckoutSession } from "@/lib/billing";
 import { SiteFooter } from "@/components/layout";
@@ -67,15 +67,7 @@ export default function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const initializedPlanRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const plan = searchParams.get("plan");
-    if (plan && initializedPlanRef.current !== plan) {
-      initializedPlanRef.current = plan;
-      handleStart(plan);
-    }
-  }, [searchParams]);
-
-  async function handleStart(plan: string) {
+  const handleStart = useCallback(async (plan: string) => {
     setLoadingPlan(plan);
     setError(null);
 
@@ -104,7 +96,7 @@ export default function PricingPage() {
       }
 
       const data = await createCheckoutSession({
-        tenantId: tenantId || "",
+        tenantId: "",
         priceId: source,
         successUrl,
         cancelUrl,
@@ -121,8 +113,15 @@ export default function PricingPage() {
     } finally {
       setLoadingPlan(null);
     }
-  }
+  }, [router]);
 
+  useEffect(() => {
+    const plan = searchParams.get("plan");
+    if (plan && initializedPlanRef.current !== plan) {
+      initializedPlanRef.current = plan;
+      handleStart(plan);
+    }
+  }, [searchParams, handleStart]);
   function renderPlan(plan: typeof plans[number]) {
     let price = plan.price;
 
