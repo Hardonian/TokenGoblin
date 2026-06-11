@@ -7,6 +7,7 @@ import (
 
 	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
+	"github.com/google/uuid"
 )
 
 // BillingHandler groups billing-related HTTP handlers.
@@ -176,7 +177,7 @@ func (h *BillingHandler) HandleRegisterTenant(w http.ResponseWriter, r *http.Req
 	}
 
 	var req struct {
-		TenantID string `json:"tenant_id"`
+		TenantID string `json:"tenant_id"` // Kept for backwards compatibility but ignored
 		Name     string `json:"name"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -185,21 +186,24 @@ func (h *BillingHandler) HandleRegisterTenant(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusBadRequest, Envelope{
 			OK:     false,
 			Status: "error",
-			Error:  issue("invalid_json", "Request body must include tenant_id and name."),
+			Error:  issue("invalid_json", "Request body must include name."),
 		})
 		return
 	}
 
-	if req.TenantID == "" || req.Name == "" {
+	if req.Name == "" {
 		writeJSON(w, http.StatusBadRequest, Envelope{
 			OK:     false,
 			Status: "error",
-			Error:  issue("invalid_request", "tenant_id and name are required."),
+			Error:  issue("invalid_request", "name is required."),
 		})
 		return
 	}
 
-	tenant, apiKey, err := billing.RegisterTenant(r.Context(), h.Repo, req.TenantID, req.Name)
+	// ALWAYS auto-generate the Tenant ID for security, ignoring any requested one.
+	tenantID := uuid.NewString()
+
+	tenant, apiKey, err := billing.RegisterTenant(r.Context(), h.Repo, tenantID, req.Name)
 	if err != nil {
 		if err.Error() == "tenant already exists: "+req.TenantID {
 			writeJSON(w, http.StatusConflict, Envelope{

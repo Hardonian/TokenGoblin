@@ -44,3 +44,24 @@ func (rl *RateLimiter) AllowIngestion(ctx context.Context, tenantID string) (boo
 
 	return res.Allowed > 0, nil
 }
+
+// AllowIP checks if an IP has capacity for public requests.
+func (rl *RateLimiter) AllowIP(ctx context.Context, ip string) (bool, error) {
+	if rl == nil || rl.limiter == nil {
+		return true, nil
+	}
+
+	limit := redis_rate.Limit{
+		Rate:   5,
+		Burst:  5,
+		Period: time.Minute,
+	}
+
+	key := "rate:ip:" + ip
+	res, err := rl.limiter.Allow(ctx, key, limit)
+	if err != nil {
+		return false, err
+	}
+
+	return res.Allowed > 0, nil
+}

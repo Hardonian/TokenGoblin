@@ -91,7 +91,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/api/billing/status", wrap(billingHandler.HandleBillingStatus))
 
 	// Public tenant registration (no auth)
-	mux.Handle("/api/tenant/register", http.HandlerFunc(billingHandler.HandleRegisterTenant))
+	mux.Handle("/api/tenant/register", IPRateLimitMiddleware(limiter, http.HandlerFunc(billingHandler.HandleRegisterTenant)))
 
 	// ═══════════════════════════════════════════════════
 	// V2 API — Intelligence, Forecasting, Executive

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -68,7 +69,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 		}
 
 		tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
-		if config.IsProduction() && !config.AllowDemoTenantAuth() {
+		if config.IsProduction() {
 			writeAuthError(w, "api_key_required", "Production routes require API key authentication.")
 			return
 		}
@@ -196,6 +197,14 @@ func isAllowedOrigin(origin string) bool {
 	case "https://tokengoblin.com", "https://app.tokengoblin.com", "http://localhost:3000", "http://localhost:8080":
 		return true
 	}
+	allowedStr := os.Getenv("ALLOWED_ORIGINS")
+	if allowedStr != "" {
+		for _, o := range strings.Split(allowedStr, ",") {
+			if strings.TrimSpace(o) == origin {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -266,4 +275,40 @@ func TimeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// IPRateLimitMiddleware limits requests by IP address
+func IPRateLimitMiddleware(limiter *moat.RateLimiter, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if limiter != nil {
+			ip := getIP(r)
+			allowed, err := limiter.AllowIP(r.Context(), ip)
+			if err == nil && !allowed {
+				writeJSON(w, http.StatusTooManyRequests, Envelope{
+					OK:     false,
+					Status: "error",
+					Error:  issue("rate_limited", "IP rate limit exceeded. Please try again later."),
+				})
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func getIP(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	if idx := strings.IndexByte(ip, ','); idx >= 0 {
+		ip = ip[:idx]
+	}
+	if idx := strings.LastIndexByte(ip, ':'); idx >= 0 {
+		ip = ip[:idx]
+	}
+	return strings.TrimSpace(ip)
 }

@@ -8,12 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stripe/stripe-go/v76"
+	"github.com/stripe/stripe-go/v76/webhook"
 
 	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/demo"
@@ -781,12 +785,67 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		writeMethodError(w)
 		return
 	}
-	writeJSON(w, http.StatusNotImplemented, Envelope{
-		OK:     false,
-		Status: "degraded",
-		Error:  issue("not_implemented", "Stripe signature verification webhook is not implemented in the Go server yet."),
-		Degraded: []domain.Issue{{Code: "not_implemented", Message: "Use the internal verified billing route until Stripe webhook verification is implemented."}},
-	})
+	
+	const MaxBodyBytes = int64(65536)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("read_error", err.Error())})
+		return
+	}
+	
+	secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+	if secret == "" {
+		writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "STRIPE_WEBHOOK_SECRET is not configured")})
+		return
+	}
+	
+	event, err := webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), secret)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("invalid_signature", err.Error())})
+		return
+	}
+	
+	verifiedEvent := billing.VerifiedStripeEvent{
+		EventID:   event.ID,
+		EventType: event.Type,
+	}
+
+	if strings.HasPrefix(event.Type, "customer.subscription.") {
+		var sub stripe.Subscription
+		if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
+			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "failed to parse subscription data")})
+			return
+		}
+		verifiedEvent.SubscriptionID = sub.ID
+		if sub.Customer != nil {
+			verifiedEvent.CustomerID = sub.Customer.ID
+		}
+		verifiedEvent.SubscriptionStatus = string(sub.Status)
+		verifiedEvent.Metadata = sub.Metadata
+	} else if event.Type == "checkout.session.completed" {
+		var session stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "failed to parse checkout session data")})
+			return
+		}
+		if session.Customer != nil {
+			verifiedEvent.CustomerID = session.Customer.ID
+		}
+		if session.Subscription != nil {
+			verifiedEvent.SubscriptionID = session.Subscription.ID
+		}
+		verifiedEvent.TenantID = session.ClientReferenceID
+		verifiedEvent.Metadata = session.Metadata
+	}
+	
+	_, err = billing.ProcessVerifiedStripeEvent(r.Context(), h.Repo, verifiedEvent, time.Now().UTC())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("processing_error", err.Error())})
+		return
+	}
+	
+	w.WriteHeader(http.StatusOK)
 }
 
 func tenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
