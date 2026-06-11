@@ -269,6 +269,38 @@ func (r *PostgresRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID str
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) ListAPIKeys(ctx context.Context, tenantID string) ([]domain.APIKey, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked
+		FROM api_keys
+		WHERE tenant_id = $1 AND is_revoked = false
+		ORDER BY created_at DESC
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+
+	var keys []domain.APIKey
+	for rows.Next() {
+		var key domain.APIKey
+		if err := rows.Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.Role, &key.CreatedAt, &key.LastUsedAt, &key.IsRevoked); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, wrapDBErr(rows.Err())
+}
+
+func (r *PostgresRepository) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE api_keys
+		SET is_revoked = true
+		WHERE tenant_id = $1 AND key_id = $2
+	`, tenantID, keyID)
+	return wrapDBErr(err)
+}
+
 func (r *PostgresRepository) UpsertTenantMember(ctx context.Context, member domain.TenantMember) error {
 	now := member.UpdatedAt
 	if now.IsZero() {

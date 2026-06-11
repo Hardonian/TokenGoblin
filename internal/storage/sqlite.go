@@ -784,6 +784,47 @@ func (r *SQLiteRepository) UpdateAPIKeyLastUsed(ctx context.Context, keyID strin
 	return wrapDBErr(err)
 }
 
+func (r *SQLiteRepository) ListAPIKeys(ctx context.Context, tenantID string) ([]domain.APIKey, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT key_id, tenant_id, name, key_hash, role, created_at, last_used_at, is_revoked
+		FROM api_keys
+		WHERE tenant_id = ? AND is_revoked = 0
+		ORDER BY created_at DESC
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+
+	var keys []domain.APIKey
+	for rows.Next() {
+		var key domain.APIKey
+		var createdAt string
+		var lastUsedAt sql.NullString
+		var isRevoked int
+		if err := rows.Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.Role, &createdAt, &lastUsedAt, &isRevoked); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		key.CreatedAt = parseTime(createdAt)
+		if lastUsedAt.Valid {
+			t := parseTime(lastUsedAt.String)
+			key.LastUsedAt = &t
+		}
+		key.IsRevoked = isRevoked == 1
+		keys = append(keys, key)
+	}
+	return keys, wrapDBErr(rows.Err())
+}
+
+func (r *SQLiteRepository) RevokeAPIKey(ctx context.Context, tenantID, keyID string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE api_keys
+		SET is_revoked = 1
+		WHERE tenant_id = ? AND key_id = ?
+	`, tenantID, keyID)
+	return wrapDBErr(err)
+}
+
 func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

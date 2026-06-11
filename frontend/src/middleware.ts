@@ -10,10 +10,12 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   ) || request.nextUrl.pathname === "/"; // Dashboard is protected
 
-  // In a real application, we would check for a JWT cookie here.
-  // Since TokenGoblin demo relies on a URL parameter or headers for demo tenant injection,
-  // we will enforce that the tenant_id is present if it's a protected path, OR just let the
-  // components handle the empty state, but we add security headers.
+  const apiKey = request.cookies.get("tg_api_key")?.value;
+
+  if (isProtected && !apiKey) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
 
   // Add security headers to all responses
   const headers = new Headers();
@@ -23,9 +25,14 @@ export function middleware(request: NextRequest) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
   // Let the request proceed, injecting headers
+  const reqHeaders = new Headers(request.headers);
+  if (apiKey) {
+    reqHeaders.set("Authorization", `Bearer ${apiKey}`);
+  }
+
   const response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: reqHeaders,
     },
   });
 

@@ -16,6 +16,23 @@ type Repository interface {
 	GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error)
 	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
 	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
+	GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error)
+	GetPricingOverride(ctx context.Context, tenantID, provider, modelID string) (*domain.PricePoint, error)
+	SetPricingOverride(ctx context.Context, tenantID string, point domain.PricePoint) error
+	ListPricingOverrides(ctx context.Context, tenantID string) ([]domain.PricePoint, error)
+	DeleteTenantData(ctx context.Context, tenantID string) error
+	DeleteOldEvents(ctx context.Context, retentionDays int) (int64, error)
+	SaveAPIKey(ctx context.Context, key domain.APIKey) error
+	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
+	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error
+	ListAPIKeys(ctx context.Context, tenantID string) ([]domain.APIKey, error)
+	RevokeAPIKey(ctx context.Context, keyID string, tenantID string) error
+	UpsertTenantMember(ctx context.Context, member domain.TenantMember) error
+	ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
+	SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error
+	ListAuditEvents(ctx context.Context, tenantID string, limit int) ([]domain.AuditEvent, error)
+	SetRecommendationState(ctx context.Context, state domain.RecommendationState) error
+	ListRecommendationStates(ctx context.Context, tenantID string) ([]domain.RecommendationState, error)
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
@@ -102,6 +119,14 @@ func (r *UnavailableRepository) GetAPIKey(context.Context, string) (*domain.APIK
 }
 
 func (r *UnavailableRepository) UpdateAPIKeyLastUsed(context.Context, string) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) ListAPIKeys(context.Context, string) ([]domain.APIKey, error) {
+	return nil, r.err()
+}
+
+func (r *UnavailableRepository) RevokeAPIKey(context.Context, string, string) error {
 	return r.err()
 }
 

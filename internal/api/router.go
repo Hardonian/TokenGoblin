@@ -93,6 +93,21 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Public tenant registration (no auth)
 	mux.Handle("/api/tenant/register", IPRateLimitMiddleware(limiter, http.HandlerFunc(billingHandler.HandleRegisterTenant)))
 
+	// API Key Routes (requires auth)
+	mux.Handle("/api/tenant/login", AuthMiddleware(repo, http.HandlerFunc(billingHandler.HandleTenantLogin)))
+	mux.Handle("/api/tenant/keys", wrapAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			billingHandler.HandleListAPIKeys(w, r)
+		case http.MethodPost:
+			billingHandler.HandleGenerateAPIKey(w, r)
+		case http.MethodDelete:
+			billingHandler.HandleRevokeAPIKey(w, r)
+		default:
+			writeMethodError(w)
+		}
+	})))
+
 	// ═══════════════════════════════════════════════════
 	// V2 API — Intelligence, Forecasting, Executive
 	// ═══════════════════════════════════════════════════
