@@ -75,7 +75,6 @@ type ModelStats = {
 // ------------------------------------------------------------------
 
 export default function CommandCenter() {
-  const [tenant, setTenant] = useState("demo-tenant");
   const [scorecard, setScorecard] = useState<ExecutiveScorecard | null>(null);
   const [forecast, setForecast] = useState<SpendForecast | null>(null);
   const [costLeaks, setCostLeaks] = useState<CostLeak[]>([]);
@@ -89,7 +88,7 @@ export default function CommandCenter() {
 
     const fetchV2 = async <T,>(path: string): Promise<T | null> => {
       try {
-        const res = await fetch(path, { headers: { "x-tenant-id": tenant } });
+        const res = await fetch(path);
         const env: Envelope<T> = await res.json();
         return env.data || null;
       } catch (e) {
@@ -115,7 +114,7 @@ export default function CommandCenter() {
     if (md) setModels(md.models || []);
     
     setLoading(false);
-  }, [tenant]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -128,7 +127,6 @@ export default function CommandCenter() {
     setLoading(true);
     await fetch("/api/dashboard/seed", {
       method: "POST",
-      headers: { "x-tenant-id": tenant },
     });
     await loadAll();
   };
@@ -149,15 +147,12 @@ export default function CommandCenter() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-600 text-xs">--tenant</span>
-              <input
-                aria-label="Tenant ID"
-                className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48"
-                value={tenant}
-                onChange={(e) => setTenant(e.target.value)}
-              />
-            </div>
+            <button 
+              onClick={() => window.location.href = "/keys"}
+              className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-[#ffb000] text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
+            >
+              [ API Keys ]
+            </button>
             <button 
               onClick={seedDemo}
               className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-zinc-400 text-xs px-4 py-1.5 transition-all uppercase tracking-widest"

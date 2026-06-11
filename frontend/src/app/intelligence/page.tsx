@@ -26,8 +26,7 @@ type Duplicates = {
 };
 
 export default function IntelligencePage() {
-  const [tenantId, setTenantId] = useState("demo-tenant");
-  const [waste, setWaste] = useState<Waste | null>(null);
+    const [waste, setWaste] = useState<Waste | null>(null);
   const [graveyard, setGraveyard] = useState<{ graveyard_prompts: Waste["wasteful_prompts"]; total_waste_usd: number; count: number } | null>(null);
   const [zombies, setZombies] = useState<{ zombie_agents: Array<{ worker_id: string; event_count: number; acceptance_rate: number; total_cost_usd: number }>; count: number } | null>(null);
   const [leaks, setLeaks] = useState<{ cost_leaks: Array<{ pattern_type: string; cost_usd: number; event_count: number }>; total_leak_cost: number; count: number } | null>(null);
@@ -42,7 +41,7 @@ export default function IntelligencePage() {
     setError(null);
     try {
       const fetch2 = async <T,>(path: string) => {
-        const res = await fetch(path, { headers: { "x-tenant-id": tenantId } });
+        const res = await fetch(path);
         const payload: Envelope<T> = await res.json();
         if (!res.ok || !payload?.ok) throw new Error(payload?.error?.message || `Failed ${path}`);
         return payload.data as T;
@@ -88,21 +87,7 @@ export default function IntelligencePage() {
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Fleet Intelligence</h1>
             <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Passive signals only — no agent modifications.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600 text-xs">--tenant</span>
-            <input
-              value={tenantId}
-              onChange={(e) => setTenantId(e.target.value)}
-              className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48"
-              placeholder="tenant-id"
-            />
-            <button
-              onClick={loadAll}
-              className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
-            >
-              [ Sync ]
-            </button>
-          </div>
+          
         </div>
 
         {error && (

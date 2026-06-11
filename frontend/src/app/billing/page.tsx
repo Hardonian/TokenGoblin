@@ -124,25 +124,7 @@ function BillingInner() {
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Subscription_Control</h1>
             <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Stripe integration & limits.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600 text-xs">--tenant</span>
-            <input
-              value={tenantId}
-              onChange={(e) => {
-                setTenantId(e.target.value);
-                setEffectiveTenant(e.target.value);
-              }}
-              placeholder="tenant-id"
-              className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48"
-            />
-            <button
-              onClick={load}
-              disabled={loading || !effectiveTenant}
-              className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest disabled:opacity-50"
-            >
-              {loading ? "[ ... ]" : "[ Load ]"}
-            </button>
-          </div>
+          
         </div>
 
         {error && (

@@ -17,15 +17,14 @@ type Forecast = {
 };
 
 export default function ForecastPage() {
-  const [tenantId, setTenantId] = useState("demo-tenant");
-  const [forecast, setForecast] = useState<Forecast | null>(null);
+    const [forecast, setForecast] = useState<Forecast | null>(null);
   const [error, setError] = useState<string | null>(null);
   const initialized = useRef(false);
 
   const load = async () => {
     setError(null);
     try {
-      const res = await fetch("/v2/forecasts/spend", { headers: { "x-tenant-id": tenantId } });
+      const res = await fetch("/v2/forecasts/spend");
       const payload: Envelope<Forecast> = await res.json();
       if (!res.ok || !payload?.ok) {
         throw new Error(payload?.error?.message || "Forecast failed");
@@ -55,11 +54,7 @@ export default function ForecastPage() {
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Spend Forecast</h1>
             <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Projected monthly spend and confidence intervals.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600 text-xs">--tenant</span>
-            <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48" placeholder="tenant-id" />
-            <button onClick={load} className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest">[ Sync ]</button>
-          </div>
+          
         </div>
 
         {error && (
