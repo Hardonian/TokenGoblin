@@ -86,7 +86,7 @@ export default function IntelligencePage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Intelligence ]</p>
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Fleet Intelligence</h1>
-            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> Passive signals only — no agent modifications.</p>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Passive signals only — no agent modifications.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-600 text-xs">--tenant</span>
@@ -155,7 +155,7 @@ export default function IntelligencePage() {
                   </table>
                 </div>
               ) : (
-                <p className="text-zinc-600 text-xs uppercase tracking-widest p-4">>> No hallucination clusters.</p>
+                <p className="text-zinc-600 text-xs uppercase tracking-widest p-4">{'>>'} No hallucination clusters.</p>
               )}
             </div>
           </Card>
@@ -194,7 +194,7 @@ function LeaksTable({ leaks }: { leaks: Array<{ pattern_type: string; cost_usd: 
   return (
     <div className="text-xs">
       {leaks.length === 0 ? (
-        <p className="text-zinc-600 uppercase tracking-widest p-4">>> No significant cost leaks.</p>
+        <p className="text-zinc-600 uppercase tracking-widest p-4">{'>>'} No significant cost leaks.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -247,7 +247,7 @@ function GraveyardTable({ items, totalWaste }: { items: Array<{ fingerprint: str
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">>> Prompt graveyard is empty.</td>
+                <td colSpan={3} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">{'>>'} Prompt graveyard is empty.</td>
               </tr>
             )}
           </tbody>
@@ -261,7 +261,7 @@ function DuplicatesTable({ items }: { items: Array<{ fingerprint: string; count:
   return (
     <div className="text-xs">
       {items.length === 0 ? (
-        <p className="text-zinc-600 uppercase tracking-widest p-4">>> No duplicate clusters.</p>
+        <p className="text-zinc-600 uppercase tracking-widest p-4">{'>>'} No duplicate clusters.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">

@@ -57,7 +57,7 @@ export default function SignupPage() {
               Init Workspace
             </h1>
             <p className="text-xs text-zinc-500 uppercase tracking-widest">
-              >> Allocate a free tenant slot.
+              {'>>'} Allocate a free tenant slot.
             </p>
           </div>
 

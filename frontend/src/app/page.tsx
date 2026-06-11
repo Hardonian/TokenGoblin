@@ -227,7 +227,7 @@ export default function CommandCenter() {
               </div>
               <div className="p-4">
                 {costLeaks.length === 0 ? (
-                  <p className="text-zinc-600 text-xs uppercase tracking-widest">>> System clean. No leaks detected.</p>
+                  <p className="text-zinc-600 text-xs uppercase tracking-widest">{'>>'} System clean. No leaks detected.</p>
                 ) : (
                   <div className="grid gap-3">
                     {costLeaks.map((leak, i) => (
@@ -286,7 +286,7 @@ export default function CommandCenter() {
                     {graveyard?.count === 0 && (
                       <tr>
                         <td colSpan={3} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">
-                          >> Buffer empty.
+                          {'>>'} Buffer empty.
                         </td>
                       </tr>
                     )}
@@ -309,7 +309,7 @@ export default function CommandCenter() {
               <div className="p-4">
                 {zombieAgents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 text-center">
-                    <p className="text-zinc-600 text-xs uppercase tracking-widest">>> No dead agents found.</p>
+                    <p className="text-zinc-600 text-xs uppercase tracking-widest">{'>>'} No dead agents found.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -379,7 +379,7 @@ export default function CommandCenter() {
                 {models.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">
-                      >> No data. Seed to proceed.
+                      {'>>'} No data. Seed to proceed.
                     </td>
                   </tr>
                 )}

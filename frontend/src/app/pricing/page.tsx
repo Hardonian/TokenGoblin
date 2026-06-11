@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createCheckoutSession, createBillingPortalSession, getBillingStatus } from "@/lib/billing";
+import { createCheckoutSession } from "@/lib/billing";
 import { SiteFooter } from "@/components/layout";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const plans = [
   {
     id: "free",
-    name: "Free",
+    name: "FREE",
     price: "$0",
     period: "forever",
     description: "Exploratory visibility for small operators.",
@@ -27,7 +27,7 @@ const plans = [
   },
   {
     id: "pro",
-    name: "Pro",
+    name: "PRO",
     price: "$29",
     period: "per month",
     description: "Forecasting and cost-leak analysis for active AI fleets.",
@@ -43,7 +43,7 @@ const plans = [
   },
   {
     id: "enterprise",
-    name: "Enterprise",
+    name: "ENTERPRISE",
     price: "$99",
     period: "per month",
     description: "Unlimited observability for platform teams.",
@@ -91,8 +91,7 @@ export default function PricingPage() {
         throw new Error("Select a valid plan.");
       }
 
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "";
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
       const successUrl = `${origin}/billing?plan=${encodeURIComponent(plan)}`;
       const cancelUrl = `${origin}/pricing`;
 
@@ -119,16 +118,13 @@ export default function PricingPage() {
 
       throw new Error("Checkout session did not return a URL.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to start checkout."
-      );
+      setError(err instanceof Error ? err.message : "Unable to start checkout.");
     } finally {
       setLoadingPlan(null);
     }
   }
 
   function renderPlan(plan: typeof plans[number]) {
-    const isAnnualActive = annual;
     let price = plan.price;
 
     if (plan.id === "pro" && annual) {
@@ -139,53 +135,56 @@ export default function PricingPage() {
 
     const buttonLabel =
       plan.id === "free"
-        ? "Create free account"
+        ? "[ Allocate Free ]"
         : plan.id === "enterprise"
-          ? "Contact sales"
-          : "Start Pro trial";
+          ? "[ Init: Enterprise ]"
+          : "[ Init: Pro Trial ]";
 
     return (
       <div
-        className={`relative flex flex-col rounded-2xl border p-6 ${
+        key={plan.id}
+        className={`relative flex flex-col border p-6 bg-black transition-colors ${
           plan.highlighted
-            ? "border-[#00ff9d]/70 bg-surface-strong shadow-[0_0_35px_rgba(0,255,157,0.08)]"
-            : "border-border bg-surface"
+            ? "border-[#ffb000]"
+            : "border-[#333] hover:border-zinc-500"
         }`}
       >
-        {plan.id === "pro" && (
-          <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2">
-            <span className="inline-flex rounded-full bg-[#00ff9d] px-3 py-1 text-xs font-semibold text-black">
-              Most popular
-            </span>
+        {plan.highlighted && (
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-[#ffb000]"></div>
+        )}
+
+        {plan.highlighted && (
+          <div className="mb-4 text-[#ffb000] text-[10px] uppercase tracking-widest font-bold">
+            {'>>'} Recommended Protocol
           </div>
         )}
 
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-text-secondary">
-            {plan.name}
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+            [{plan.name}]
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-semibold text-text-primary">
+            <span className={`text-4xl font-bold tracking-tight ${plan.highlighted ? "text-[#ffb000]" : "text-white"}`}>
               {price}
             </span>
-            <span className="text-sm text-text-muted">
+            <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
               /{annual && plan.id !== "free" ? "mo, billed annually" : plan.period}
             </span>
           </div>
           {plan.id !== "free" && (
-            <p className="text-sm text-text-secondary">
+            <p className="text-xs text-zinc-400 mt-2 font-mono">
               {plan.description}
             </p>
           )}
         </div>
 
-        <ul className="mt-6 flex-1 space-y-3">
+        <ul className="mt-8 flex-1 space-y-4">
           {plan.features.map((feature) => (
             <li
               key={feature}
-              className="flex gap-2 text-sm text-text-secondary"
+              className="flex gap-3 text-xs text-zinc-300 font-mono"
             >
-              <span className="mt-0.5 h-2.5 w-2.5 rounded-full bg-[#00ff9d]/80" />
+              <span className="text-[#ffb000]">{'>>'}</span>
               {feature}
             </li>
           ))}
@@ -195,13 +194,13 @@ export default function PricingPage() {
           <button
             onClick={() => handleStart(plan.id)}
             disabled={loadingPlan === plan.id}
-            className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+            className={`w-full px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors ${
               plan.highlighted
-                ? "bg-[#00ff9d] text-black hover:bg-[#00e08a]"
-                : "border border-border-strong text-text-primary hover:border-[#00ff9d] hover:text-[#00ff9d]"
-            } disabled:opacity-60`}
+                ? "bg-[#ffb000] text-black hover:bg-[#ff8c00]"
+                : "border border-[#333] text-zinc-300 hover:border-[#ffb000] hover:text-[#ffb000]"
+            } disabled:opacity-50`}
           >
-            {loadingPlan === plan.id ? "Redirecting…" : buttonLabel}
+            {loadingPlan === plan.id ? "[ Redirecting... ]" : buttonLabel}
           </button>
         </div>
       </div>
@@ -209,60 +208,66 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
-      <section className="relative overflow-hidden border-b border-border">
-        <div className="absolute left-1/2 top-0 h-[520px] w-[920px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_top,rgba(0,255,157,0.12),transparent_68%)] opacity-70" />
+    <main className="min-h-screen bg-black text-zinc-300 font-mono selection:bg-[#ffb000] selection:text-black">
+      <section className="relative overflow-hidden border-b border-[#333] bg-[#050505]">
+        <div className="absolute left-0 top-0 h-full w-full bg-[linear-gradient(rgba(255,176,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,176,0,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
         <div className="relative mx-auto max-w-5xl px-6 pb-20 pt-24">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#00ff9d]">
-              Pricing
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#ffb000]">
+              [ Pricing_Matrix ]
             </p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-text-primary md:text-5xl">
-              Transparent pricing for autonomous spend control
+            <h1 className="mt-6 text-3xl font-bold tracking-widest text-white uppercase md:text-4xl">
+              Autonomous Spend Control
             </h1>
-            <p className="mt-4 text-base text-text-secondary md:text-lg">
-              Start free. Upgrade when you’re ready to move from data to
-              action. No hidden fees, no installer lock-in.
+            <p className="mt-6 text-sm text-zinc-400 font-mono">
+              Start free. Upgrade when you're ready to move from data to action. 
+              No hidden fees, no installer lock-in.
             </p>
           </div>
 
-          <div className="mx-auto mt-10 flex max-w-md items-center justify-center gap-3 rounded-full border border-border-strong bg-surface p-1">
+          <div className="mx-auto mt-12 flex max-w-sm items-center justify-center gap-1 border border-[#333] bg-black p-1">
             <button
               onClick={() => setAnnual(false)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
                 !annual
-                  ? "bg-text-primary text-black"
-                  : "text-text-secondary hover:text-text-primary"
+                  ? "bg-[#ffb000] text-black"
+                  : "text-zinc-500 hover:text-white"
               }`}
             >
-              Monthly
+              [ Monthly ]
             </button>
             <button
               onClick={() => setAnnual(true)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
                 annual
-                  ? "bg-text-primary text-black"
-                  : "text-text-secondary hover:text-text-primary"
+                  ? "bg-[#ffb000] text-black"
+                  : "text-zinc-500 hover:text-white"
               }`}
             >
-              Annual
-              <span className="ml-1 text-xs text-[#00ff9d]">
-                save 20%
-              </span>
+              [ Annual ]
+              <span className="block text-[8px] text-zinc-500">save 20%</span>
             </button>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-24 pt-14">
+      {error && (
+        <div className="mx-auto max-w-5xl px-6 pt-12">
+          <div className="border border-red-900 bg-[#0a0000] p-4 text-xs text-red-500 font-bold uppercase tracking-widest">
+            [ERR] {error}
+          </div>
+        </div>
+      )}
+
+      <section className="mx-auto max-w-[1200px] px-6 pb-24 pt-16">
         <div className="grid gap-6 md:grid-cols-3">{plans.map(renderPlan)}</div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-6 pb-24">
-        <h2 className="text-center text-2xl font-semibold text-text-primary">
-          Frequently asked questions
+      <section className="mx-auto max-w-4xl px-6 pb-24 border-t border-[#333] pt-24">
+        <h2 className="text-xl font-bold text-white uppercase tracking-widest mb-12 text-center">
+          [ Interrogation_Logs ]
         </h2>
-        <div className="mt-8 space-y-4">
+        <div className="grid md:grid-cols-2 gap-8">
           {[
             {
               q: "What happens if I exceed my event limit?",
@@ -280,16 +285,16 @@ export default function PricingPage() {
               q: "Do you integrate with StripedBank and Settler?",
               a: "Yes — for B2B pipelines, Settler is the canonical counterpart for Stripe, bank, and invoice reconciliation.",
             },
-          ].map((faq) => (
+          ].map((faq, i) => (
             <div
-              key={faq.q}
-              className="rounded-2xl border border-border bg-surface px-6 py-5"
+              key={i}
+              className="border border-[#333] bg-black p-6 group hover:border-zinc-500 transition-colors"
             >
-              <h3 className="text-sm font-semibold text-text-primary">
-                {faq.q}
+              <h3 className="text-xs font-bold text-[#ffb000] uppercase tracking-widest mb-4">
+                Q: {faq.q}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                {faq.a}
+              <p className="text-xs text-zinc-400 font-mono leading-relaxed">
+                {'>>'} {faq.a}
               </p>
             </div>
           ))}

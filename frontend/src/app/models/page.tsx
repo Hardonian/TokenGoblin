@@ -58,7 +58,7 @@ export default function ModelsPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Analytics ]</p>
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Model Matrix</h1>
-            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> Cost, quality, and latency by model.</p>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Cost, quality, and latency by model.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-600 text-xs">--tenant</span>
@@ -102,7 +102,7 @@ export default function ModelsPage() {
                 ))}
                 {(!models || models.length === 0) && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-zinc-600 uppercase tracking-widest">>> No model data. Seed demo data to populate.</td>
+                    <td colSpan={6} className="px-5 py-8 text-center text-zinc-600 uppercase tracking-widest">{'>>'} No model data. Seed demo data to populate.</td>
                   </tr>
                 )}
               </tbody>

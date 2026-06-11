@@ -53,7 +53,7 @@ export default function ForecastPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Forecast ]</p>
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Spend Forecast</h1>
-            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> Projected monthly spend and confidence intervals.</p>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Projected monthly spend and confidence intervals.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-600 text-xs">--tenant</span>
@@ -87,7 +87,7 @@ export default function ForecastPage() {
                 <span className="text-[#ffb000] font-bold">${row.spend_usd.toFixed(2)}</span>
               </div>
             ))}
-            {!forecast?.daily_trend?.length && <p className="text-zinc-600 text-xs uppercase tracking-widest">>> No forecast data. Seed required.</p>}
+            {!forecast?.daily_trend?.length && <p className="text-zinc-600 text-xs uppercase tracking-widest">{'>>'} No forecast data. Seed required.</p>}
           </div>
         </div>
       </section>

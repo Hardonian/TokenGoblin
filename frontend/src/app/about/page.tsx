@@ -32,7 +32,6 @@ const brands = [
 
 export default function AboutPage() {
   const [now, setNow] = useState(new Date());
-  const autoRedirectTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -40,53 +39,62 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="inline-flex rounded-full border border-[#00ff9d]/40 bg-accent-muted px-3 py-1 text-xs font-semibold text-[#00ff9d]">
-            System context
+    <main className="min-h-screen bg-black text-zinc-300 font-mono selection:bg-[#ffb000] selection:text-black">
+      <section className="mx-auto max-w-[1200px] px-6 py-24">
+        
+        <div className="mx-auto max-w-2xl text-center border-b border-[#333] pb-12">
+          <span className="inline-block border border-[#ffb000] bg-[#ffb000]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#ffb000] mb-6">
+            [ System_Context ]
           </span>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            Hardonian product system
+          <h1 className="text-3xl font-bold tracking-widest text-white uppercase md:text-4xl">
+            Hardonian Product System
           </h1>
-          <p className="mt-4 text-base text-text-secondary">
-            A coordinated stack across observability, reconciliation, and
-            alignment. Each module is designed to reduce ambiguity, preserve
-            evidence, and move operators from reaction to control.
+          <p className="mt-6 text-xs text-zinc-500 font-mono uppercase tracking-widest leading-relaxed">
+            {'>>'} A coordinated stack across observability, reconciliation, and alignment. 
+            Each module is designed to reduce ambiguity, preserve evidence, and move 
+            operators from reaction to control.
           </p>
         </div>
 
-        <div className="mx-auto mt-12 grid gap-4 md:grid-cols-3">
+        <div className="mt-16 grid gap-6 md:grid-cols-3">
           {brands.map((brand) => (
             <a
               key={brand.name}
               href={brand.href}
-              className="group rounded-2xl border border-border bg-surface p-5 transition hover:border-[#00ff9d]"
+              className="group border border-[#333] bg-black p-6 transition-colors hover:border-[#ffb000] flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">{brand.name}</h2>
-                  <p className="mt-2 text-sm text-text-secondary">{brand.description}</p>
+              <div>
+                <div className="flex items-start justify-between border-b border-[#222] pb-4 mb-4">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-widest">
+                    {brand.name}
+                  </h2>
+                  <span className="text-[#ffb000] opacity-0 group-hover:opacity-100 transition-opacity">
+                    [↗]
+                  </span>
                 </div>
-                <span className="text-xs text-text-muted">→</span>
+                <p className="text-xs text-zinc-400 font-mono leading-relaxed">
+                  {brand.description}
+                </p>
               </div>
-              <div className="mt-5 flex items-center gap-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#00ff9d]" />
-                <span className="text-xs text-text-muted">{brand.github}</span>
+              <div className="mt-8 flex items-center gap-3">
+                <span className="text-[#ffb000] text-[10px]">{'>>'}{'>'}</span>
+                <span className="text-[10px] text-zinc-600 uppercase tracking-widest">
+                  {brand.github}
+                </span>
               </div>
             </a>
           ))}
         </div>
 
-        <div className="mx-auto mt-10 grid gap-4 md:grid-cols-3">
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
           {[
             {
               label: "Operator posture",
-              value: "deterministic",
+              value: "DETERMINISTIC",
             },
             {
               label: "Evidence model",
-              value: "hash-linked",
+              value: "HASH-LINKED",
             },
             {
               label: "Local time",
@@ -95,14 +103,19 @@ export default function AboutPage() {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-2xl border border-border bg-surface p-5"
+              className="border border-[#222] bg-[#0a0a0a] p-4 flex items-center justify-between"
             >
-              <p className="text-xs text-text-muted">{item.label}</p>
-              <p className="mt-1 text-sm text-white">{item.value}</p>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-widest">
+                {item.label}
+              </p>
+              <p className="text-xs font-bold text-[#ffb000] uppercase tracking-widest">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
       </section>
+      
       <SiteFooter />
     </main>
   );

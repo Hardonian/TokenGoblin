@@ -122,7 +122,7 @@ function BillingInner() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Billing ]</p>
             <h1 className="text-xl font-bold text-white tracking-widest uppercase">Subscription_Control</h1>
-            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> Stripe integration & limits.</p>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">{'>>'} Stripe integration & limits.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-600 text-xs">--tenant</span>
@@ -190,7 +190,7 @@ function BillingInner() {
                         ? "bg-yellow-500"
                         : "bg-[#ffb000]"
                   }`}
-                  style={{ width: \`\${Math.min(status.usage_percent, 100)}%\` }}
+                  style={{ width: `${Math.min(status.usage_percent, 100)}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-widest">
@@ -211,7 +211,7 @@ function BillingInner() {
                   <div>
                     <p className="text-sm font-bold text-white uppercase tracking-widest">Upgrade Protocol</p>
                     <p className="text-xs text-zinc-500 font-mono mt-1">
-                      >> Unlock increased limits, deeper forecasts, and SLA support.
+                      {'>>'} Unlock increased limits, deeper forecasts, and SLA support.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
