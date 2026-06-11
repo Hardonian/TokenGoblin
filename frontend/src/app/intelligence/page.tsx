@@ -79,33 +79,35 @@ export default function IntelligencePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
-      <section className="mx-auto max-w-6xl px-6 py-12 space-y-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <main className="min-h-screen bg-black text-zinc-300 font-mono pb-20 selection:bg-[#ffb000] selection:text-black">
+      <section className="mx-auto max-w-[1400px] px-6 py-12 space-y-8">
+        
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between border-b border-[#333] pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Intelligence</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Fleet Intelligence</h1>
-            <p className="mt-2 text-sm text-text-secondary">Passive signals only — no agent modifications.</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Intelligence ]</p>
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase">Fleet Intelligence</h1>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> Passive signals only — no agent modifications.</p>
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-zinc-600 text-xs">--tenant</span>
             <input
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
-              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-white outline-none"
+              className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48"
               placeholder="tenant-id"
             />
             <button
               onClick={loadAll}
-              className="rounded-lg bg-[#00ff9d] px-3 py-2 text-sm font-semibold text-black"
+              className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
-              Refresh
+              [ Sync ]
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="rounded-xl border border-[#ff4d4d]/40 bg-[#1b0505] p-4 text-sm text-red-300">
-            {error}
+          <div className="border border-red-900 bg-[#0a0000] p-4 text-xs text-red-500 font-bold uppercase tracking-widest">
+            [ERR] {error}
           </div>
         )}
 
@@ -130,28 +132,30 @@ export default function IntelligencePage() {
             <DuplicatesTable items={duplicates?.duplicate_clusters || []} />
           </Card>
           <Card title="Hallucination Map">
-            <div className="space-y-2 text-sm text-text-secondary">
+            <div className="space-y-2 text-sm text-zinc-400">
               {heatmap?.heatmap_cells && heatmap.heatmap_cells.length > 0 ? (
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr>
-                      <th className="px-3 py-2 text-xs text-text-muted">Model</th>
-                      <th className="px-3 py-2 text-xs text-text-muted">Category</th>
-                      <th className="px-3 py-2 text-xs text-text-muted">Failure Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {heatmap.heatmap_cells.slice(0, 10).map((row, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-2">{row.model}</td>
-                        <td className="px-3 py-2">{row.category}</td>
-                        <td className="px-3 py-2">{(row.failure_rate * 100).toFixed(1)}%</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
+                      <tr>
+                        <th className="px-4 py-3 font-normal">Model</th>
+                        <th className="px-4 py-3 font-normal">Category</th>
+                        <th className="px-4 py-3 font-normal">Failure Rate</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#222]">
+                      {heatmap.heatmap_cells.slice(0, 10).map((row, i) => (
+                        <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                          <td className="px-4 py-3 text-zinc-200">{row.model}</td>
+                          <td className="px-4 py-3 text-zinc-400">{row.category}</td>
+                          <td className="px-4 py-3 text-[#ffb000]">{(row.failure_rate * 100).toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
-                <p>No hallucination clusters.</p>
+                <p className="text-zinc-600 text-xs uppercase tracking-widest p-4">>> No hallucination clusters.</p>
               )}
             </div>
           </Card>
@@ -163,49 +167,55 @@ export default function IntelligencePage() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white">{title}</h2>
-        <span className="text-xs text-text-muted">INTELLIGENCE</span>
+    <div className="border border-[#333] bg-black group hover:border-zinc-500 transition-colors">
+      <div className="border-b border-[#333] px-4 py-3 flex items-center justify-between bg-[#0a0a0a]">
+        <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">
+          // {title}
+        </h2>
+        <span className="text-[10px] text-zinc-600 uppercase tracking-widest">INTELLIGENCE</span>
       </div>
-      {children}
+      <div className="p-0">
+        {children}
+      </div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-xs text-text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
+    <div className="border border-[#333] bg-black p-4 relative group hover:border-zinc-500 transition-colors">
+      <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-4">[{label}]</p>
+      <p className="text-2xl font-bold tracking-tight text-[#ffb000]">{value}</p>
     </div>
   );
 }
 
 function LeaksTable({ leaks }: { leaks: Array<{ pattern_type: string; cost_usd: number; event_count: number }> }) {
   return (
-    <div className="space-y-2 text-sm">
+    <div className="text-xs">
       {leaks.length === 0 ? (
-        <p className="text-text-muted">No significant cost leaks.</p>
+        <p className="text-zinc-600 uppercase tracking-widest p-4">>> No significant cost leaks.</p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr>
-              <th className="px-3 py-2 text-xs text-text-muted">Pattern</th>
-              <th className="px-3 py-2 text-xs text-text-muted text-right">Events</th>
-              <th className="px-3 py-2 text-xs text-text-muted text-right">Cost</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {leaks.slice(0, 5).map((leak, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2">{leak.pattern_type}</td>
-                <td className="px-3 py-2 text-right">{leak.event_count}</td>
-                <td className="px-3 py-2 text-right text-red-300">${leak.cost_usd.toFixed(2)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
+              <tr>
+                <th className="px-4 py-3 font-normal">Pattern</th>
+                <th className="px-4 py-3 font-normal text-right">Events</th>
+                <th className="px-4 py-3 font-normal text-right">Cost</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#222]">
+              {leaks.slice(0, 5).map((leak, i) => (
+                <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                  <td className="px-4 py-3 text-zinc-200">{leak.pattern_type}</td>
+                  <td className="px-4 py-3 text-right text-zinc-400">{leak.event_count}</td>
+                  <td className="px-4 py-3 text-right text-red-500 font-bold">${leak.cost_usd.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -213,62 +223,66 @@ function LeaksTable({ leaks }: { leaks: Array<{ pattern_type: string; cost_usd: 
 
 function GraveyardTable({ items, totalWaste }: { items: Array<{ fingerprint: string; total_cost_usd: number; event_count: number }>; totalWaste: number }) {
   return (
-    <div className="space-y-2 text-sm">
-      <div className="flex items-center justify-between text-xs text-text-muted">
+    <div className="text-xs">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-zinc-500 px-4 py-2 border-b border-[#222]">
         <span>Total lost</span>
-        <span>${totalWaste.toFixed(2)}</span>
+        <span className="text-red-500">${totalWaste.toFixed(2)}</span>
       </div>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="px-3 py-2 text-xs text-text-muted">Fingerprint</th>
-            <th className="px-3 py-2 text-xs text-text-muted text-right">Events</th>
-            <th className="px-3 py-2 text-xs text-text-muted text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {items.slice(0, 5).map((item, i) => (
-            <tr key={i}>
-              <td className="px-3 py-2 font-mono text-xs text-text-secondary">{item.fingerprint.substring(0, 12)}…</td>
-              <td className="px-3 py-2 text-right">{item.event_count}</td>
-              <td className="px-3 py-2 text-right text-white">${item.total_cost_usd.toFixed(2)}</td>
-            </tr>
-          ))}
-          {items.length === 0 && (
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
             <tr>
-              <td colSpan={3} className="px-3 py-4 text-text-muted">Prompt graveyard is empty.</td>
+              <th className="px-4 py-3 font-normal">Fingerprint</th>
+              <th className="px-4 py-3 font-normal text-right">Events</th>
+              <th className="px-4 py-3 font-normal text-right">Cost</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-[#222]">
+            {items.slice(0, 5).map((item, i) => (
+              <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                <td className="px-4 py-3 font-mono text-zinc-500">{item.fingerprint.substring(0, 12)}…</td>
+                <td className="px-4 py-3 text-right text-zinc-300">{item.event_count}</td>
+                <td className="px-4 py-3 text-right text-[#ffb000]">${item.total_cost_usd.toFixed(2)}</td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">>> Prompt graveyard is empty.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 function DuplicatesTable({ items }: { items: Array<{ fingerprint: string; count: number; redundant_cost_usd: number }> }) {
   return (
-    <div className="space-y-2 text-sm">
+    <div className="text-xs">
       {items.length === 0 ? (
-        <p className="text-text-muted">No duplicate clusters.</p>
+        <p className="text-zinc-600 uppercase tracking-widest p-4">>> No duplicate clusters.</p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr>
-              <th className="px-3 py-2 text-xs text-text-muted">Fingerprint</th>
-              <th className="px-3 py-2 text-xs text-text-muted text-right">Count</th>
-              <th className="px-3 py-2 text-xs text-text-muted text-right">Redundant</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {items.slice(0, 5).map((item, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2 font-mono text-xs text-text-secondary">{item.fingerprint.substring(0, 12)}…</td>
-                <td className="px-3 py-2 text-right">{item.count}</td>
-                <td className="px-3 py-2 text-right text-red-300">${item.redundant_cost_usd.toFixed(2)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
+              <tr>
+                <th className="px-4 py-3 font-normal">Fingerprint</th>
+                <th className="px-4 py-3 font-normal text-right">Count</th>
+                <th className="px-4 py-3 font-normal text-right">Redundant</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#222]">
+              {items.slice(0, 5).map((item, i) => (
+                <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                  <td className="px-4 py-3 font-mono text-zinc-500">{item.fingerprint.substring(0, 12)}…</td>
+                  <td className="px-4 py-3 text-right text-zinc-300">{item.count}</td>
+                  <td className="px-4 py-3 text-right text-red-500">${item.redundant_cost_usd.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

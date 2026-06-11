@@ -52,23 +52,24 @@ export default function ExecutivePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
-      <section className="mx-auto max-w-5xl px-6 py-12 space-y-8">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <main className="min-h-screen bg-black text-zinc-300 font-mono pb-20 selection:bg-[#ffb000] selection:text-black">
+      <section className="mx-auto max-w-[1400px] px-6 py-12 space-y-8">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between border-b border-[#333] pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Executive</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Leadership Scorecard</h1>
-            <p className="mt-2 text-sm text-text-secondary">AI maturity, fleet ROI, and waste.</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000] mb-2">[ Executive ]</p>
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase">Leadership Scorecard</h1>
+            <p className="mt-2 text-xs text-zinc-500 uppercase tracking-widest">>> AI maturity, fleet ROI, and waste.</p>
           </div>
           <div className="flex items-center gap-2">
-            <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-white outline-none" placeholder="tenant-id" />
-            <button onClick={load} className="rounded-lg bg-[#00ff9d] px-3 py-2 text-sm font-semibold text-black">Refresh</button>
+            <span className="text-zinc-600 text-xs">--tenant</span>
+            <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48" placeholder="tenant-id" />
+            <button onClick={load} className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest">[ Sync ]</button>
           </div>
         </div>
 
         {error && (
-          <div className="rounded-xl border border-[#ff4d4d]/40 bg-[#1b0505] p-4 text-sm text-red-300">
-            {error}
+          <div className="border border-red-900 bg-[#0a0000] p-4 text-xs text-red-500 font-bold uppercase tracking-widest">
+            [ERR] {error}
           </div>
         )}
 
@@ -91,9 +92,10 @@ export default function ExecutivePage() {
 
 function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border border-border bg-surface p-4`}>
-      <p className="text-xs text-text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${highlight ? "text-[#00ff9d]" : "text-white"}`}>{value}</p>
+    <div className={`border ${highlight ? "border-[#ffb000]" : "border-[#333]"} bg-black p-4 relative group hover:border-zinc-500 transition-colors`}>
+      {highlight && <div className="absolute top-0 left-0 w-full h-[1px] bg-[#ffb000]"></div>}
+      <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-4">[{label}]</p>
+      <p className={`text-2xl font-bold tracking-tight ${highlight ? "text-[#ffb000]" : "text-zinc-200"}`}>{value}</p>
     </div>
   );
 }

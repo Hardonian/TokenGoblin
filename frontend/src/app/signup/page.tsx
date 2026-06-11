@@ -46,26 +46,25 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-text-primary">
+    <main className="min-h-screen bg-black text-zinc-300 font-mono selection:bg-[#ffb000] selection:text-black">
       <section className="mx-auto flex min-h-[85vh] max-w-md flex-col justify-center px-6">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#00ff9d]">
-              TokenGoblin
+        <div className="space-y-6 border border-[#333] bg-[#0a0a0a] p-8">
+          <div className="space-y-2 border-b border-[#333] pb-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#ffb000]">
+              [ TokenGoblin ]
             </p>
-            <h1 className="text-3xl font-semibold text-white">
-              Create your workspace
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase">
+              Init Workspace
             </h1>
-            <p className="text-sm text-text-secondary">
-              Start with a free tenant. Upgrade later when you need more
-              capacity, forecasting, or dedicated support.
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">
+              >> Allocate a free tenant slot.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-text-secondary">
-                Tenant ID
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">
+                [ Tenant ID ]
               </label>
               <input
                 value={tenantId}
@@ -74,48 +73,54 @@ export default function SignupPage() {
                     e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
                   )
                 }
-                placeholder="my-company"
-                className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-white outline-none transition focus:border-[#00ff9d]"
+                placeholder="company-id"
+                className="h-10 w-full border border-[#333] bg-black px-3 text-sm text-[#ffb000] outline-none transition focus:border-[#ffb000]"
               />
-              <p className="mt-1 text-xs text-text-muted">
-                Lowercase letters, numbers, and hyphens only
+              <p className="mt-2 text-[10px] text-zinc-600 uppercase tracking-widest">
+                // Lowercase letters, numbers, hyphens
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-text-secondary">
-                Company / project name
+              <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">
+                [ Organization ]
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Acme Corp"
-                className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-white outline-none transition focus:border-[#00ff9d]"
+                className="h-10 w-full border border-[#333] bg-black px-3 text-sm text-[#ffb000] outline-none transition focus:border-[#ffb000]"
               />
             </div>
             {error && (
-              <div className="rounded-lg border border-red-500/40 bg-[#1b0505] p-3 text-sm text-red-300">
-                {error}
+              <div className="border border-red-900 bg-[#0a0000] p-3 text-xs text-red-500 font-bold uppercase tracking-widest">
+                [ERR] {error}
               </div>
             )}
+            
+            {result && (
+              <div className="border border-green-900 bg-[#000a00] p-3 text-xs text-green-500 font-bold uppercase tracking-widest">
+                [SUCCESS] Tenant created. Redirecting to console...
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading || !tenantId || !name}
-              className="h-11 w-full rounded-lg bg-[#00ff9d] text-sm font-semibold text-black transition hover:bg-[#00e08a] disabled:opacity-60"
+              disabled={loading || !tenantId || !name || !!result}
+              className="mt-4 h-10 w-full bg-[#ffb000] text-xs font-bold uppercase tracking-widest text-black transition hover:bg-[#ff8c00] disabled:opacity-50"
             >
-              {loading ? "Creating…" : "Create workspace"}
+              {loading ? "[ Executing... ]" : "[ Allocate ]"}
             </button>
           </form>
 
-          <div className="space-y-2">
+          <div className="space-y-4 pt-4 border-t border-[#333]">
             <Link
               href="/pricing"
-              className="flex w-full items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-white transition hover:border-[#00ff9d] hover:text-[#00ff9d]"
+              className="flex w-full items-center justify-center border border-[#333] bg-black px-4 py-2 text-xs font-bold text-zinc-400 uppercase tracking-widest transition hover:border-[#ffb000] hover:text-[#ffb000]"
             >
-              Review plans
+              [ View Allocations ]
             </Link>
-            <p className="text-center text-xs text-text-muted">
-              By creating an account you agree to the Terms of Service and
-              Privacy Policy.
+            <p className="text-center text-[10px] text-zinc-600 uppercase tracking-widest">
+              By proceeding, you agree to our ToS & Privacy protocols.
             </p>
           </div>
         </div>

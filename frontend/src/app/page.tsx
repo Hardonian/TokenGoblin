@@ -134,110 +134,116 @@ export default function CommandCenter() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-gray-300 font-sans selection:bg-[#00FF41] selection:text-black pb-20">
+    <main className="min-h-screen bg-black text-zinc-300 font-mono selection:bg-[#ffb000] selection:text-black pb-20">
       {/* HEADER */}
-      <header className="border-b border-[#1f1f1f] bg-black/50 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-[#333] bg-black sticky top-0 z-30">
         <div className="max-w-[1400px] mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-[#00FF41] flex items-center justify-center text-black font-black text-xl tracking-tighter">
-              TG
+          <div className="flex items-center gap-4">
+            <div className="text-[#ffb000] font-black text-xl">
+              [TG_CMD]
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-white tracking-tight">TokenGoblin</h1>
-              <p className="text-xs text-[#00FF41] uppercase tracking-[0.2em] font-mono">Command Center</p>
+              <h1 className="text-lg font-bold text-white tracking-widest uppercase">System Overview</h1>
+              <p className="text-xs text-zinc-500 uppercase tracking-[0.2em]">Live Telemetry Active</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-mono">ID:</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-600 text-xs">--tenant</span>
               <input
                 aria-label="Tenant ID"
-                className="bg-[#141414] border border-[#2a2a2a] rounded text-white text-sm pl-9 pr-3 py-1.5 focus:outline-none focus:border-[#00FF41] transition-colors font-mono w-48"
+                className="bg-black border border-[#333] text-[#ffb000] text-sm px-3 py-1 focus:outline-none focus:border-[#ffb000] transition-colors w-48"
                 value={tenant}
                 onChange={(e) => setTenant(e.target.value)}
               />
             </div>
             <button 
               onClick={seedDemo}
-              className="bg-[#141414] hover:bg-[#1f1f1f] border border-[#2a2a2a] hover:border-gray-500 text-gray-300 text-sm px-4 py-1.5 rounded transition-all active:scale-95"
+              className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-zinc-400 text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
-              Seed Data
+              [ Seed ]
             </button>
             <button 
               onClick={loadAll}
-              className="bg-[#00FF41] hover:bg-[#00cc33] text-black font-medium text-sm px-4 py-1.5 rounded shadow-[0_0_15px_rgba(0,255,65,0.2)] transition-all active:scale-95"
+              className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
-              Refresh
+              [ Sync ]
             </button>
           </div>
         </div>
       </header>
 
       {loading && (
-        <div className="h-1 bg-[#1a1a1a] w-full overflow-hidden">
-          <div className="h-full bg-[#00FF41] w-1/3 animate-[slide_1.5s_infinite_ease-in-out]"></div>
+        <div className="h-0.5 bg-[#111] w-full overflow-hidden">
+          <div className="h-full bg-[#ffb000] w-1/3 animate-[slide_1.5s_infinite_ease-in-out]"></div>
         </div>
       )}
 
-      <div className="max-w-[1400px] mx-auto px-6 pt-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-6 pt-8 space-y-8">
+        
         {/* TOP ROW: EXECUTIVE SCORECARD */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <ScoreCard 
-            title="AI Maturity Grade" 
-            value={scorecard?.grade || "N/A"} 
-            subValue={`Score: ${scorecard?.maturity_score || 0}/100`}
-            highlight
-          />
-          <ScoreCard 
-            title="Total Spend (Forecast)" 
-            value={`$${formatMoney(forecast?.projected_spend_usd || 0)}`} 
-            subValue={`Waste: ${scorecard?.waste_pct.toFixed(1)}%`}
-          />
-          <ScoreCard 
-            title="Agent Fleet ROI" 
-            value={`${scorecard?.roi_multiplier?.toFixed(1) || 0}x`} 
-            subValue={`${scorecard?.active_agents || 0} active workers`}
-          />
-          <ScoreCard 
-            title="Platform Reliability" 
-            value={`${(100 - (scorecard?.failure_rate_pct || 0)).toFixed(1)}%`} 
-            subValue={`${formatInt(scorecard?.avg_latency_ms || 0)}ms avg latency`}
-          />
+        <div>
+          <div className="text-xs text-zinc-600 uppercase tracking-[0.3em] mb-4 border-b border-[#333] pb-2">
+            :: Executive_Telemetry
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <ScoreCard 
+              title="AI Maturity Grade" 
+              value={scorecard?.grade || "N/A"} 
+              subValue={`Score: ${scorecard?.maturity_score || 0}/100`}
+              highlight
+            />
+            <ScoreCard 
+              title="Total Spend (FCST)" 
+              value={`$${formatMoney(forecast?.projected_spend_usd || 0)}`} 
+              subValue={`Waste: ${scorecard?.waste_pct.toFixed(1)}%`}
+            />
+            <ScoreCard 
+              title="Agent Fleet ROI" 
+              value={`${scorecard?.roi_multiplier?.toFixed(1) || 0}x`} 
+              subValue={`${scorecard?.active_agents || 0} workers`}
+            />
+            <ScoreCard 
+              title="Sys_Reliability" 
+              value={`${(100 - (scorecard?.failure_rate_pct || 0)).toFixed(1)}%`} 
+              subValue={`${formatInt(scorecard?.avg_latency_ms || 0)}ms lag`}
+            />
+          </div>
         </div>
 
         {/* MIDDLE SECTION: THE WASTE RADAR */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
             
             {/* Cost Leaks */}
-            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-xl">
-              <div className="border-b border-[#2a2a2a] px-5 py-4 flex justify-between items-center bg-[#141414]">
-                <h2 className="text-white font-medium flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                  Active Cost Leaks
+            <div className="border border-[#333] bg-black">
+              <div className="border-b border-[#333] px-4 py-3 flex justify-between items-center bg-[#0a0a0a]">
+                <h2 className="text-zinc-300 font-bold tracking-widest text-sm flex items-center gap-2 uppercase">
+                  <span className="w-1.5 h-1.5 bg-red-500 animate-pulse"></span>
+                  Cost_Leaks.log
                 </h2>
-                <span className="text-xs font-mono text-gray-500">INTELLIGENCE_ENGINE v2.0</span>
+                <span className="text-xs text-zinc-600 uppercase">Engine_v2.0</span>
               </div>
-              <div className="p-5">
+              <div className="p-4">
                 {costLeaks.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No significant cost leaks detected in the current window.</p>
+                  <p className="text-zinc-600 text-xs uppercase tracking-widest">>> System clean. No leaks detected.</p>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid gap-3">
                     {costLeaks.map((leak, i) => (
-                      <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1a1a1a] border border-[#333] rounded-lg p-4 hover:border-red-900/50 transition-colors group">
+                      <div key={i} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0a0a0a] border border-[#222] p-3 hover:border-red-900 transition-colors">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-red-400 font-mono text-xs border border-red-900/50 bg-red-900/10 px-2 py-0.5 rounded">
-                              {leak.pattern_type}
+                          <div className="flex items-center gap-3">
+                            <span className="text-red-500 font-bold text-xs">
+                              [{leak.pattern_type.toUpperCase()}]
                             </span>
-                            <span className="text-gray-400 text-sm">{leak.event_count} events</span>
+                            <span className="text-zinc-500 text-xs">Events: {leak.event_count}</span>
                           </div>
-                          <p className="text-gray-300 text-sm mt-2">{leak.description}</p>
+                          <p className="text-zinc-400 text-xs mt-2 font-mono">{leak.description}</p>
                         </div>
                         <div className="text-right whitespace-nowrap">
-                          <p className="text-red-400 font-medium text-lg">-${formatMoney(leak.cost_usd)}</p>
-                          <p className="text-xs text-gray-500 uppercase tracking-widest">Wasted</p>
+                          <p className="text-red-500 font-bold text-sm">-${formatMoney(leak.cost_usd)}</p>
+                          <p className="text-[10px] text-zinc-600 uppercase tracking-widest">Drain</p>
                         </div>
                       </div>
                     ))}
@@ -247,40 +253,40 @@ export default function CommandCenter() {
             </div>
 
             {/* Prompt Graveyard */}
-            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-xl">
-              <div className="border-b border-[#2a2a2a] px-5 py-4 flex justify-between items-center bg-[#141414]">
-                <h2 className="text-white font-medium flex items-center gap-2">
-                  <span className="text-gray-400">🪦</span> Prompt Graveyard
+            <div className="border border-[#333] bg-black">
+              <div className="border-b border-[#333] px-4 py-3 flex justify-between items-center bg-[#0a0a0a]">
+                <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">
+                  [!] Graveyard_Dump
                 </h2>
-                <span className="text-xs font-mono text-red-400">
+                <span className="text-xs text-red-500 font-bold tracking-widest">
                   Total Lost: ${formatMoney(graveyard?.total_waste_usd || 0)}
                 </span>
               </div>
               <div className="p-0 overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-[#111] text-gray-500 font-mono text-xs uppercase">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
                     <tr>
-                      <th className="px-5 py-3 font-medium">Prompt Fingerprint</th>
-                      <th className="px-5 py-3 font-medium text-right">Event Count</th>
-                      <th className="px-5 py-3 font-medium text-right">Cost Drain</th>
+                      <th className="px-4 py-3 font-normal">Fingerprint</th>
+                      <th className="px-4 py-3 font-normal text-right">Events</th>
+                      <th className="px-4 py-3 font-normal text-right">Cost</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#2a2a2a]">
+                  <tbody className="divide-y divide-[#222]">
                     {(graveyard?.graveyard_prompts || []).slice(0, 5).map((prompt, i) => (
-                      <tr key={i} className="hover:bg-[#141414] transition-colors">
-                        <td className="px-5 py-4 font-mono text-xs text-gray-400">
+                      <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                        <td className="px-4 py-3 text-zinc-400">
                           {prompt.fingerprint.substring(0, 16)}...
                         </td>
-                        <td className="px-5 py-4 text-right text-gray-300">{prompt.event_count}</td>
-                        <td className="px-5 py-4 text-right text-red-400 font-medium">
+                        <td className="px-4 py-3 text-right text-zinc-300">{prompt.event_count}</td>
+                        <td className="px-4 py-3 text-right text-red-500">
                           ${formatMoney(prompt.total_cost_usd)}
                         </td>
                       </tr>
                     ))}
                     {graveyard?.count === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-5 py-8 text-center text-gray-500">
-                          The graveyard is empty.
+                        <td colSpan={3} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">
+                          >> Buffer empty.
                         </td>
                       </tr>
                     )}
@@ -291,34 +297,34 @@ export default function CommandCenter() {
             
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             
             {/* Zombie Agents */}
-            <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-xl h-full">
-              <div className="border-b border-[#2a2a2a] px-5 py-4 bg-[#141414]">
-                <h2 className="text-white font-medium flex items-center gap-2">
-                  <span className="text-green-500">🧟</span> Zombie Agents
+            <div className="border border-[#333] bg-black h-full">
+              <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
+                <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">
+                  [?] Zombie_Procs
                 </h2>
               </div>
-              <div className="p-5">
+              <div className="p-4">
                 {zombieAgents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 text-center">
-                    <p className="text-gray-500 text-sm">No low-value, high-activity agents detected.</p>
+                    <p className="text-zinc-600 text-xs uppercase tracking-widest">>> No dead agents found.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {zombieAgents.map((zombie, i) => (
-                      <div key={i} className="p-4 bg-[#1a1a1a] border border-[#333] rounded-lg">
+                      <div key={i} className="p-3 bg-[#0a0a0a] border border-[#222]">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-white font-medium">{zombie.worker_id}</span>
-                          <span className="text-red-400 font-mono text-sm">${formatMoney(zombie.total_cost_usd)}</span>
+                          <span className="text-zinc-300 font-bold text-xs">{zombie.worker_id}</span>
+                          <span className="text-red-500 text-xs">-${formatMoney(zombie.total_cost_usd)}</span>
                         </div>
-                        <div className="w-full bg-[#222] rounded-full h-1.5 mb-1 mt-3">
+                        <div className="w-full bg-[#111] h-1 mb-1 mt-3">
                           <style>{`.zombie-bar-${i} { width: ${zombie.acceptance_rate * 100}%; }`}</style>
-                          <div className={`bg-[#00FF41] h-1.5 rounded-full zombie-bar-${i}`}></div>
+                          <div className={`bg-[#ffb000] h-1 zombie-bar-${i}`}></div>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>Acceptance Rate</span>
+                        <div className="flex justify-between text-[10px] text-zinc-600 uppercase tracking-widest">
+                          <span>Acceptance</span>
                           <span>{(zombie.acceptance_rate * 100).toFixed(1)}%</span>
                         </div>
                       </div>
@@ -332,46 +338,48 @@ export default function CommandCenter() {
         </div>
 
         {/* BOTTOM SECTION: MODEL PERFORMANCE GRID */}
-        <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-xl">
-          <div className="border-b border-[#2a2a2a] px-5 py-4 flex justify-between items-center bg-[#141414]">
-            <h2 className="text-white font-medium">Model Analytics Matrix</h2>
+        <div className="border border-[#333] bg-black">
+          <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
+            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">
+              // Model_Matrix
+            </h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-[#111] text-gray-500 font-mono text-xs uppercase border-b border-[#2a2a2a]">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
                 <tr>
-                  <th className="px-5 py-4 font-medium">Model / Provider</th>
-                  <th className="px-5 py-4 font-medium text-right">Volume</th>
-                  <th className="px-5 py-4 font-medium text-right">Spend</th>
-                  <th className="px-5 py-4 font-medium text-right">Cost/Call</th>
-                  <th className="px-5 py-4 font-medium text-right">Cost/Outcome</th>
-                  <th className="px-5 py-4 font-medium text-right">Quality</th>
-                  <th className="px-5 py-4 font-medium text-right">Latency</th>
+                  <th className="px-4 py-3 font-normal">Provider/ID</th>
+                  <th className="px-4 py-3 font-normal text-right">Vol</th>
+                  <th className="px-4 py-3 font-normal text-right">Spend</th>
+                  <th className="px-4 py-3 font-normal text-right">Cost/Call</th>
+                  <th className="px-4 py-3 font-normal text-right text-white">Cost/Outcome</th>
+                  <th className="px-4 py-3 font-normal text-right">Quality</th>
+                  <th className="px-4 py-3 font-normal text-right">Lag</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#2a2a2a]">
+              <tbody className="divide-y divide-[#222]">
                 {models.map((m, i) => (
-                  <tr key={i} className="hover:bg-[#141414] transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-medium text-white">{m.model_id}</div>
-                      <div className="text-xs text-gray-500">{m.provider}</div>
+                  <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="text-zinc-200 font-bold">{m.model_id}</div>
+                      <div className="text-[10px] text-zinc-500 uppercase">{m.provider}</div>
                     </td>
-                    <td className="px-5 py-4 text-right text-gray-400">{formatInt(m.event_count)}</td>
-                    <td className="px-5 py-4 text-right text-gray-300 font-mono">${formatMoney(m.total_cost_usd)}</td>
-                    <td className="px-5 py-4 text-right text-gray-400 font-mono">${formatMoney(m.avg_cost_per_call)}</td>
-                    <td className="px-5 py-4 text-right text-white font-mono font-medium">${formatMoney(m.cost_per_outcome)}</td>
-                    <td className="px-5 py-4 text-right">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${m.acceptance_rate > 0.8 ? 'bg-green-900/20 text-[#00FF41]' : m.acceptance_rate > 0.5 ? 'bg-yellow-900/20 text-yellow-400' : 'bg-red-900/20 text-red-400'}`}>
+                    <td className="px-4 py-3 text-right text-zinc-400">{formatInt(m.event_count)}</td>
+                    <td className="px-4 py-3 text-right text-zinc-300">${formatMoney(m.total_cost_usd)}</td>
+                    <td className="px-4 py-3 text-right text-zinc-400">${formatMoney(m.avg_cost_per_call)}</td>
+                    <td className="px-4 py-3 text-right text-[#ffb000] font-bold">${formatMoney(m.cost_per_outcome)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`px-2 py-0.5 text-[10px] tracking-widest uppercase border ${m.acceptance_rate > 0.8 ? 'border-green-500/30 text-green-500' : m.acceptance_rate > 0.5 ? 'border-yellow-500/30 text-yellow-500' : 'border-red-500/30 text-red-500'}`}>
                         {(m.acceptance_rate * 100).toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-right text-gray-400">{formatInt(m.avg_latency_ms)}ms</td>
+                    <td className="px-4 py-3 text-right text-zinc-400">{formatInt(m.avg_latency_ms)}ms</td>
                   </tr>
                 ))}
                 {models.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
-                      No model data available. Seed demo data to populate.
+                    <td colSpan={7} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">
+                      >> No data. Seed to proceed.
                     </td>
                   </tr>
                 )}
@@ -394,13 +402,14 @@ export default function CommandCenter() {
 
 function ScoreCard({ title, value, subValue, highlight }: { title: string, value: string, subValue: string, highlight?: boolean }) {
   return (
-    <div className={`bg-[#0f0f0f] border ${highlight ? 'border-[#00FF41]/30 shadow-[0_0_20px_rgba(0,255,65,0.05)]' : 'border-[#2a2a2a] shadow-lg'} rounded-xl p-5 flex flex-col justify-between group hover:border-[#444] transition-colors`}>
-      <h3 className="text-gray-500 text-xs font-mono uppercase tracking-wider mb-2">{title}</h3>
-      <p className={`text-3xl font-semibold mb-3 ${highlight ? 'text-[#00FF41]' : 'text-white'}`}>{value}</p>
+    <div className={`bg-black border ${highlight ? 'border-[#ffb000]' : 'border-[#333]'} p-4 flex flex-col justify-between group hover:border-zinc-500 transition-colors relative`}>
+      {highlight && <div className="absolute top-0 left-0 w-full h-[1px] bg-[#ffb000]"></div>}
+      <h3 className="text-zinc-500 text-[10px] uppercase tracking-widest mb-4">[{title}]</h3>
+      <p className={`text-2xl font-bold mb-2 tracking-tight ${highlight ? 'text-[#ffb000]' : 'text-zinc-200'}`}>{value}</p>
       <div className="mt-auto flex items-center justify-between">
-        <p className="text-xs text-gray-400">{subValue}</p>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${highlight ? 'bg-[#00FF41]/10 text-[#00FF41]' : 'bg-[#1f1f1f] text-gray-400'}`}>
-          →
+        <p className="text-[10px] text-zinc-600 uppercase tracking-widest">{subValue}</p>
+        <div className={`opacity-0 group-hover:opacity-100 transition-opacity text-xs ${highlight ? 'text-[#ffb000]' : 'text-zinc-500'}`}>
+          {'>'}
         </div>
       </div>
     </div>

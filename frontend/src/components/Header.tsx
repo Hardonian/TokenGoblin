@@ -21,13 +21,13 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#030303]/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-3 transition hover:opacity-90">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#00ff9d] text-sm font-black text-black shadow-[0_0_20px_rgba(0,255,157,0.35)]">
-            TG
+    <header className="sticky top-0 z-40 border-b border-[#333] bg-black">
+      <div className="mx-auto flex h-14 w-full items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2 group transition-colors">
+          <span className="text-[#ffb000] font-black text-lg group-hover:text-[#ff8c00]">
+            root@tg:~#
           </span>
-          <span className="text-base font-semibold tracking-tight text-white">
+          <span className="text-sm tracking-widest text-zinc-300 group-hover:text-white uppercase">
             TokenGoblin
           </span>
         </Link>
@@ -37,19 +37,13 @@ export function Header() {
           aria-expanded={open}
           aria-controls="primary-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className="inline-flex items-center justify-center rounded-md p-2 text-zinc-300 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00ff9d] md:hidden"
+          className="inline-flex items-center justify-center rounded-none p-2 text-[#ffb000] border border-transparent hover:border-[#ffb000] transition-colors focus:outline-none md:hidden"
         >
           <span className="sr-only">Toggle navigation</span>
-          <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-            {open ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
+          <span className="font-bold">{open ? "[X]" : "[=]"}</span>
         </button>
 
-        <nav id="primary-navigation" className="hidden md:flex md:items-center md:gap-5">
+        <nav id="primary-navigation" className="hidden md:flex md:items-center md:gap-4">
           {navLinks.map((link) =>
             link.external ? (
               <a
@@ -57,24 +51,24 @@ export function Header() {
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="text-sm text-zinc-300 transition hover:text-white"
+                className="text-xs text-zinc-500 hover:text-[#ffb000] transition-colors tracking-wider"
               >
-                {link.label}
+                [{link.label.toUpperCase()}]
               </a>
             ) : (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm text-zinc-300 transition hover:text-white"
+                className="text-xs text-zinc-500 hover:text-[#ffb000] transition-colors tracking-wider"
               >
-                {link.label}
+                [{link.label.toUpperCase()}]
               </Link>
             )
           )}
         </nav>
       </div>
 
-      <div className={`${open ? "block" : "hidden"} md:hidden border-t border-white/10 bg-[#050505]`}>
+      <div className={`${open ? "block" : "hidden"} md:hidden border-t border-[#333] bg-black`}>
         <nav className="flex flex-col px-4 py-3">
           {navLinks.map((link) =>
             link.external ? (
@@ -83,19 +77,19 @@ export function Header() {
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                className="px-2 py-2 text-sm text-zinc-400 hover:text-[#ffb000] transition-colors uppercase tracking-widest"
                 onClick={() => setOpen(false)}
               >
-                {link.label}
+                &gt; {link.label}
               </a>
             ) : (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-md px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                className="px-2 py-2 text-sm text-zinc-400 hover:text-[#ffb000] transition-colors uppercase tracking-widest"
                 onClick={() => setOpen(false)}
               >
-                {link.label}
+                &gt; {link.label}
               </Link>
             )
           )}
