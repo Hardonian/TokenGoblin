@@ -157,15 +157,15 @@ function BillingInner() {
 
             <div className="space-y-2 border border-[#333] bg-black p-4">
               <div className="h-1 w-full overflow-hidden bg-[#111]">
+                <style>{`.progress-bar { width: ${Math.min(status.usage_percent, 100)}%; }`}</style>
                 <div
-                  className={`h-full transition-all duration-1000 ${
+                  className={`progress-bar h-full transition-all duration-1000 ${
                     status.at_limit
                       ? "bg-red-500"
                       : status.near_limit
                         ? "bg-yellow-500"
                         : "bg-[#ffb000]"
                   }`}
-                  style={{ width: `${Math.min(status.usage_percent, 100)}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-widest">

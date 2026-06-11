@@ -36,8 +36,6 @@ export function Header() {
 
         <button
           type="button"
-          aria-expanded={open ? "true" : "false"}
-          aria-controls="primary-navigation"
           onClick={() => setOpen((prev) => !prev)}
           className="inline-flex items-center justify-center rounded-none p-2 text-[#ffb000] border border-transparent hover:border-[#ffb000] transition-colors focus:outline-none md:hidden"
         >
