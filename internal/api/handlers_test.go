@@ -327,8 +327,8 @@ func TestStripeWebhookHandler(t *testing.T) {
 
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("expected 501, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
 	updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")

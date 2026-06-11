@@ -808,10 +808,10 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 	
 	verifiedEvent := billing.VerifiedStripeEvent{
 		EventID:   event.ID,
-		EventType: event.Type,
+		EventType: string(event.Type),
 	}
 
-	if strings.HasPrefix(event.Type, "customer.subscription.") {
+	if strings.HasPrefix(string(event.Type), "customer.subscription.") {
 		var sub stripe.Subscription
 		if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
 			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "failed to parse subscription data")})
@@ -823,7 +823,7 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		}
 		verifiedEvent.SubscriptionStatus = string(sub.Status)
 		verifiedEvent.Metadata = sub.Metadata
-	} else if event.Type == "checkout.session.completed" {
+	} else if string(event.Type) == "checkout.session.completed" {
 		var session stripe.CheckoutSession
 		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
 			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "failed to parse checkout session data")})
