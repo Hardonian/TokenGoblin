@@ -536,8 +536,6 @@ func (r *SQLiteRepository) ListPricingOverrides(ctx context.Context, tenantID st
 	return nil, nil
 }
 
-
-
 func (r *SQLiteRepository) GetTenantCurrentMonthCost(ctx context.Context, tenantID string) (float64, error) {
 	now := time.Now().UTC()
 	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -597,7 +595,6 @@ func (r *SQLiteRepository) SetPricingOverride(ctx context.Context, tenantID stri
 	`, overrideID, tenantID, point.Provider, point.ModelID, point.InputCostPerMillion, point.OutputCostPerMillion, formatTime(time.Now().UTC()))
 	return wrapDBErr(err)
 }
-
 
 func (r *SQLiteRepository) SaveAPIKey(ctx context.Context, key domain.APIKey) error {
 	role := normalizeRole(key.Role)

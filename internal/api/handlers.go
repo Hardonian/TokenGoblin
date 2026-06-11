@@ -785,7 +785,7 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		writeMethodError(w)
 		return
 	}
-	
+
 	const MaxBodyBytes = int64(65536)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 	payload, err := io.ReadAll(r.Body)
@@ -793,19 +793,19 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("read_error", err.Error())})
 		return
 	}
-	
+
 	secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 	if secret == "" {
 		writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "STRIPE_WEBHOOK_SECRET is not configured")})
 		return
 	}
-	
+
 	event, err := webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), secret)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, Envelope{OK: false, Status: "error", Error: issue("invalid_signature", err.Error())})
 		return
 	}
-	
+
 	verifiedEvent := billing.VerifiedStripeEvent{
 		EventID:   event.ID,
 		EventType: string(event.Type),
@@ -838,13 +838,13 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		verifiedEvent.TenantID = session.ClientReferenceID
 		verifiedEvent.Metadata = session.Metadata
 	}
-	
+
 	_, err = billing.ProcessVerifiedStripeEvent(r.Context(), h.Repo, verifiedEvent, time.Now().UTC())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("processing_error", err.Error())})
 		return
 	}
-	
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1081,7 +1081,7 @@ func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Req
 
 	// Gather all tenant data for export
 	export := map[string]interface{}{
-		"tenant_id": tenantID,
+		"tenant_id":   tenantID,
 		"exported_at": time.Now().UTC().Format(time.RFC3339),
 	}
 

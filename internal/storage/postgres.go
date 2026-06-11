@@ -863,7 +863,6 @@ const tokenEventSelectPostgres = `
 	FROM token_usage_events
 `
 
-
 func scanTokenEventsPostgres(rows pgx.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {

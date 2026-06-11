@@ -628,7 +628,6 @@ func (s *ExecutionService) normalize(tenantID string, event domain.TokenEvent) (
 	return event, issues, nil
 }
 
-
 func validateEvent(event domain.TokenEvent) []domain.Issue {
 	var issues []domain.Issue
 	if strings.TrimSpace(event.EventID) == "" {

@@ -20,16 +20,16 @@ import (
 
 // BillingStatus describes the current billing state of a tenant.
 type BillingStatus struct {
-	TenantID             string  `json:"tenant_id"`
-	Tier                 string  `json:"tier"`
-	StripeCustomerID     string  `json:"stripe_customer_id,omitempty"`
-	CurrentMonthCostUSD  float64 `json:"current_month_cost_usd"`
-	UsageLimitUSD        float64 `json:"usage_limit_usd"`
-	UsagePercent         float64 `json:"usage_percent"`
-	SubscriptionID       string  `json:"subscription_id,omitempty"`
-	NeedsUpgrade         bool    `json:"needs_upgrade"`
-	NearLimit            bool    `json:"near_limit"`
-	AtLimit              bool    `json:"at_limit"`
+	TenantID            string  `json:"tenant_id"`
+	Tier                string  `json:"tier"`
+	StripeCustomerID    string  `json:"stripe_customer_id,omitempty"`
+	CurrentMonthCostUSD float64 `json:"current_month_cost_usd"`
+	UsageLimitUSD       float64 `json:"usage_limit_usd"`
+	UsagePercent        float64 `json:"usage_percent"`
+	SubscriptionID      string  `json:"subscription_id,omitempty"`
+	NeedsUpgrade        bool    `json:"needs_upgrade"`
+	NearLimit           bool    `json:"near_limit"`
+	AtLimit             bool    `json:"at_limit"`
 }
 
 func stripeSecretKey() string {
@@ -146,14 +146,14 @@ func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantI
 
 	// Create a checkout session
 	vals := url.Values{
-		"mode":                        {"subscription"},
-		"customer":                    {customerID},
-		"success_url":                 {successURL},
-		"cancel_url":                  {cancelURL},
-		"line_items[0][price]":        {priceID},
-		"line_items[0][quantity]":     {"1"},
-		"metadata[tenant_id]":         {tenantID},
-		"client_reference_id":         {tenantID},
+		"mode":                                   {"subscription"},
+		"customer":                               {customerID},
+		"success_url":                            {successURL},
+		"cancel_url":                             {cancelURL},
+		"line_items[0][price]":                   {priceID},
+		"line_items[0][quantity]":                {"1"},
+		"metadata[tenant_id]":                    {tenantID},
+		"client_reference_id":                    {tenantID},
 		"subscription_data[metadata][tenant_id]": {tenantID},
 	}
 
@@ -163,8 +163,8 @@ func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantI
 	}
 
 	var sessionResult struct {
-		ID     string `json:"id"`
-		URL    string `json:"url"`
+		ID  string `json:"id"`
+		URL string `json:"url"`
 	}
 	if err := json.Unmarshal(sessionResp, &sessionResult); err != nil {
 		return "", "", fmt.Errorf("parse checkout session response: %w", err)

@@ -95,8 +95,15 @@ export default function PricingPage() {
         throw new Error("Stripe price id is not configured.");
       }
 
+      const tenantId = typeof document !== "undefined" ? document.cookie.match(/(^| )tg_tenant_id=([^;]+)/)?.[2] : null;
+
+      if (!tenantId) {
+        router.push("/signup?plan=" + plan);
+        return;
+      }
+
       const data = await createCheckoutSession({
-        tenantId: "",
+        tenantId,
         priceId: source,
         successUrl,
         cancelUrl,

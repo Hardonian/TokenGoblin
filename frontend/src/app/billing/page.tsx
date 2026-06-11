@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 function BillingInner() {
   const search = useSearchParams();
   const tenantParam = search.get("tenant_id");
-  const effectiveTenant = tenantParam || "";
+  const cookieTenant = typeof document !== "undefined" ? document.cookie.match(/(^| )tg_tenant_id=([^;]+)/)?.[2] : null;
+  const effectiveTenant = tenantParam || cookieTenant || "";
   const [status, setStatus] = useState<{
     tenant_id: string;
     tier: string;

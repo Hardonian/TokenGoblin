@@ -102,10 +102,10 @@ type Budget struct {
 
 // BudgetStatus constants.
 const (
-	BudgetStatusHealthy    = "healthy"
-	BudgetStatusWarning    = "warning"
-	BudgetStatusCritical   = "critical"
-	BudgetStatusExceeded   = "exceeded"
+	BudgetStatusHealthy  = "healthy"
+	BudgetStatusWarning  = "warning"
+	BudgetStatusCritical = "critical"
+	BudgetStatusExceeded = "exceeded"
 )
 
 // ROITrend represents return on AI investment over time.
@@ -117,10 +117,10 @@ type ROITrend struct {
 
 // ROIDataPoint represents a single period's ROI calculation.
 type ROIDataPoint struct {
-	PeriodStart       time.Time `json:"period_start"`
-	PeriodEnd         time.Time `json:"period_end"`
-	TotalCostUSD      float64   `json:"total_cost_usd"`
-	AcceptedOutputs   int       `json:"accepted_outputs"`
-	CostPerOutcome    float64   `json:"cost_per_outcome"`
-	EfficiencyIndex   float64   `json:"efficiency_index"`
+	PeriodStart     time.Time `json:"period_start"`
+	PeriodEnd       time.Time `json:"period_end"`
+	TotalCostUSD    float64   `json:"total_cost_usd"`
+	AcceptedOutputs int       `json:"accepted_outputs"`
+	CostPerOutcome  float64   `json:"cost_per_outcome"`
+	EfficiencyIndex float64   `json:"efficiency_index"`
 }

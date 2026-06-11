@@ -120,8 +120,8 @@ func TestDetect(t *testing.T) {
 			},
 			prior: []domain.TokenEvent{
 				{WorkerID: "worker_1", TotalTokens: 20000, Timestamp: now.Add(-10 * time.Second)},
-				{WorkerID: "worker_1", TotalTokens: 20000, Timestamp: now.Add(-20 * time.Second)}, // Total 60000 > 50000
-				{WorkerID: "worker_2", TotalTokens: 50000, Timestamp: now.Add(-10 * time.Second)}, // Different worker
+				{WorkerID: "worker_1", TotalTokens: 20000, Timestamp: now.Add(-20 * time.Second)},  // Total 60000 > 50000
+				{WorkerID: "worker_2", TotalTokens: 50000, Timestamp: now.Add(-10 * time.Second)},  // Different worker
 				{WorkerID: "worker_1", TotalTokens: 20000, Timestamp: now.Add(-100 * time.Second)}, // Outside window
 			},
 			expectedTypes: []domain.AnomalyType{domain.AnomalyVelocitySpike},

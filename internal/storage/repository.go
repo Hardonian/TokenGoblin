@@ -51,7 +51,7 @@ type Repository interface {
 	ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error)
 	UpsertBudget(ctx context.Context, budget domain.Budget) error
 	ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error)
-	
+
 	Close() error
 }
 

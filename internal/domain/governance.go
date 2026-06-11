@@ -68,13 +68,13 @@ type PolicyViolation struct {
 
 // ComplianceReport summarizes governance status for a tenant.
 type ComplianceReport struct {
-	TenantID            string    `json:"tenant_id"`
-	GeneratedAt         time.Time `json:"generated_at"`
-	ActivePolicies      int       `json:"active_policies"`
-	TotalViolations30d  int       `json:"total_violations_30d"`
-	OpenViolations      int       `json:"open_violations"`
-	ResolvedViolations  int       `json:"resolved_violations"`
-	PIIDetections30d    int       `json:"pii_detections_30d"`
-	ShadowAIEvents30d   int       `json:"shadow_ai_events_30d"`
-	ComplianceScore     int       `json:"compliance_score"`
+	TenantID           string    `json:"tenant_id"`
+	GeneratedAt        time.Time `json:"generated_at"`
+	ActivePolicies     int       `json:"active_policies"`
+	TotalViolations30d int       `json:"total_violations_30d"`
+	OpenViolations     int       `json:"open_violations"`
+	ResolvedViolations int       `json:"resolved_violations"`
+	PIIDetections30d   int       `json:"pii_detections_30d"`
+	ShadowAIEvents30d  int       `json:"shadow_ai_events_30d"`
+	ComplianceScore    int       `json:"compliance_score"`
 }

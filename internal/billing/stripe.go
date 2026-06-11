@@ -68,8 +68,9 @@ func (e StripeConflictError) Error() string {
 }
 
 type StripeSyncer struct {
-	repo   storage.Repository
-	logger *slog.Logger
+	repo     storage.Repository
+	logger   *slog.Logger
+	interval time.Duration
 }
 
 func NewStripeSyncer(repo storage.Repository, logger *slog.Logger) *StripeSyncer {
@@ -77,13 +78,20 @@ func NewStripeSyncer(repo storage.Repository, logger *slog.Logger) *StripeSyncer
 		logger = slog.Default()
 	}
 	return &StripeSyncer{
-		repo:   repo,
-		logger: logger,
+		repo:     repo,
+		logger:   logger,
+		interval: 1 * time.Hour,
 	}
 }
 
+// WithInterval allows overriding the sync interval for testing purposes.
+func (s *StripeSyncer) WithInterval(d time.Duration) *StripeSyncer {
+	s.interval = d
+	return s
+}
+
 func (s *StripeSyncer) Start(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
 	for {

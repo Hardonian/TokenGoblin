@@ -40,11 +40,11 @@ func TestEvaluateBudget(t *testing.T) {
 	eng := NewEngine()
 
 	tests := []struct {
-		name        string
-		limit       float64
-		spend       float64
-		threshold   float64
-		wantStatus  string
+		name       string
+		limit      float64
+		spend      float64
+		threshold  float64
+		wantStatus string
 	}{
 		{"healthy", 1000, 500, 0.8, domain.BudgetStatusHealthy},
 		{"warning", 1000, 850, 0.8, domain.BudgetStatusWarning},

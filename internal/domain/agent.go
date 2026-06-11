@@ -10,10 +10,10 @@ import "time"
 type AgentStatus string
 
 const (
-	AgentStatusActive    AgentStatus = "active"
-	AgentStatusPaused    AgentStatus = "paused"
-	AgentStatusRetired   AgentStatus = "retired"
-	AgentStatusDegraded  AgentStatus = "degraded"
+	AgentStatusActive   AgentStatus = "active"
+	AgentStatusPaused   AgentStatus = "paused"
+	AgentStatusRetired  AgentStatus = "retired"
+	AgentStatusDegraded AgentStatus = "degraded"
 )
 
 // AgentFramework identifies the agent's orchestration framework.

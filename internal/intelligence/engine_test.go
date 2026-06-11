@@ -47,7 +47,7 @@ func TestFindGraveyardPrompts(t *testing.T) {
 		{FingerprintID: "fp1", OccurrenceCount: 5, AvgAcceptanceRate: 0, TotalCostUSD: 5.00},
 		{FingerprintID: "fp2", OccurrenceCount: 10, AvgAcceptanceRate: 0.8, TotalCostUSD: 3.00},
 		{FingerprintID: "fp3", OccurrenceCount: 2, AvgAcceptanceRate: 0, TotalCostUSD: 10.00}, // Too few occurrences
-		{FingerprintID: "fp4", OccurrenceCount: 3, AvgAcceptanceRate: 0, TotalCostUSD: 0.50}, // Too cheap
+		{FingerprintID: "fp4", OccurrenceCount: 3, AvgAcceptanceRate: 0, TotalCostUSD: 0.50},  // Too cheap
 		{FingerprintID: "fp5", OccurrenceCount: 3, AvgAcceptanceRate: 0, TotalCostUSD: 2.00},
 	}
 

@@ -318,7 +318,7 @@ func (h *BillingHandler) HandleGenerateAPIKey(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("save_failed", err.Error())})
 		return
 	}
-	
+
 	writeJSON(w, http.StatusCreated, Envelope{
 		OK:     true,
 		Status: "success",
