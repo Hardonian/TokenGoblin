@@ -22,14 +22,14 @@ export default function KeysPage() {
     fetchKeys();
   }, []);
 
-  const fetchKeys = async () => {
+  async function fetchKeys() {
     try {
       const res = await fetch("/api/tenant/keys");
       const data = await res.json();
       if (!data.ok) throw new Error(data.error?.message || "Failed to fetch keys");
       setKeys(data.data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -53,8 +53,8 @@ export default function KeysPage() {
       setGeneratedKey(data.data.api_key);
       setNewKeyName("");
       fetchKeys();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setGenerating(false);
     }
@@ -71,8 +71,8 @@ export default function KeysPage() {
       if (!data.ok) throw new Error(data.error?.message || "Failed to revoke key");
       
       fetchKeys();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
