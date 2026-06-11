@@ -335,9 +335,7 @@ export default function CommandCenter() {
         {/* BOTTOM SECTION: MODEL PERFORMANCE GRID */}
         <div className="border border-[#333] bg-black">
           <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
-            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">
-              // Model_Matrix
-            </h2>
+            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">{/* Model_Matrix */}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">

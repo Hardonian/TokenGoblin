@@ -76,9 +76,7 @@ export default function SignupPage() {
                 placeholder="company-id"
                 className="h-10 w-full border border-[#333] bg-black px-3 text-sm text-[#ffb000] outline-none transition focus:border-[#ffb000]"
               />
-              <p className="mt-2 text-[10px] text-zinc-600 uppercase tracking-widest">
-                // Lowercase letters, numbers, hyphens
-              </p>
+              <p className="mt-2 text-[10px] text-zinc-600 uppercase tracking-widest">{/* Lowercase letters, numbers, hyphens */}</p>
             </div>
             <div>
               <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">

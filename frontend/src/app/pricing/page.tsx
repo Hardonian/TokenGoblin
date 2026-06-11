@@ -62,8 +62,7 @@ const plans = [
 export default function PricingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tenantId, setTenantId] = useState("");
-  const [annual, setAnnual] = useState(false);
+    const [annual, setAnnual] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const initializedPlanRef = useRef<string | null>(null);
@@ -220,7 +219,7 @@ export default function PricingPage() {
               Autonomous Spend Control
             </h1>
             <p className="mt-6 text-sm text-zinc-400 font-mono">
-              Start free. Upgrade when you're ready to move from data to action. 
+              Start free. Upgrade when you&apos;re ready to move from data to action. 
               No hidden fees, no installer lock-in.
             </p>
           </div>

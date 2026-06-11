@@ -71,9 +71,7 @@ export default function ForecastPage() {
 
         <div className="border border-[#333] bg-black">
           <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
-            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">
-              // Daily_Trend.dat
-            </h2>
+            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">{/* Daily_Trend.dat */}</h2>
           </div>
           <div className="p-4 space-y-2 text-sm">
             {(forecast?.daily_trend || []).slice(-10).map((row, i) => (

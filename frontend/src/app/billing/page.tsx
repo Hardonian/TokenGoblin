@@ -11,8 +11,7 @@ export const dynamic = "force-dynamic";
 function BillingInner() {
   const search = useSearchParams();
   const tenantParam = search.get("tenant_id");
-  const [tenantId, setTenantId] = useState("");
-  const [effectiveTenant, setEffectiveTenant] = useState("");
+    const [effectiveTenant, setEffectiveTenant] = useState("");
   const [status, setStatus] = useState<{
     tenant_id: string;
     tier: string;
@@ -31,7 +30,6 @@ function BillingInner() {
 
   useEffect(() => {
     if (tenantParam) {
-      setTenantId(tenantParam);
       setEffectiveTenant(tenantParam);
     }
   }, [tenantParam]);
@@ -220,9 +218,7 @@ function BillingInner() {
 
             {status.subscription_id && (
               <div className="border border-[#333] bg-[#0a0a0a] p-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-4">
-                  // Subscription_Context
-                </p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-4">{/* Subscription_Context */}</p>
                 <div className="space-y-3 text-xs text-zinc-400 font-mono">
                   <div className="flex items-center justify-between border-b border-[#222] pb-2">
                     <span className="uppercase tracking-widest">SUB_ID</span>

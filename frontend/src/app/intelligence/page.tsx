@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 type Envelope<T> = {
@@ -75,7 +74,7 @@ export default function IntelligencePage() {
       }, 0);
       return () => window.clearTimeout(timer);
     }
-  }, []);
+  }, [loadAll]);
 
   return (
     <main className="min-h-screen bg-black text-zinc-300 font-mono pb-20 selection:bg-[#ffb000] selection:text-black">
@@ -154,9 +153,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <div className="border border-[#333] bg-black group hover:border-zinc-500 transition-colors">
       <div className="border-b border-[#333] px-4 py-3 flex items-center justify-between bg-[#0a0a0a]">
-        <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">
-          // {title}
-        </h2>
+        <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">{/* {title} */}</h2>
         <span className="text-[10px] text-zinc-600 uppercase tracking-widest">INTELLIGENCE</span>
       </div>
       <div className="p-0">
