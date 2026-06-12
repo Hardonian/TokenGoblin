@@ -93,3 +93,50 @@ func TestGenerateScorecard(t *testing.T) {
 	assert.Equal(t, 100, scorecard.TotalEvents30d)
 	assert.InDelta(t, 10.0, scorecard.TotalSpend30d, 0.01)
 }
+
+func TestCalculateStdDev(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []float64
+		mean     float64
+		expected float64
+	}{
+		{
+			name:     "empty slice",
+			values:   []float64{},
+			mean:     10.0,
+			expected: 3.0, // mean * 0.3
+		},
+		{
+			name:     "single value",
+			values:   []float64{5.0},
+			mean:     10.0,
+			expected: 3.0, // mean * 0.3
+		},
+		{
+			name:     "identical values",
+			values:   []float64{5.0, 5.0, 5.0},
+			mean:     5.0,
+			expected: 0.0,
+		},
+		{
+			name:     "simple sequence",
+			values:   []float64{1.0, 2.0, 3.0},
+			mean:     2.0,
+			expected: 1.0, // sqrt(((1-2)^2 + (2-2)^2 + (3-2)^2) / 2) = sqrt((1 + 0 + 1) / 2) = sqrt(2/2) = 1.0
+		},
+		{
+			name:     "complex sequence",
+			values:   []float64{2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0},
+			mean:     5.0,
+			expected: 2.138, // approximation, math.Sqrt(32 / 7) = 2.1380899...
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateStdDev(tt.values, tt.mean)
+			assert.InDelta(t, tt.expected, result, 0.001)
+		})
+	}
+}
