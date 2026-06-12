@@ -554,11 +554,25 @@ func (h *IngestionHandler) HandleReportMarkdown(w http.ResponseWriter, r *http.R
 		b.WriteString("No usage evidence exists for this tenant yet.\n\n")
 	} else {
 		for _, driver := range summary.TopCostDrivers {
-			b.WriteString(fmt.Sprintf("- %s `%s`: estimated `$%.4f` across `%d` events\n", driver.Type, driver.Key, driver.TotalCostUSD, driver.EventCount))
+			b.WriteString("- ")
+			b.WriteString(driver.Type)
+			b.WriteString(" `")
+			b.WriteString(driver.Key)
+			b.WriteString("`: estimated `$")
+			b.WriteString(strconv.FormatFloat(driver.TotalCostUSD, 'f', 4, 64))
+			b.WriteString("` across `")
+			b.WriteString(strconv.FormatInt(int64(driver.EventCount), 10))
+			b.WriteString("` events\n")
 		}
 		for _, item := range analyses {
 			for _, issue := range item.Issues {
-				b.WriteString(fmt.Sprintf("- `%s` on event `%s`: %s\n", issue.Code, item.EventID, issue.Message))
+				b.WriteString("- `")
+				b.WriteString(issue.Code)
+				b.WriteString("` on event `")
+				b.WriteString(item.EventID)
+				b.WriteString("`: ")
+				b.WriteString(issue.Message)
+				b.WriteString("\n")
 			}
 		}
 		b.WriteString("\n")
