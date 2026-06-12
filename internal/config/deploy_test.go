@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestValidateServerEnvRequiresProductionBoundaries(t *testing.T) {
 	t.Setenv("TG_ENV", "production")
@@ -18,5 +22,36 @@ func TestValidateServerEnvAllowsLocalDemoMode(t *testing.T) {
 
 	if err := ValidateServerEnv(); err != nil {
 		t.Fatalf("expected local demo mode to pass: %v", err)
+	}
+}
+
+func TestIsProduction(t *testing.T) {
+	tests := []struct {
+		name     string
+		envKey   string
+		envVal   string
+		expected bool
+	}{
+		{"default behavior no env", "", "", false},
+		{"TG_ENV production", "TG_ENV", "production", true},
+		{"APP_ENV production uppercase", "APP_ENV", "PRODUCTION", true},
+		{"GO_ENV production padded", "GO_ENV", "  production  ", true},
+		{"NODE_ENV mixed case", "NODE_ENV", "PrOdUcTiOn", true},
+		{"VERCEL_ENV production", "VERCEL_ENV", "production", true},
+		{"TG_ENV development", "TG_ENV", "development", false},
+		{"unsupported key production", "UNSUPPORTED_ENV", "production", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear relevant env vars to isolate test case
+			for _, key := range []string{"TG_ENV", "APP_ENV", "GO_ENV", "NODE_ENV", "VERCEL_ENV"} {
+				t.Setenv(key, "")
+			}
+			if tc.envKey != "" {
+				t.Setenv(tc.envKey, tc.envVal)
+			}
+			assert.Equal(t, tc.expected, IsProduction())
+		})
 	}
 }
