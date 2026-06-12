@@ -189,26 +189,74 @@ function normalizeStripeEvent(event: { id?: string; type?: string }): VerifiedSt
   const object = asRecord(data.object);
   const metadata = metadataRecord(object.metadata);
   const eventType = asString(eventRecord.type);
+  const eventId = asString(eventRecord.id);
 
+  if (eventType === "checkout.session.completed") {
+    return handleCheckoutSessionCompleted(eventId, eventType, object, metadata);
+  } else if (eventType.startsWith("customer.subscription.")) {
+    return handleCustomerSubscription(eventId, eventType, object, metadata);
+  }
+
+  return handleDefaultEvent(eventId, eventType, object, metadata);
+}
+
+function extractTenantId(object: Record<string, unknown>, metadata: Record<string, string>): string {
+  return (
+    asString(metadata.tenant_id) ||
+    asString(metadata.tenantId) ||
+    asString(object.client_reference_id)
+  );
+}
+
+function handleCheckoutSessionCompleted(
+  eventId: string,
+  eventType: string,
+  object: Record<string, unknown>,
+  metadata: Record<string, string>
+): VerifiedStripeEvent {
   return {
-    event_id: asString(eventRecord.id),
+    event_id: eventId,
     event_type: eventType,
     customer_id: asString(object.customer),
-    subscription_id: subscriptionID(eventType, object),
+    subscription_id: asString(object.subscription),
     subscription_status: asString(object.status),
-    tenant_id:
-      asString(metadata.tenant_id) ||
-      asString(metadata.tenantId) ||
-      asString(object.client_reference_id),
+    tenant_id: extractTenantId(object, metadata),
     metadata,
   };
 }
 
-function subscriptionID(eventType: string, object: Record<string, unknown>): string {
-  if (eventType.startsWith("customer.subscription.")) {
-    return asString(object.id);
-  }
-  return asString(object.subscription);
+function handleCustomerSubscription(
+  eventId: string,
+  eventType: string,
+  object: Record<string, unknown>,
+  metadata: Record<string, string>
+): VerifiedStripeEvent {
+  return {
+    event_id: eventId,
+    event_type: eventType,
+    customer_id: asString(object.customer),
+    subscription_id: asString(object.id),
+    subscription_status: asString(object.status),
+    tenant_id: extractTenantId(object, metadata),
+    metadata,
+  };
+}
+
+function handleDefaultEvent(
+  eventId: string,
+  eventType: string,
+  object: Record<string, unknown>,
+  metadata: Record<string, string>
+): VerifiedStripeEvent {
+  return {
+    event_id: eventId,
+    event_type: eventType,
+    customer_id: asString(object.customer),
+    subscription_id: asString(object.subscription),
+    subscription_status: asString(object.status),
+    tenant_id: extractTenantId(object, metadata),
+    metadata,
+  };
 }
 
 function metadataRecord(value: unknown): Record<string, string> {
