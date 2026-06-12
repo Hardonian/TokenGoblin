@@ -1,3 +1,4 @@
-🎯 **What:** Added a missing test suite for the anomaly detector to verify deterministic threshold calculation and signal detection.
-📊 **Coverage:** Covered all scenario branches in `Detect` (unknown model pricing, spend spikes, token spikes, velocity spikes, latency spikes, repeated failed outputs, and high cost per accepted output), as well as a test for `DefaultThresholds`.
-✨ **Result:** Enhanced test coverage and ensured anomaly detection logic is reliable and safe to refactor.
+🎯 **What:** Extracted the overly long prompt fingerprint calculation from `BuildFingerprints` into a separate pure function `mapAccumulatorToFingerprint`. The `accumulator` struct was moved to package scope to support this.
+💡 **Why:** This isolates the somewhat complex business logic for mapping stats to waste scores, significantly reducing the size of the `BuildFingerprints` loop and improving maintainability and readability.
+✅ **Verification:** Ran tests with `go test ./internal/intelligence/...` and full `npm run test`, preserving identical behavior and passing type checks with `npm run typecheck` (`go vet` via `npm run lint`).
+✨ **Result:** Improved modularity and readability of code without changing any existing functionality.

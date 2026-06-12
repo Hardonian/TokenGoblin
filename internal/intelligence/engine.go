@@ -32,18 +32,19 @@ func HashPrompt(prompt string) string {
 }
 
 // BuildFingerprints aggregates events into prompt fingerprints.
+type accumulator struct {
+	hash          string
+	firstSeen     time.Time
+	lastSeen      time.Time
+	count         int
+	totalCost     float64
+	totalOutput   int
+	acceptedCount int
+	workerSet     map[string]struct{}
+	taskCategory  string
+}
+
 func (e *Engine) BuildFingerprints(tenantID string, events []domain.TokenEvent) []domain.PromptFingerprint {
-	type accumulator struct {
-		hash          string
-		firstSeen     time.Time
-		lastSeen      time.Time
-		count         int
-		totalCost     float64
-		totalOutput   int
-		acceptedCount int
-		workerSet     map[string]struct{}
-		taskCategory  string
-	}
 
 	buckets := make(map[string]*accumulator)
 
@@ -86,52 +87,7 @@ func (e *Engine) BuildFingerprints(tenantID string, events []domain.TokenEvent) 
 
 	fingerprints := make([]domain.PromptFingerprint, 0, len(buckets))
 	for _, acc := range buckets {
-		acceptanceRate := 0.0
-		if acc.count > 0 {
-			acceptanceRate = float64(acc.acceptedCount) / float64(acc.count)
-		}
-		avgCost := 0.0
-		if acc.count > 0 {
-			avgCost = acc.totalCost / float64(acc.count)
-		}
-		avgOutput := 0
-		if acc.count > 0 {
-			avgOutput = acc.totalOutput / acc.count
-		}
-
-		// Waste score: higher = more wasteful
-		// (1 - acceptance_rate) × avg_cost × occurrence_count
-		wasteScore := (1.0 - acceptanceRate) * avgCost * float64(acc.count)
-		isWasteful := wasteScore > 1.0 && acceptanceRate < 0.2 && acc.count >= 3
-
-		wasteReason := ""
-		if isWasteful {
-			if acceptanceRate == 0 {
-				wasteReason = "zero_acceptance"
-			} else if acceptanceRate < 0.1 {
-				wasteReason = "near_zero_acceptance"
-			} else {
-				wasteReason = "low_acceptance_high_cost"
-			}
-		}
-
-		fingerprints = append(fingerprints, domain.PromptFingerprint{
-			FingerprintID:         fmt.Sprintf("fp_%s", acc.hash[:16]),
-			TenantID:              tenantID,
-			PromptHash:            acc.hash,
-			FirstSeenAt:           acc.firstSeen,
-			LastSeenAt:            acc.lastSeen,
-			OccurrenceCount:       acc.count,
-			AvgCostUSD:            avgCost,
-			AvgOutputTokens:       avgOutput,
-			AvgAcceptanceRate:     acceptanceRate,
-			CanonicalTaskCategory: acc.taskCategory,
-			IsWasteful:            isWasteful,
-			WasteReason:           wasteReason,
-			WasteScore:            wasteScore,
-			TotalCostUSD:          acc.totalCost,
-			UniqueWorkers:         len(acc.workerSet),
-		})
+		fingerprints = append(fingerprints, mapAccumulatorToFingerprint(tenantID, acc))
 	}
 
 	// Sort by waste score descending
@@ -140,6 +96,55 @@ func (e *Engine) BuildFingerprints(tenantID string, events []domain.TokenEvent) 
 	})
 
 	return fingerprints
+}
+
+func mapAccumulatorToFingerprint(tenantID string, acc *accumulator) domain.PromptFingerprint {
+	acceptanceRate := 0.0
+	if acc.count > 0 {
+		acceptanceRate = float64(acc.acceptedCount) / float64(acc.count)
+	}
+	avgCost := 0.0
+	if acc.count > 0 {
+		avgCost = acc.totalCost / float64(acc.count)
+	}
+	avgOutput := 0
+	if acc.count > 0 {
+		avgOutput = acc.totalOutput / acc.count
+	}
+
+	// Waste score: higher = more wasteful
+	// (1 - acceptance_rate) × avg_cost × occurrence_count
+	wasteScore := (1.0 - acceptanceRate) * avgCost * float64(acc.count)
+	isWasteful := wasteScore > 1.0 && acceptanceRate < 0.2 && acc.count >= 3
+
+	wasteReason := ""
+	if isWasteful {
+		if acceptanceRate == 0 {
+			wasteReason = "zero_acceptance"
+		} else if acceptanceRate < 0.1 {
+			wasteReason = "near_zero_acceptance"
+		} else {
+			wasteReason = "low_acceptance_high_cost"
+		}
+	}
+
+	return domain.PromptFingerprint{
+		FingerprintID:         fmt.Sprintf("fp_%s", acc.hash[:16]),
+		TenantID:              tenantID,
+		PromptHash:            acc.hash,
+		FirstSeenAt:           acc.firstSeen,
+		LastSeenAt:            acc.lastSeen,
+		OccurrenceCount:       acc.count,
+		AvgCostUSD:            avgCost,
+		AvgOutputTokens:       avgOutput,
+		AvgAcceptanceRate:     acceptanceRate,
+		CanonicalTaskCategory: acc.taskCategory,
+		IsWasteful:            isWasteful,
+		WasteReason:           wasteReason,
+		WasteScore:            wasteScore,
+		TotalCostUSD:          acc.totalCost,
+		UniqueWorkers:         len(acc.workerSet),
+	}
 }
 
 // ═══════════════════════════════════════════════════════════
