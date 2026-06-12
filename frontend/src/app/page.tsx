@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { formatMoney, formatInt } from "@/components/shared";
+import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoblinSpinner } from "@/components/GoblinSpinner";
 
@@ -73,17 +74,20 @@ type ModelStats = {
 };
 
 // ------------------------------------------------------------------
+// Fetcher
+// ------------------------------------------------------------------
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error?.message || "Failed to fetch");
+  return json.data;
+};
+
+// ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
 
 export default function CommandCenter() {
-  const [scorecard, setScorecard] = useState<ExecutiveScorecard | null>(null);
-  const [forecast, setForecast] = useState<SpendForecast | null>(null);
-  const [costLeaks, setCostLeaks] = useState<CostLeak[]>([]);
-  const [zombieAgents, setZombieAgents] = useState<ZombieAgent[]>([]);
-  const [graveyard, setGraveyard] = useState<PromptGraveyardResult | null>(null);
-  const [models, setModels] = useState<ModelStats[]>([]);
-  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   
   // Hardcoded for demonstration of monetization moat
@@ -94,52 +98,32 @@ export default function CommandCenter() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const { data: scorecard, mutate: mutSC } = useSWR<ExecutiveScorecard>("/v2/executive/scorecard", fetcher);
+  const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>("/v2/forecasts/spend", fetcher);
+  const { data: clData, mutate: mutCL } = useSWR<{ cost_leaks: CostLeak[] }>("/v2/intelligence/cost-leaks", fetcher);
+  const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>("/v2/intelligence/zombie-agents", fetcher);
+  const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>("/v2/intelligence/prompt-graveyard", fetcher);
+  const { data: mdData, mutate: mutMD } = useSWR<{ models: ModelStats[] }>("/v2/analytics/models", fetcher);
 
-    const fetchV2 = async <T,>(path: string): Promise<T | null> => {
-      try {
-        const res = await fetch(path);
-        const env: Envelope<T> = await res.json();
-        return env.data || null;
-      } catch (e) {
-        console.error(`Failed to fetch ${path}`, e);
-        return null;
-      }
-    };
+  const costLeaks = clData?.cost_leaks || [];
+  const zombieAgents = zaData?.zombie_agents || [];
+  const models = mdData?.models || [];
+  const loading = !scorecard && !forecast && !clData && !zaData && !graveyard && !mdData;
 
-    const [sc, fc, cl, za, gy, md] = await Promise.all([
-      fetchV2<ExecutiveScorecard>("/v2/executive/scorecard"),
-      fetchV2<SpendForecast>("/v2/forecasts/spend"),
-      fetchV2<{ cost_leaks: CostLeak[] }>("/v2/intelligence/cost-leaks"),
-      fetchV2<{ zombie_agents: ZombieAgent[] }>("/v2/intelligence/zombie-agents"),
-      fetchV2<PromptGraveyardResult>("/v2/intelligence/prompt-graveyard"),
-      fetchV2<{ models: ModelStats[] }>("/v2/analytics/models"),
-    ]);
-    
-    if (sc) setScorecard(sc);
-    if (fc) setForecast(fc);
-    if (cl) setCostLeaks(cl.cost_leaks || []);
-    if (za) setZombieAgents(za.zombie_agents || []);
-    if (gy) setGraveyard(gy);
-    if (md) setModels(md.models || []);
-    
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadAll();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadAll]);
+  const loadAll = () => {
+    mutSC();
+    mutFC();
+    mutCL();
+    mutZA();
+    mutGY();
+    mutMD();
+  };
 
   const seedDemo = async () => {
-    setLoading(true);
     await fetch("/api/dashboard/seed", {
       method: "POST",
     });
-    await loadAll();
+    loadAll();
   };
 
   return (

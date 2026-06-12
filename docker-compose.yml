@@ -1,16 +1,14 @@
 version: "3.9"
 
 services:
-  token-goblin:
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.backend
     ports:
       - "8080:8080"
-      - "3000:3000"
     environment:
       - PORT=8080
-      - FRONTEND_PORT=3000
       - DATABASE_URL=sqlite:///data/token_goblin.db
       # Stripe (required for billing)
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
@@ -19,10 +17,6 @@ services:
       - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
       # Internal webhook secret (for Stripe webhook → Go API)
       - TG_INTERNAL_WEBHOOK_SECRET=${TG_INTERNAL_WEBHOOK_SECRET:-change-me-in-production}
-      # Frontend
-      - NEXT_PUBLIC_TG_API_BASE=http://localhost:8080
-      - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
-      - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
     volumes:
       - token-goblin-data:/data
     restart: unless-stopped
@@ -31,6 +25,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_TG_API_BASE=http://backend:8080
+      - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
+      - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   token-goblin-data:

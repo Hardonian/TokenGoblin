@@ -47,9 +47,15 @@ func OpenSQLite(ctx context.Context, dbPath string) (*SQLiteRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: open sqlite: %v", ErrUnavailable, err)
 	}
-	db.SetMaxOpenConns(1)
-
 	repo := &SQLiteRepository{db: db}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := repo.migrate(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -149,6 +155,7 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_occurred ON token_usage_events (tenant_id, occurred_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_worker ON token_usage_events (tenant_id, worker_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_model ON token_usage_events (tenant_id, model_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_fingerprint ON token_usage_events (tenant_id, fingerprint);`,
 		`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
 		`CREATE TABLE IF NOT EXISTS api_keys (
 			key_id TEXT PRIMARY KEY,

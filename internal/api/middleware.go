@@ -209,6 +209,7 @@ func secureHeaders(w http.ResponseWriter) {
 	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
 	w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
 
 	if config.IsProduction() {
 		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
