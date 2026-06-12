@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, HTMLMotionProps } from "framer-motion";
 
 export function Card({
   children,
@@ -63,7 +63,7 @@ export function Button({
   size?: "sm" | "md" | "lg";
   className?: string;
   disabled?: boolean;
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+} & HTMLMotionProps<"button">) {
   const base =
     "inline-flex items-center justify-center font-semibold transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 

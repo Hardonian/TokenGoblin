@@ -1,5 +1,6 @@
 "use client";
-
+import { motion } from "framer-motion";
+import { TokenCoin } from "./TokenCoin";
 export default function UsageBar({
   percent,
   label,
@@ -12,21 +13,26 @@ export default function UsageBar({
     clamped >= 90
       ? "bg-red-500"
       : clamped >= 70
-        ? "bg-amber-500"
-        : "bg-[#426b51]";
+        ? "bg-[#ffb000]"
+        : "bg-[#10b981]";
 
   return (
     <div className="w-full">
       {label && (
-        <div className="mb-1 flex justify-between text-xs text-[#52604e]">
-          <span>{label}</span>
+        <div className="mb-2 flex items-center justify-between text-xs font-bold text-zinc-300">
+          <span className="flex items-center gap-2">
+            <TokenCoin size={14} delay={Math.random()} />
+            {label}
+          </span>
           <span>{clamped.toFixed(1)}%</span>
         </div>
       )}
-      <div className="h-3 w-full overflow-hidden rounded-full bg-[#e0e4d8]">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${clamped}%` }}
+      <div className="h-4 w-full overflow-hidden rounded-full bg-zinc-800 border border-zinc-700">
+        <motion.div
+          className={`h-full rounded-full ${color}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${clamped}%` }}
+          transition={{ type: "spring", stiffness: 50, damping: 10 }}
         />
       </div>
     </div>
