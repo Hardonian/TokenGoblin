@@ -424,3 +424,44 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 		t.Fatalf("billing lifecycle not applied: %+v", updated)
 	}
 }
+
+func TestValidInternalBearer(t *testing.T) {
+	t.Setenv("TG_INTERNAL_WEBHOOK_SECRET", "supersecret123")
+
+	req := httptest.NewRequest(http.MethodPost, "/internal/billing/stripe-event", nil)
+
+	// Missing header
+	if validInternalBearer(req) {
+		t.Fatal("expected missing header to be invalid")
+	}
+
+	// Invalid prefix
+	req.Header.Set("Authorization", "Token supersecret123")
+	if validInternalBearer(req) {
+		t.Fatal("expected invalid prefix to be invalid")
+	}
+
+	// Empty token
+	req.Header.Set("Authorization", "Bearer ")
+	if validInternalBearer(req) {
+		t.Fatal("expected empty token to be invalid")
+	}
+
+	// Different length token
+	req.Header.Set("Authorization", "Bearer supersec")
+	if validInternalBearer(req) {
+		t.Fatal("expected different length token to be invalid")
+	}
+
+	// Invalid token (same length)
+	req.Header.Set("Authorization", "Bearer supersecret124")
+	if validInternalBearer(req) {
+		t.Fatal("expected invalid token to be invalid")
+	}
+
+	// Valid token
+	req.Header.Set("Authorization", "Bearer supersecret123")
+	if !validInternalBearer(req) {
+		t.Fatal("expected valid token to be valid")
+	}
+}

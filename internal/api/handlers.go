@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/csv"
 	"encoding/hex"
@@ -912,10 +913,12 @@ func validInternalBearer(r *http.Request) bool {
 		return false
 	}
 	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
-	if token == "" || len(token) != len(expected) {
+	if token == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
+	expectedHash := sha256.Sum256([]byte(expected))
+	tokenHash := sha256.Sum256([]byte(token))
+	return subtle.ConstantTimeCompare(tokenHash[:], expectedHash[:]) == 1
 }
 
 func randomHex(bytes int) string {
