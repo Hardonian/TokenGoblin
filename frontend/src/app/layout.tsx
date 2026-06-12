@@ -16,14 +16,33 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TokenGoblin | AI Spend & Token-Efficiency Observability",
   description:
-    "Enterprise operational intelligence and pricing audit controls for autonomous AI agents.",
+    "Enterprise operational intelligence and pricing audit controls for autonomous AI agents. Track your agentic LLM spend, discover cost leaks, and find zombie agents.",
+  keywords: ["AI Spend", "LLM Costs", "Autonomous Agents", "Token Cost Optimization", "AI Observability", "TokenGoblin"],
+  metadataBase: new URL("https://tokengoblin.com"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "TokenGoblin",
+    title: "TokenGoblin — Master Your AI Spend",
     description:
-      "Enterprise operational intelligence and pricing audit controls for autonomous AI agents.",
+      "Enterprise operational intelligence and pricing audit controls for autonomous AI agents. Track your agentic LLM spend, discover cost leaks, and find zombie agents.",
     url: "https://tokengoblin.com",
     siteName: "TokenGoblin",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "TokenGoblin Dashboard Preview",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TokenGoblin | AI Spend Observability",
+    description: "Don't let rogue agents burn your tokens. Uncover cost leaks today.",
+    creator: "@TokenGoblin",
   },
 };
 
