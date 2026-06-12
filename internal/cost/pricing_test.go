@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCalculateKnownModelUsesInternalPricing(t *testing.T) {
@@ -62,5 +63,88 @@ func TestPricingEnvOverride(t *testing.T) {
 
 	if result.CostEstimateUSD == nil || *result.CostEstimateUSD != 2 {
 		t.Fatalf("expected override cost 2 USD, got %#v", result.CostEstimateUSD)
+	}
+}
+
+func TestSplitKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		raw    string
+		wantP1 string
+		wantP2 string
+		wantOk bool
+	}{
+		{
+			name:   "standard case",
+			raw:    "provider:model",
+			wantP1: "provider",
+			wantP2: "model",
+			wantOk: true,
+		},
+		{
+			name:   "with whitespace",
+			raw:    "  provider  :  model  ",
+			wantP1: "provider",
+			wantP2: "model",
+			wantOk: true,
+		},
+		{
+			name:   "with uppercase characters",
+			raw:    "ProViDer:MoDel",
+			wantP1: "provider",
+			wantP2: "model",
+			wantOk: true,
+		},
+		{
+			name:   "extra colons",
+			raw:    "provider:model:version",
+			wantP1: "provider",
+			wantP2: "model:version",
+			wantOk: true,
+		},
+		{
+			name:   "missing colon",
+			raw:    "providermodel",
+			wantP1: "",
+			wantP2: "",
+			wantOk: false,
+		},
+		{
+			name:   "empty first part",
+			raw:    ":model",
+			wantP1: "",
+			wantP2: "",
+			wantOk: false,
+		},
+		{
+			name:   "empty second part",
+			raw:    "provider:",
+			wantP1: "",
+			wantP2: "",
+			wantOk: false,
+		},
+		{
+			name:   "whitespace only parts",
+			raw:    "   :   ",
+			wantP1: "",
+			wantP2: "",
+			wantOk: false,
+		},
+		{
+			name:   "empty string",
+			raw:    "",
+			wantP1: "",
+			wantP2: "",
+			wantOk: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p1, p2, ok := splitKey(tt.raw)
+			assert.Equal(t, tt.wantOk, ok)
+			assert.Equal(t, tt.wantP1, p1)
+			assert.Equal(t, tt.wantP2, p2)
+		})
 	}
 }
