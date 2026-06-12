@@ -93,3 +93,24 @@ func TestGenerateScorecard(t *testing.T) {
 	assert.Equal(t, 100, scorecard.TotalEvents30d)
 	assert.InDelta(t, 10.0, scorecard.TotalSpend30d, 0.01)
 }
+
+func TestCalculateStdDev(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []float64
+		mean     float64
+		expected float64
+	}{
+		{"empty values", []float64{}, 10.0, 3.0},       // mean * 0.3
+		{"single value", []float64{5.0}, 5.0, 1.5},     // mean * 0.3
+		{"identical values", []float64{5.0, 5.0, 5.0}, 5.0, 0.0},
+		{"varying values", []float64{2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0}, 5.0, 2.138},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateStdDev(tt.values, tt.mean)
+			assert.InDelta(t, tt.expected, result, 0.01)
+		})
+	}
+}
