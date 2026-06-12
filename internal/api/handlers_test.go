@@ -62,6 +62,41 @@ func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
 	}
 }
 
+func TestV2EndpointsDegradeWhenDatabaseUnavailable(t *testing.T) {
+	repo := storage.NewUnavailableRepository(storage.ErrUnavailable)
+	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
+	mux := NewRouter(service, repo, nil)
+	
+	endpoints := []string{
+		"/v2/intelligence/waste",
+		"/v2/intelligence/prompt-graveyard",
+		"/v2/intelligence/cost-leaks",
+		"/v2/forecasts/spend",
+		"/v2/executive/scorecard",
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+			req.Header.Set("x-tenant-id", "tenant-a")
+			rec := httptest.NewRecorder()
+
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200 degraded read, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			var envelope Envelope
+			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if !envelope.OK || envelope.Status != "degraded" {
+				t.Fatalf("expected degraded ok envelope, got %#v", envelope)
+			}
+		})
+	}
+}
+
 func TestHandleExportCSV(t *testing.T) {
 	router, cleanup := testRouter(t)
 	defer cleanup()

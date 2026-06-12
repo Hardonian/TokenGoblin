@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokenGoblin — AI Spend Operations</title>
+  <meta name="description" content="Operational infrastructure for AI token spend: attribution, forecasting, leak detection, and routing optimization." />
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --panel: #0F0F0F;
+      --border: #1E1E1E;
+      --ink: #EBEBEB;
+      --muted: #8A8A8A;
+      --accent: #FFB000;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 24px 0;
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .logo { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.08em; }
+    .links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; margin-left: 22px; }
+    .links a:hover { color: var(--ink); }
+    .hero {
+      padding: 100px 0 72px;
+    }
+    .eyebrow {
+      display: inline-block;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      max-width: 860px;
+    }
+    .sub {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 620px;
+    }
+    .actions {
+      margin-top: 36px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .primary { background: var(--accent); color: #000; }
+    .primary:hover { background: #e6a400; }
+    .secondary { background: transparent; color: var(--ink); border-color: var(--border); }
+    .secondary:hover { border-color: #3A3A3A; }
+    .proof {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin: 80px 0 64px;
+    }
+    .metric {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 24px;
+      border-radius: 10px;
+    }
+    .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+    .value { margin-top: 14px; font-size: 1.8rem; font-weight: 700; }
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 28px;
+      margin: 24px 0;
+    }
+    .two { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .stack { margin: 80px 0; }
+    .stack h2, .stack h3 { margin: 0; }
+    .stack h2 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stack h3 { font-size: 1.05rem; font-weight: 600; margin-top: 28px; }
+    .stack p { margin-top: 10px; color: var(--muted); }
+    .bullets { margin-top: 12px; padding-left: 0; list-style: none; }
+    .bullets li { padding: 6px 0; color: var(--muted); }
+    .bullets li::before { content: "— "; color: var(--accent); }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 28px;
+    }
+    .price {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 24px;
+      border-radius: 10px;
+    }
+    .price.featured { border-color: var(--accent); }
+    .price h4 { margin: 0; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    .price .amount { margin-top: 14px; font-size: 1.6rem; font-weight: 700; }
+    .price ul { margin-top: 18px; padding-left: 0; list-style: none; }
+    .price li { padding: 6px 0; color: var(--muted); font-size: 0.95rem; }
+    .price li::before { content: "✓ "; color: var(--accent); }
+    .price .cta { margin-top: 18px; }
+    .price .cta a { display: block; text-align: center; padding: 10px 12px; border-radius: 6px; background: var(--accent); color: #000; text-decoration: none; font-weight: 600; }
+    footer { border-top: 1px solid var(--border); padding: 36px 0; color: var(--muted); }
+    .muted { color: var(--muted); }
+    .accent { color: var(--accent); }
+    @media (max-width: 860px) {
+      .proof, .two, .three, .four { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <nav>
+        <div class="logo">TokenGoblin</div>
+        <div class="links">
+          <a href="#proof">Proof</a>
+          <a href="#what">What</a>
+          <a href="#deployment">Deployment</a>
+          <a href="#pricing">Pricing</a>
+          <a href="mailto:scott@hardonian.com?subject=TokenGoblin%20Inquiry">Request Access</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <div class="eyebrow">AI Operations · Revenue Infrastructure</div>
+      <h1>
+        <span class="accent">TokenGoblin</span> is operational infrastructure for AI spend: attribution, forecasting, leak detection, and routing optimization.
+      </h1>
+      <p class="sub">
+        Stop treating token usage as an abstract cost center. Get deterministic visibility across workers, models, and outputs — and maintain control as spend scales.
+      </p>
+      <div class="actions">
+        <a class="btn primary" href="mailto:scott@hardonian.com?subject=TokenGoblin%20Enterprise%20Inquiry">Talk to Sales</a>
+        <a class="btn secondary" href="#pricing">See Deployment Options</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="proof">
+    <div class="proof">
+      <div class="metric">
+        <div class="label">Live checkout</div>
+        <div class="value">Active</div>
+      </div>
+      <div class="metric">
+        <div class="label">Self-hosted target</div>
+        <div class="value">Docker-ready</div>
+      </div>
+      <div class="metric">
+        <div class="label">Buyer model</div>
+        <div class="value">B2B + Ops SaaS</div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="panel">
+        <h3>What TokenGoblin does</h3>
+        <ul class="bullets">
+          <li>Tracks token usage per worker, per model, per feature</li>
+          <li>Detects cost leaks and zombie / redundant agent patterns</li>
+          <li>Provides deterministic routing recommendations with estimated savings</li>
+          <li>Gives leadership a scorecard on AI-fleet maturity and ROI</li>
+          <li>Generates persistent recommendation audit trails</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Operational guarantees</h3>
+        <ul class="bullets">
+          <li>Deterministic pricing and overage logic</li>
+          <li>Stripe checkout + customer portal + webhook lifecycle</li>
+          <li>Multi-tenant isolation</li>
+          <li>Self-hosted option with docker-compose</li>
+          <li>Runs in production-backed data configurations</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap stack" id="what">
+    <h2>What buyers actually need</h2>
+    <p class="muted">TokenGoblin solves a real operational problem: invisible AI spend.</p>
+
+    <div class="four">
+      <div class="panel">
+        <h3>Cost Leaks</h3>
+        <p>Excess output tokens, weak routing, repeated tasks on expensive models.</p>
+      </div>
+      <div class="panel">
+        <h3>Fleet Risk</h3>
+        <p>Many workers, many models, no unified attribution or guardrails.</p>
+      </div>
+      <div class="panel">
+        <h3>Governance</h3>
+        <p>Finance wants deterministic billing; ops wants daily operational views.</p>
+      </div>
+      <div class="panel">
+        <h3>Savings</h3>
+        <p>Route to cheaper models, enforce limits, and measure decisions over time.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap stack" id="deployment">
+    <h2>Deployment modes</h2>
+    <p class="muted">Designed to sell via the path that fits the buyer.</p>
+
+    <div class="two">
+      <div class="panel">
+        <h3>Managed SaaS</h3>
+        <p>Buy online and start immediately. Works for individuals, small teams, and mid-market buyers. Stripe checkout + portal included.</p>
+      </div>
+      <div class="panel">
+        <h3>Self-hosted / Enterprise</h3>
+        <p>Buyers with data and compliance requirements can run behind their own infrastructure using the commercial self-hosted package. See <a href="LICENSE-SELFHOSTED.md" style="color:#ffb000;">LICENSE-SELFHOSTED.md</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap stack" id="pricing">
+    <h2>Commercial structure</h2>
+    <div class="pricing-grid">
+      <div class="price">
+        <h4>Starter · SaaS</h4>
+        <div class="amount">$0 <span class="muted">/ month</span></div>
+        <ul>
+          <li>1 tenant</li>
+          <li>Basic visibility</li>
+          <li>Dashboard + reports</li>
+          <li>Email support</li>
+        </ul>
+        <div class="cta"><a href="mailto:scott@hardonian.com?subject=TokenGoblin%20Starter">Create Free Tenant</a></div>
+      </div>
+      <div class="price featured">
+        <h4>Pro · SaaS</h4>
+        <div class="amount">$29 <span class="muted">/ month</span></div>
+        <ul>
+          <li>5 tenants</li>
+          <li>Forecasting</li>
+          <li>Leak + zombie-agent detection</li>
+          <li>Routing recommendations</li>
+          <li>Priority support</li>
+        </ul>
+        <div class="cta"><a href="mailto:scott@hardonian.com?subject=TokenGoblin%20Pro">Subscribe</a></div>
+      </div>
+      <div class="price">
+        <h4>Enterprise</h4>
+        <div class="amount">$99 <span class="muted">/ month</span></div>
+        <ul>
+          <li>Unlimited tenants</li>
+          <li>Custom pricing rules</li>
+          <li>Audit trail + RBAC</li>
+          <li>SLA</li>
+          <li>Self-hosted option</li>
+        </ul>
+        <div class="cta"><a href="mailto:scott@hardonian.com?subject=TokenGoblin%20Enterprise">Contact Sales</a></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <div class="muted">TokenGoblin is revenue infrastructure built for operations. Contact: scott@hardonian.com</div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -45,16 +45,32 @@ npm run dev
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | No | SQLite path (default: `file:token_goblin.db`) or Postgres DSN |
-| `STRIPE_SECRET_KEY` | For billing | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | For billing | Stripe webhook signing secret |
-| `STRIPE_PRICE_PRO` | For billing | Stripe Price ID for Pro plan |
-| `STRIPE_PRICE_ENTERPRISE` | For billing | Stripe Price ID for Enterprise plan |
-| `TG_INTERNAL_WEBHOOK_SECRET` | For billing | Internal secret for Stripe webhook forwarding |
-| `PORT` | No | API server port (default: 8080) |
-| `NEXT_PUBLIC_TG_API_BASE` | Yes (frontend) | API base URL |
-| `NEXT_PUBLIC_STRIPE_PRICE_PRO` | For billing | Stripe Price ID for Pro (frontend) |
-| `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` | For billing | Stripe Price ID for Enterprise (frontend) |
+| `DATABASE_URL` | Optional | SQLite path (default: `file:token_goblin.db`) or Postgres DSN |
+| `STRIPE_SECRET_KEY` | Required (Billing) | Stripe secret key for backend API calls |
+| `STRIPE_WEBHOOK_SECRET` | Required (Billing) | Stripe webhook signing secret to verify Stripe events |
+| `STRIPE_PRICE_PRO` | Required (Billing) | Stripe Price ID for Pro plan (backend) |
+| `STRIPE_PRICE_ENTERPRISE` | Required (Billing) | Stripe Price ID for Enterprise plan (backend) |
+| `TG_INTERNAL_WEBHOOK_SECRET` | Required (Billing) | Internal secret for Stripe webhook forwarding |
+| `PORT` | Optional | API server port (default: 8080) |
+| `TG_ENV` | Optional | Environment mode (set to `production` to enforce API key auth) |
+| `NEXT_PUBLIC_TG_API_BASE` | Required (Vercel) | API base URL (e.g. `https://api.yourdomain.com`) |
+| `NEXT_PUBLIC_STRIPE_PRICE_PRO` | Required (Vercel) | Stripe Price ID for Pro (frontend UI checkout) |
+| `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` | Required (Vercel) | Stripe Price ID for Enterprise (frontend UI checkout) |
+
+> [!IMPORTANT]
+> When deploying the frontend to Vercel, you must configure `NEXT_PUBLIC_TG_API_BASE`, `NEXT_PUBLIC_STRIPE_PRICE_PRO`, and `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` directly in the Vercel dashboard. Vercel ignores `vercel.json` for runtime secrets.
+
+## Runtime & Operations
+
+The backend runs on port `8080` by default (can be overridden via `PORT`).
+- **Health/Metrics**: The backend exposes Prometheus metrics at `/metrics` which can also be used as a simple liveness probe.
+- **Database**: In production, provide `TG_DB_DSN` or `DATABASE_URL` for Postgres. If omitted, it will degrade gracefully to an ephemeral SQLite database.
+We aim to answer:
+- Are my LLM calls failing silently?
+- Which agents are wasting tokens without business value?
+- How much will we spend next month?
+- Are we leaking internal data or PII?
+- **Deprecation**: Running the backend without `TG_ENV=production` enables a demo tenant mode that bypasses API key checks. This behavior is deprecated and will be removed in v1.0.
 
 ## API Reference
 

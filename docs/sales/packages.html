@@ -1,0 +1,31 @@
+<h1>TokenGoblin Packages — Quick Reference</h1>
+<p>Reference pricing used to send quotes, fit discovery calls, and onboard operators without leaving the terminal.</p>
+<ul>
+  <li><a href="index.html">Back to sales page</a></li>
+  <li><a href="checklist.html">Completion checklist</a></li>
+</ul>
+<pre id="quote"></pre>
+<script>
+(async () => {
+  const res = await fetch('/api/billing/status');
+  // use generated script output instead of relying on `/api/billing/status` in static docs
+  const quote = `[Starter] Free / month
+ - 1 tenant
+ - 10,000 events/mo
+ - CSV export
+ - Support: Email support
+[Pro] USD 29/ month
+ - 5 tenants
+ - 100,000 events/mo
+ - Forecasting
+ - Routing recommendations
+ - Support: Priority support
+[Enterprise] USD 99/ month
+ - Unlimited tenants
+ - Unlimited events
+ - Audit trail + RBAC
+ - SLA
+ - Support: Dedicated support`;
+  document.getElementById('quote').textContent = quote;
+})();
+</script>

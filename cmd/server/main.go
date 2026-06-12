@@ -66,6 +66,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if !config.IsProduction() {
+		slog.Warn("DEPRECATION NOTICE: Demo tenant mode (x-tenant-id header without API key) is active because TG_ENV is not 'production'. This mode is deprecated and will be removed in v1.0. Please migrate to using API keys.")
+	}
+
 	// 3. Storage Initialization (Postgres or SQLite fallback)
 	var repo storage.Repository
 	var err error

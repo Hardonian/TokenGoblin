@@ -28,12 +28,6 @@ const (
 	MaxAdminBodyBytes  = 512 << 10
 )
 
-func enforceMaxHeaderBytes(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, MaxIngestBodyBytes)
-		next.ServeHTTP(w, r)
-	})
-}
 
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
