@@ -24,8 +24,8 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-API: http://localhost:8080  
-Dashboard: http://localhost:3000
+API: <http://localhost:8080>  
+Dashboard: <http://localhost:3000>
 
 ### 3. Run locally (development)
 
@@ -65,11 +65,7 @@ npm run dev
 The backend runs on port `8080` by default (can be overridden via `PORT`).
 - **Health/Metrics**: The backend exposes Prometheus metrics at `/metrics` which can also be used as a simple liveness probe.
 - **Database**: In production, provide `TG_DB_DSN` or `DATABASE_URL` for Postgres. If omitted, it will degrade gracefully to an ephemeral SQLite database.
-We aim to answer:
-- Are my LLM calls failing silently?
-- Which agents are wasting tokens without business value?
-- How much will we spend next month?
-- Are we leaking internal data or PII?
+
 - **Deprecation**: Running the backend without `TG_ENV=production` enables a demo tenant mode that bypasses API key checks. This behavior is deprecated and will be removed in v1.0.
 
 ## API Reference
