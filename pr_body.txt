@@ -1,0 +1,3 @@
+🎯 What: Added tests for the pure mathematical function `calculateStdDev` in `internal/forecast/engine.go` which was previously missing test coverage.
+📊 Coverage: Added scenarios for empty slice, single value, identical values, and simple/complex value sequences to ensure accurate standard deviation calculations and proper edge case handling.
+✨ Result: Improved unit test coverage for the `internal/forecast` package. The standard deviation utility function is now robustly tested against basic mathematical expectations.
