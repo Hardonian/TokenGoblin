@@ -10,13 +10,6 @@ import { GoblinSpinner } from "@/components/GoblinSpinner";
 // API Types
 // ------------------------------------------------------------------
 
-type Envelope<T> = {
-  ok: boolean;
-  status: string;
-  data?: T;
-  error?: { code: string; message: string };
-};
-
 type ExecutiveScorecard = {
   maturity_score: number;
   grade: string;

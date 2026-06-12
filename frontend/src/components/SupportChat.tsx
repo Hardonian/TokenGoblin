@@ -23,7 +23,7 @@ export function SupportChat() {
                 <GoblinMascot size={24} />
                 <h3 className="text-zinc-200 font-bold text-sm tracking-widest uppercase">Goblin Support</h3>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-zinc-500 hover:text-white">✕</button>
+              <button aria-label="Close Support Chat" onClick={() => setIsOpen(false)} className="text-zinc-500 hover:text-white">✕</button>
             </div>
             <div className="p-4 flex-1 h-64 overflow-y-auto bg-black text-sm text-zinc-400 font-mono flex flex-col gap-3">
               <div className="bg-[#1a1a1a] p-3 rounded-r-lg rounded-bl-lg border border-[#333] w-10/12 self-start">
@@ -48,6 +48,7 @@ export function SupportChat() {
         whileTap={{ scale: 0.9 }}
         transition={{ type: "spring", stiffness: 400, damping: 10 }}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Toggle Support Chat"
         className="w-14 h-14 bg-var(--color-accent-goblin) border-2 border-var(--color-accent-goblin-strong) rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] cursor-pointer"
       >
         {isOpen ? (

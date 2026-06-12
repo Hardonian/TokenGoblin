@@ -22,6 +22,8 @@ export function GoblinMascot({ className = "", size = 48 }: { className?: string
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="overflow-visible"
+        role="img"
+        aria-label="Token Goblin Mascot"
       >
         {/* Goblin Ears */}
         <motion.path

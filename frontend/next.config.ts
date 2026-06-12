@@ -4,6 +4,11 @@ const apiBase = process.env.NEXT_PUBLIC_TG_API_BASE || "http://127.0.0.1:8080";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  compress: true,
+  poweredByHeader: false,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
+  },
   turbopack: {
     root: process.cwd(),
   },

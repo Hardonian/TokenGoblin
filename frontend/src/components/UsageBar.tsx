@@ -21,7 +21,7 @@ export default function UsageBar({
       {label && (
         <div className="mb-2 flex items-center justify-between text-xs font-bold text-zinc-300">
           <span className="flex items-center gap-2">
-            <TokenCoin size={14} delay={Math.random()} />
+            <TokenCoin size={14} delay={((label?.length || 0) * 0.15) % 1} />
             {label}
           </span>
           <span>{clamped.toFixed(1)}%</span>
