@@ -93,3 +93,44 @@ func TestGenerateScorecard(t *testing.T) {
 	assert.Equal(t, 100, scorecard.TotalEvents30d)
 	assert.InDelta(t, 10.0, scorecard.TotalSpend30d, 0.01)
 }
+
+func TestCalculateStdDev(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []float64
+		mean     float64
+		expected float64
+	}{
+		{
+			name:     "Empty values",
+			values:   []float64{},
+			mean:     10.0,
+			expected: 10.0 * 0.3, // 30% uncertainty default
+		},
+		{
+			name:     "Single value",
+			values:   []float64{5.0},
+			mean:     5.0,
+			expected: 5.0 * 0.3, // 30% uncertainty default
+		},
+		{
+			name:     "Zero variance",
+			values:   []float64{10.0, 10.0, 10.0},
+			mean:     10.0,
+			expected: 0.0,
+		},
+		{
+			name:     "Normal variance",
+			values:   []float64{2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0},
+			mean:     5.0,
+			expected: 2.138, // Roughly 2.138
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateStdDev(tt.values, tt.mean)
+			assert.InDelta(t, tt.expected, result, 0.01)
+		})
+	}
+}
