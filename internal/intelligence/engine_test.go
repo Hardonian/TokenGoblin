@@ -194,3 +194,57 @@ func TestGenerateWasteReport(t *testing.T) {
 	assert.Equal(t, "t1", report.TenantID)
 	assert.True(t, report.TotalWasteUSD > 0, "should detect waste")
 }
+
+
+func TestHashPrompt(t *testing.T) {
+	// Pre-calculate expected hashes to ensure the test is robust
+	// and doesn't just call the function itself to get the expected value.
+	// Hash of "hello world"
+	helloWorldHash := "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+	// Hash of ""
+	emptyHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "normal string",
+			input:    "hello world",
+			expected: helloWorldHash,
+		},
+		{
+			name:     "leading and trailing spaces",
+			input:    "  hello world  ",
+			expected: helloWorldHash,
+		},
+		{
+			name:     "mixed case",
+			input:    "HeLlo WoRlD",
+			expected: helloWorldHash,
+		},
+		{
+			name:     "spaces and mixed case",
+			input:    "  HeLlo WoRlD  ",
+			expected: helloWorldHash,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: emptyHash,
+		},
+		{
+			name:     "whitespace only",
+			input:    "   \t\n  ",
+			expected: emptyHash,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := HashPrompt(tt.input)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
