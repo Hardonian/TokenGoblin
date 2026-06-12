@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney, formatInt } from "@/components/shared";
+import { motion, AnimatePresence } from "framer-motion";
+import { GoblinSpinner } from "@/components/GoblinSpinner";
 
 // ------------------------------------------------------------------
 // API Types
@@ -82,6 +84,15 @@ export default function CommandCenter() {
   const [graveyard, setGraveyard] = useState<PromptGraveyardResult | null>(null);
   const [models, setModels] = useState<ModelStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
+  
+  // Hardcoded for demonstration of monetization moat
+  const isPro = false;
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -160,6 +171,12 @@ export default function CommandCenter() {
               [ Seed ]
             </button>
             <button 
+              onClick={() => showToast("Export requires an Enterprise Subscription!")}
+              className="bg-black hover:bg-[#111] border border-var(--color-accent-goblin) text-var(--color-accent-goblin) text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
+            >
+              [ Export ]
+            </button>
+            <button 
               onClick={loadAll}
               className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
@@ -167,11 +184,25 @@ export default function CommandCenter() {
             </button>
           </div>
         </div>
+
+        {/* TOAST NOTIFICATION */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#111] border border-var(--color-accent-goblin) px-6 py-3 rounded text-var(--color-accent-goblin) font-bold uppercase tracking-widest text-xs shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+            >
+              {toast}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {loading && (
-        <div className="h-0.5 bg-[#111] w-full overflow-hidden">
-          <div className="h-full bg-[#ffb000] w-1/3 animate-[slide_1.5s_infinite_ease-in-out]"></div>
+        <div className="w-full flex justify-center py-4 bg-[#0a0a0a] border-b border-[#333]">
+          <GoblinSpinner />
         </div>
       )}
 
@@ -257,7 +288,15 @@ export default function CommandCenter() {
                   Total Lost: ${formatMoney(graveyard?.total_waste_usd || 0)}
                 </span>
               </div>
-              <div className="p-0 overflow-x-auto">
+              <div className="p-0 overflow-x-auto relative">
+                {!isPro && (
+                  <div className="absolute inset-0 z-10 backdrop-blur-[4px] bg-black/60 flex flex-col items-center justify-center p-6 text-center">
+                    <span className="text-[#ffb000] text-3xl mb-2">🔒</span>
+                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Enterprise Feature</h3>
+                    <p className="text-zinc-400 text-xs mb-4">Upgrade to view full graveyard forensics.</p>
+                    <a href="/billing" className="bg-[#ffb000] text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-[#ff8c00]">Upgrade Now</a>
+                  </div>
+                )}
                 <table className="w-full text-xs text-left">
                   <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
                     <tr>
@@ -301,7 +340,15 @@ export default function CommandCenter() {
                   [?] Zombie_Procs
                 </h2>
               </div>
-              <div className="p-4">
+              <div className="p-4 relative min-h-[200px]">
+                {!isPro && (
+                  <div className="absolute inset-0 z-10 backdrop-blur-[4px] bg-black/60 flex flex-col items-center justify-center p-6 text-center">
+                    <span className="text-red-500 text-3xl mb-2">🧟</span>
+                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Pro Feature Locked</h3>
+                    <p className="text-zinc-400 text-xs mb-4">Zombie agent forensics require Pro.</p>
+                    <a href="/billing" className="bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-zinc-200">Unlock Pro</a>
+                  </div>
+                )}
                 {zombieAgents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 text-center">
                     <p className="text-zinc-600 text-xs uppercase tracking-widest">{'>>'} No dead agents found.</p>
