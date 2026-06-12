@@ -1130,7 +1130,7 @@ const tokenEventSelect = `
 		cost_is_degraded, cost_degraded_code, external_estimate_usd,
 		external_estimate_currency, latency_ms, task_category, output_status,
 		review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
-		prompt_reference, output_reference, tags_json, idempotency_key
+		prompt_reference, output_reference, tags_json, idempotency_key, fingerprint
 	FROM token_usage_events
 `
 
@@ -1148,7 +1148,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
 			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
-			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey); err != nil {
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey, &event.Fingerprint); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		event.JobID = jobID.String

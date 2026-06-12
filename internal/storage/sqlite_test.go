@@ -61,6 +61,8 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 			occurred_at TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			tags_json TEXT,
+			idempotency_key TEXT,
+			fingerprint TEXT,
 			PRIMARY KEY (tenant_id, event_id)
 		);
 	`)
