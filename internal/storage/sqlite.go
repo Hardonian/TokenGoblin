@@ -155,11 +155,11 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_model ON token_usage_events (tenant_id, model_id);`,
 
-				`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_fingerprint ON token_usage_events (tenant_id, fingerprint);`,
+		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_fingerprint ON token_usage_events (tenant_id, fingerprint);`,
 
-				`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
+		`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
 
-				`CREATE TABLE IF NOT EXISTS api_keys (
+		`CREATE TABLE IF NOT EXISTS api_keys (
 			tenant_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			key_hash TEXT NOT NULL,
@@ -833,6 +833,38 @@ func (r *SQLiteRepository) RevokeAPIKey(ctx context.Context, tenantID, keyID str
 	return wrapDBErr(err)
 }
 
+func (r *SQLiteRepository) upsertTenant(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(tenant_id) DO UPDATE SET updated_at = excluded.updated_at
+	`, tenantID, tenantID, formatTime(now), formatTime(now))
+	return err
+}
+
+func (r *SQLiteRepository) upsertWorker(ctx context.Context, tx *sql.Tx, tenantID, workerID, workerName string, now time.Time) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO workers (tenant_id, worker_id, name, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, worker_id) DO UPDATE SET
+			name = excluded.name,
+			updated_at = excluded.updated_at
+	`, tenantID, workerID, workerName, formatTime(now), formatTime(now))
+	return err
+}
+
+func (r *SQLiteRepository) upsertJob(ctx context.Context, tx *sql.Tx, tenantID, jobID, workerID, taskCategory string, now time.Time) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO jobs (tenant_id, job_id, worker_id, name, task_category, status, started_at, ended_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, job_id) DO UPDATE SET
+			worker_id = excluded.worker_id,
+			task_category = excluded.task_category,
+			updated_at = excluded.updated_at
+	`, tenantID, jobID, workerID, jobID, taskCategory, "active", nil, nil, formatTime(now), formatTime(now))
+	return err
+}
+
 func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -845,17 +877,7 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		now = time.Now().UTC()
 	}
 
-	tenant := domain.Tenant{
-		TenantID:  event.TenantID,
-		Name:      event.TenantID,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(tenant_id) DO UPDATE SET updated_at = excluded.updated_at
-	`, tenant.TenantID, tenant.Name, formatTime(tenant.CreatedAt), formatTime(tenant.UpdatedAt)); err != nil {
+	if err := r.upsertTenant(ctx, tx, event.TenantID, now); err != nil {
 		return wrapDBErr(err)
 	}
 
@@ -863,13 +885,7 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 	if workerName == "" {
 		workerName = event.WorkerID
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO workers (tenant_id, worker_id, name, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(tenant_id, worker_id) DO UPDATE SET
-			name = excluded.name,
-			updated_at = excluded.updated_at
-	`, event.TenantID, event.WorkerID, workerName, formatTime(now), formatTime(now)); err != nil {
+	if err := r.upsertWorker(ctx, tx, event.TenantID, event.WorkerID, workerName, now); err != nil {
 		return wrapDBErr(err)
 	}
 
@@ -881,14 +897,7 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		taskCategory = "uncategorized"
 	}
 	if event.JobID != "" {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO jobs (tenant_id, job_id, worker_id, name, task_category, status, started_at, ended_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(tenant_id, job_id) DO UPDATE SET
-				worker_id = excluded.worker_id,
-				task_category = excluded.task_category,
-				updated_at = excluded.updated_at
-		`, event.TenantID, event.JobID, event.WorkerID, event.JobID, taskCategory, "active", nil, nil, formatTime(now), formatTime(now)); err != nil {
+		if err := r.upsertJob(ctx, tx, event.TenantID, event.JobID, event.WorkerID, taskCategory, now); err != nil {
 			return wrapDBErr(err)
 		}
 	}
