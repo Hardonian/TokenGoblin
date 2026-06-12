@@ -17,6 +17,7 @@ type Alerter interface {
 
 type WebhookAlerter struct {
 	client *http.Client
+	WebhookURL string
 }
 
 func NewWebhookAlerter() *WebhookAlerter {
@@ -28,7 +29,7 @@ func NewWebhookAlerter() *WebhookAlerter {
 func (w *WebhookAlerter) Alert(ctx context.Context, tenantID string, anomalies []domain.AnomalySignal) error {
 	// In a real application, we would fetch the tenant's webhook URLs from the database.
 	// For this stub, we just simulate sending an alert.
-	webhookURL := "" // Fetch from tenant config
+	webhookURL := w.WebhookURL // Fetch from tenant config
 	if webhookURL == "" {
 		return nil
 	}
