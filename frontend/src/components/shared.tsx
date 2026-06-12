@@ -1,4 +1,7 @@
+"use client";
+
 import { type ReactNode } from "react";
+import { motion } from "framer-motion";
 
 export function Card({
   children,
@@ -83,13 +86,16 @@ export function Button({
   };
 
   return (
-    <button
+    <motion.button
+      whileHover={{ scale: disabled ? 1 : 1.02, rotate: disabled ? 0 : [0, -1, 1, 0] }}
+      whileTap={{ scale: disabled ? 1 : 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 10 }}
       className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
       disabled={disabled}
       {...props}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 

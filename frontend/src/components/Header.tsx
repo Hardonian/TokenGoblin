@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { GoblinMascot } from "./GoblinMascot";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -26,10 +27,11 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-[#333] bg-black">
       <div className="mx-auto flex h-14 w-full items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 group transition-colors">
-          <span className="text-[#ffb000] font-black text-lg group-hover:text-[#ff8c00]">
+          <GoblinMascot size={32} />
+          <span className="text-[#ffb000] font-black text-lg group-hover:text-[#10b981] transition-colors">
             root@tg:~#
           </span>
-          <span className="text-sm tracking-widest text-zinc-300 group-hover:text-white uppercase">
+          <span className="text-sm tracking-widest text-zinc-300 group-hover:text-white uppercase transition-colors">
             TokenGoblin
           </span>
         </Link>
