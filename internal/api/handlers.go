@@ -493,23 +493,24 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	row := make([]string, 10)
 	for _, event := range events {
 		costStr := ""
 		if event.CostEstimateUSD != nil {
-			costStr = fmt.Sprintf("%.6f", *event.CostEstimateUSD)
+			costStr = strconv.FormatFloat(*event.CostEstimateUSD, 'f', 6, 64)
 		}
-		if err := writer.Write([]string{
-			event.EventID,
-			event.Timestamp.Format(time.RFC3339),
-			event.WorkerID,
-			event.JobID,
-			event.Provider,
-			event.ModelID,
-			fmt.Sprintf("%d", event.TotalTokens),
-			costStr,
-			event.TaskCategory,
-			string(event.OutputStatus),
-		}); err != nil {
+		row[0] = event.EventID
+		row[1] = event.Timestamp.Format(time.RFC3339)
+		row[2] = event.WorkerID
+		row[3] = event.JobID
+		row[4] = event.Provider
+		row[5] = event.ModelID
+		row[6] = strconv.Itoa(event.TotalTokens)
+		row[7] = costStr
+		row[8] = event.TaskCategory
+		row[9] = string(event.OutputStatus)
+
+		if err := writer.Write(row); err != nil {
 			return
 		}
 	}
