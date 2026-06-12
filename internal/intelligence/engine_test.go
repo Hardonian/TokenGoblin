@@ -194,3 +194,55 @@ func TestGenerateWasteReport(t *testing.T) {
 	assert.Equal(t, "t1", report.TenantID)
 	assert.True(t, report.TotalWasteUSD > 0, "should detect waste")
 }
+
+func TestHashPrompt(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string // We will check if it matches a known stable hash or relative equality.
+	}{
+		{
+			name:     "basic hash",
+			input:    "hello world",
+			expected: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+		},
+		{
+			name:     "trim whitespace",
+			input:    "  hello world  \n",
+			expected: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+		},
+		{
+			name:     "lowercase conversion",
+			input:    "HeLLo WoRLD",
+			expected: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		},
+		{
+			name:     "whitespace only",
+			input:    "   \n\t",
+			expected: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := HashPrompt(tt.input)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+
+	// Ensure stability (same input always produces same output)
+	t.Run("stability", func(t *testing.T) {
+		input := "stable input"
+		hash1 := HashPrompt(input)
+		hash2 := HashPrompt(input)
+		assert.Equal(t, hash1, hash2)
+
+		// Ensure it's a valid hex string of SHA-256 (64 chars)
+		assert.Len(t, hash1, 64)
+	})
+}
