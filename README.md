@@ -63,6 +63,7 @@ npm run dev
 ## Runtime & Operations
 
 The backend runs on port `8080` by default (can be overridden via `PORT`).
+
 - **Health/Metrics**: The backend exposes Prometheus metrics at `/metrics` which can also be used as a simple liveness probe.
 - **Database**: In production, provide `TG_DB_DSN` or `DATABASE_URL` for Postgres. If omitted, it will degrade gracefully to an ephemeral SQLite database.
 
@@ -71,18 +72,22 @@ The backend runs on port `8080` by default (can be overridden via `PORT`).
 ## API Reference
 
 ### Authentication
+
 All API routes (except `/api/tenant/register`) require either:
+
 - `x-tenant-id` header (for development/demo)
 - `Authorization: Bearer <api_key>` (for production)
 
 ### Ingestion
-```
+
+```text
 POST /api/ingest/token-usage
 POST /api/ingest/token-usage/batch
 ```
 
 ### Dashboard
-```
+
+```text
 GET /api/dashboard/overview
 GET /api/dashboard/workers
 GET /api/dashboard/workers/{worker_id}
@@ -95,7 +100,8 @@ GET /api/dashboard/report.md
 ```
 
 ### Billing
-```
+
+```text
 POST /api/tenant/register          — Create account (public)
 POST /api/billing/checkout         — Create Stripe Checkout session
 POST /api/billing/portal           — Create Stripe Customer Portal session
@@ -104,7 +110,8 @@ POST /api/stripe/webhook           — Stripe webhook (server-side)
 ```
 
 ### Tenant Management
-```
+
+```text
 GET    /api/tenant/members
 POST   /api/tenant/members
 POST   /api/dashboard/recommendations/{id}/status
@@ -113,11 +120,11 @@ DELETE /api/dashboard/reset
 
 ## Pricing
 
-| Plan | Price | Events/mo | Features |
-|------|-------|-----------|----------|
-| Free | $0 | 10K | Dashboard, CSV export |
-| Pro | $29 | 100K | + Output analysis, Goblin Score, recommendations |
-| Enterprise | $99 | Unlimited | + Audit trail, RBAC, custom pricing, SLA |
+| Plan       | Price | Events/mo | Features                                         |
+| ---------- | ----- | --------- | ------------------------------------------------ |
+| Free       | $0    | 10K       | Dashboard, CSV export                            |
+| Pro        | $29   | 100K      | + Output analysis, Goblin Score, recommendations |
+| Enterprise | $99   | Unlimited | + Audit trail, RBAC, custom pricing, SLA         |
 
 ## Architecture
 
