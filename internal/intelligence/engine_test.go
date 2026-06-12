@@ -194,3 +194,68 @@ func TestGenerateWasteReport(t *testing.T) {
 	assert.Equal(t, "t1", report.TenantID)
 	assert.True(t, report.TotalWasteUSD > 0, "should detect waste")
 }
+
+func TestDetectCostLeaks_ContextPadding(t *testing.T) {
+	eng := NewEngine()
+	now := time.Now().UTC()
+
+	var events []domain.TokenEvent
+	// 5 events, 3 of which use >80% of gpt-4o's 128000 context (102400)
+	for i := 0; i < 5; i++ {
+		inputTokens := 50000
+		if i < 3 {
+			inputTokens = 110000 // > 80% of 128000
+		}
+		events = append(events, domain.TokenEvent{
+			EventID:         "evt" + string(rune('a'+i)),
+			ModelID:         "gpt-4o",
+			InputTokens:     inputTokens,
+			CostEstimateUSD: ptr(1.0),
+			Timestamp:       now,
+		})
+	}
+
+	leaks := eng.DetectCostLeaks(events)
+	require.NotEmpty(t, leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.Type == domain.CostLeakContextPadding {
+			found = true
+			assert.Equal(t, 3, l.EventCount)
+			assert.Equal(t, "medium", l.Severity)
+			assert.Equal(t, "gpt-4o", l.ModelID)
+		}
+	}
+	assert.True(t, found, "should detect context padding")
+}
+
+func TestDetectCostLeaks_CacheMiss(t *testing.T) {
+	eng := NewEngine()
+	now := time.Now().UTC()
+
+	var events []domain.TokenEvent
+	// 4 events, 4 uncached for same prompt
+	for i := 0; i < 4; i++ {
+		events = append(events, domain.TokenEvent{
+			EventID:         "evt" + string(rune('a'+i)),
+			PromptExcerpt:   "identical prompt",
+			CachedTokens:    0,
+			CostEstimateUSD: ptr(1.0),
+			Timestamp:       now,
+		})
+	}
+
+	leaks := eng.DetectCostLeaks(events)
+	require.NotEmpty(t, leaks)
+
+	found := false
+	for _, l := range leaks {
+		if l.Type == domain.CostLeakCacheMiss {
+			found = true
+			assert.Equal(t, 4, l.EventCount)
+			assert.Equal(t, "medium", l.Severity)
+		}
+	}
+	assert.True(t, found, "should detect cache miss")
+}
