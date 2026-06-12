@@ -531,9 +531,9 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
 			review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
-			prompt_reference, output_reference, tags_json, idempotency_key
+			prompt_reference, output_reference, tags_json, idempotency_key, fingerprint
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = EXCLUDED.worker_id,
 			worker_name = EXCLUDED.worker_name,
@@ -564,7 +564,8 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 			prompt_reference = EXCLUDED.prompt_reference,
 			output_reference = EXCLUDED.output_reference,
 			tags_json = EXCLUDED.tags_json,
-			idempotency_key = EXCLUDED.idempotency_key
+			idempotency_key = EXCLUDED.idempotency_key,
+			fingerprint = EXCLUDED.fingerprint
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
 		nullString(event.SessionID), nullString(event.RunID), event.Provider, event.ModelID,
 		event.PromptTokens, event.CompletionTokens, event.CachedTokens, event.InputTokens,
@@ -573,7 +574,7 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
 		event.ReviewScore, event.Timestamp, now, nullString(event.PromptExcerpt),
 		nullString(event.OutputExcerpt), nullString(event.PromptReference), nullString(event.OutputReference),
-		tagsJSON, nullString(event.IdempotencyKey))
+		tagsJSON, nullString(event.IdempotencyKey), nullString(event.Fingerprint))
 	if err != nil {
 		return wrapDBErr(err)
 	}

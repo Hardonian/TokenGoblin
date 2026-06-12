@@ -148,17 +148,16 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			output_reference TEXT,
 			tags_json TEXT,
 			idempotency_key TEXT,
+			fingerprint TEXT,
 			PRIMARY KEY (tenant_id, event_id),
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
 			FOREIGN KEY (tenant_id, worker_id) REFERENCES workers(tenant_id, worker_id) ON DELETE CASCADE
 		);`,
-		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_occurred ON token_usage_events (tenant_id, occurred_at DESC);`,
-		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_worker ON token_usage_events (tenant_id, worker_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_model ON token_usage_events (tenant_id, model_id);`,
-		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_fingerprint ON token_usage_events (tenant_id, fingerprint);`,
-		`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
-		`CREATE TABLE IF NOT EXISTS api_keys (
-			key_id TEXT PRIMARY KEY,
+
+				`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
+
+				`CREATE TABLE IF NOT EXISTS api_keys (
 			tenant_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			key_hash TEXT NOT NULL,
@@ -393,6 +392,7 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 			"output_excerpt":   "TEXT",
 			"prompt_reference": "TEXT",
 			"output_reference": "TEXT",
+			"fingerprint":      "TEXT",
 		},
 		"api_keys": {
 			"role": "TEXT NOT NULL DEFAULT 'admin'",
@@ -916,9 +916,9 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			cost_is_degraded, cost_degraded_code, external_estimate_usd,
 			external_estimate_currency, latency_ms, task_category, output_status,
 			review_score, occurred_at, created_at, prompt_excerpt, output_excerpt,
-			prompt_reference, output_reference, tags_json, idempotency_key
+			prompt_reference, output_reference, tags_json, idempotency_key, fingerprint
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(tenant_id, event_id) DO UPDATE SET
 			worker_id = excluded.worker_id,
 			worker_name = excluded.worker_name,
@@ -949,7 +949,8 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 			prompt_reference = excluded.prompt_reference,
 			output_reference = excluded.output_reference,
 			tags_json = excluded.tags_json,
-			idempotency_key = excluded.idempotency_key
+			idempotency_key = excluded.idempotency_key,
+			fingerprint = excluded.fingerprint
 	`, event.TenantID, event.EventID, event.WorkerID, workerName, nullString(event.JobID),
 		nullString(event.SessionID), nullString(event.RunID), event.Provider, event.ModelID,
 		event.PromptTokens, event.CompletionTokens, event.CachedTokens, event.InputTokens,
@@ -958,7 +959,7 @@ func (r *SQLiteRepository) SaveTokenEvent(ctx context.Context, event domain.Toke
 		externalCurrency, event.LatencyMs, taskCategory, string(event.OutputStatus),
 		event.ReviewScore, formatTime(event.Timestamp), formatTime(now), nullString(event.PromptExcerpt),
 		nullString(event.OutputExcerpt), nullString(event.PromptReference), nullString(event.OutputReference),
-		tagsJSON, nullString(event.IdempotencyKey))
+		tagsJSON, nullString(event.IdempotencyKey), nullString(event.Fingerprint))
 	if err != nil {
 		return wrapDBErr(err)
 	}

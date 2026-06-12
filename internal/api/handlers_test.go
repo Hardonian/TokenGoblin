@@ -66,7 +66,7 @@ func TestV2EndpointsDegradeWhenDatabaseUnavailable(t *testing.T) {
 	repo := storage.NewUnavailableRepository(storage.ErrUnavailable)
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service, repo, nil)
-	
+
 	endpoints := []string{
 		"/v2/intelligence/waste",
 		"/v2/intelligence/prompt-graveyard",

@@ -28,7 +28,6 @@ const (
 	MaxAdminBodyBytes  = 512 << 10
 )
 
-
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := moat.ExtractBearerToken(r.Header.Get("Authorization"))

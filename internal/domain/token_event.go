@@ -57,6 +57,7 @@ type TokenEvent struct {
 	Tags             map[string]string `json:"-"`
 	TagsJSON         json.RawMessage   `json:"tags,omitempty"`
 	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
+	Fingerprint      string            `json:"fingerprint,omitempty"`
 }
 
 func (e TokenEvent) MarshalJSON() ([]byte, error) {
