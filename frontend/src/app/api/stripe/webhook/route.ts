@@ -185,58 +185,6 @@ function json(body: StripeWebhookAck, status = 200): Response {
 
 function normalizeStripeEvent(event: { id?: string; type?: string }): VerifiedStripeEvent {
   const eventRecord = asRecord(event);
-  const eventType = asString(eventRecord.type);
-
-  if (eventType === "checkout.session.completed") {
-    return processCheckoutSessionCompleted(eventRecord);
-  }
-
-  if (eventType.startsWith("customer.subscription.")) {
-    return processCustomerSubscription(eventRecord);
-  }
-
-  return processGenericEvent(eventRecord);
-}
-
-function processCheckoutSessionCompleted(eventRecord: Record<string, unknown>): VerifiedStripeEvent {
-  const data = asRecord(eventRecord.data);
-  const object = asRecord(data.object);
-  const metadata = metadataRecord(object.metadata);
-
-  return {
-    event_id: asString(eventRecord.id),
-    event_type: "checkout.session.completed",
-    customer_id: asString(object.customer),
-    subscription_id: asString(object.subscription),
-    subscription_status: asString(object.status),
-    tenant_id:
-      asString(metadata.tenant_id) ||
-      asString(metadata.tenantId) ||
-      asString(object.client_reference_id),
-    metadata,
-  };
-}
-
-function processCustomerSubscription(eventRecord: Record<string, unknown>): VerifiedStripeEvent {
-  const data = asRecord(eventRecord.data);
-  const object = asRecord(data.object);
-  const metadata = metadataRecord(object.metadata);
-
-  return {
-    event_id: asString(eventRecord.id),
-    event_type: asString(eventRecord.type),
-    customer_id: asString(object.customer),
-    subscription_id: asString(object.id),
-    subscription_status: asString(object.status),
-    tenant_id:
-      asString(metadata.tenant_id) ||
-      asString(metadata.tenantId) ||
-      asString(object.client_reference_id),
-    metadata,
-  };
-}
-
-function processGenericEvent(eventRecord: Record<string, unknown>): VerifiedStripeEvent {
   const data = asRecord(eventRecord.data);
   const object = asRecord(data.object);
   const metadata = metadataRecord(object.metadata);
@@ -246,7 +194,7 @@ function processGenericEvent(eventRecord: Record<string, unknown>): VerifiedStri
     event_id: asString(eventRecord.id),
     event_type: eventType,
     customer_id: asString(object.customer),
-    subscription_id: asString(object.subscription),
+    subscription_id: subscriptionID(eventType, object),
     subscription_status: asString(object.status),
     tenant_id:
       asString(metadata.tenant_id) ||
@@ -256,6 +204,12 @@ function processGenericEvent(eventRecord: Record<string, unknown>): VerifiedStri
   };
 }
 
+function subscriptionID(eventType: string, object: Record<string, unknown>): string {
+  if (eventType.startsWith("customer.subscription.")) {
+    return asString(object.id);
+  }
+  return asString(object.subscription);
+}
 
 function metadataRecord(value: unknown): Record<string, string> {
   const record = asRecord(value);
