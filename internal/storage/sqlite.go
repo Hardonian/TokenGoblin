@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -1345,11 +1346,12 @@ func nullString(value string) interface{} {
 }
 
 func normalizeRole(role string) string {
-	switch role {
+	r := strings.ToLower(strings.TrimSpace(role))
+	switch r {
 	case domain.RoleOwner, domain.RoleAdmin, domain.RoleAnalyst, domain.RoleIngest, domain.RoleViewer:
-		return role
+		return r
 	default:
-		return domain.RoleAdmin
+		return domain.RoleViewer
 	}
 }
 

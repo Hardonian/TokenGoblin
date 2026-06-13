@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
+	"github.com/stretchr/testify/assert"
 	_ "modernc.org/sqlite"
 )
 
@@ -96,5 +97,28 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 		IdempotencyKey: "idem-1",
 	}); err != nil {
 		t.Fatalf("save after repair: %v", err)
+	}
+}
+
+func TestNormalizeRole(t *testing.T) {
+	tests := []struct {
+		name     string
+		role     string
+		expected string
+	}{
+		{"owner", domain.RoleOwner, domain.RoleOwner},
+		{"admin", domain.RoleAdmin, domain.RoleAdmin},
+		{"analyst", domain.RoleAnalyst, domain.RoleAnalyst},
+		{"ingest", domain.RoleIngest, domain.RoleIngest},
+		{"viewer", domain.RoleViewer, domain.RoleViewer},
+		{"unknown", "unknown", domain.RoleViewer},
+		{"empty", "", domain.RoleViewer},
+		{"uppercase handles gracefully", "OWNER", domain.RoleOwner},
+		{"whitespace handles gracefully", " admin ", domain.RoleAdmin},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, normalizeRole(tt.role))
+		})
 	}
 }
