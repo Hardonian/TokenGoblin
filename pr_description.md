@@ -1,13 +1,11 @@
-# 🧪 Add tests for StripeSyncer
+🎯 **What:** This PR addresses a testing gap by adding unit tests for the `HashPrompt` function in `internal/intelligence/engine.go`. `HashPrompt` is a pure function responsible for normalizing and hashing strings, and was previously lacking explicit test coverage.
 
-## 🎯 **What:**
-Added comprehensive testing for `StripeSyncer` in `internal/billing/stripe.go` which was previously lacking tests. This required making the `StripeSyncer` more testable by exposing its ticker interval.
+📊 **Coverage:** The new `TestHashPrompt` table-driven test covers:
+- Basic hashing (happy path).
+- Whitespace trimming (leading, trailing, and mixed).
+- Lowercase conversion (case insensitivity).
+- Empty string behavior.
+- Strings containing only whitespace.
+- Hash stability (same input consistently yields the same 64-character SHA-256 hex string).
 
-## 📊 **Coverage:**
-The new test file (`internal/billing/stripe_test.go`) covers the following scenarios:
-- **Initialization:** Verifies default and explicit logger assignment, as well as the default 1-hour ticker interval.
-- **Context Cancellation:** Ensures that the `Start` loop respects `ctx.Done()` and unblocks/returns immediately upon cancellation.
-- **Ticker Mechanics:** Validates that the syncer correctly triggers the `syncAllTenants` stub on an interval (simulated using a 10ms interval for fast test execution) by verifying the logged messages.
-
-## ✨ **Result:**
-The `internal/billing` package now has test coverage for its background sync process, enabling confident future refactoring and ensuring the core background looping logic operates as intended without blocking or drifting.
+✨ **Result:** Test coverage for `internal/intelligence/engine.go` is improved, documenting and enforcing the normalization behavior (trimming, lowercasing) of the `HashPrompt` utility function.
