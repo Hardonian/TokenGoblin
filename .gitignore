@@ -15,6 +15,15 @@
 # production
 /build
 *.exe
+server
+
+# pnpm
+pnpm-lock.yaml
+frontend/pnpm-lock.yaml
+frontend/pnpm-workspace.yaml
+
+# sdks
+sdks/typescript/node_modules
 
 # local data
 /data/*

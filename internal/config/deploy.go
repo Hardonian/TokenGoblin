@@ -30,6 +30,19 @@ func ValidateServerEnv() error {
 	if strings.TrimSpace(os.Getenv("TG_INTERNAL_WEBHOOK_SECRET")) == "" {
 		missing = append(missing, "TG_INTERNAL_WEBHOOK_SECRET")
 	}
+	// Stripe billing configuration (required in production)
+	if strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY")) == "" {
+		missing = append(missing, "STRIPE_SECRET_KEY")
+	}
+	if strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")) == "" {
+		missing = append(missing, "STRIPE_WEBHOOK_SECRET")
+	}
+	if strings.TrimSpace(os.Getenv("STRIPE_PRICE_PRO")) == "" {
+		missing = append(missing, "STRIPE_PRICE_PRO")
+	}
+	if strings.TrimSpace(os.Getenv("STRIPE_PRICE_ENTERPRISE")) == "" {
+		missing = append(missing, "STRIPE_PRICE_ENTERPRISE")
+	}
 	if AllowDemoTenantAuth() {
 		return fmt.Errorf("production config unsafe: TG_ALLOW_DEMO_AUTH must be disabled")
 	}
