@@ -424,3 +424,31 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 		t.Fatalf("billing lifecycle not applied: %+v", updated)
 	}
 }
+
+func TestSanitizeCSVField(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty string", "", ""},
+		{"normal string", "normal", "normal"},
+		{"starts with equals", "=SUM(A1:B1)", "'=SUM(A1:B1)"},
+		{"starts with plus", "+1+2", "'+1+2"},
+		{"starts with minus", "-1+2", "'-1+2"},
+		{"starts with at", "@SUM(A1:B1)", "'@SUM(A1:B1)"},
+		{"equals in middle", "A=B", "A=B"},
+		{"plus in middle", "A+B", "A+B"},
+		{"minus in middle", "A-B", "A-B"},
+		{"at in middle", "A@B", "A@B"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeCSVField(tt.input)
+			if result != tt.expected {
+				t.Errorf("sanitizeCSVField(%q) = %q; expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

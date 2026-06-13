@@ -499,16 +499,16 @@ func (h *IngestionHandler) HandleExportCSV(w http.ResponseWriter, r *http.Reques
 			costStr = fmt.Sprintf("%.6f", *event.CostEstimateUSD)
 		}
 		if err := writer.Write([]string{
-			event.EventID,
+			sanitizeCSVField(event.EventID),
 			event.Timestamp.Format(time.RFC3339),
-			event.WorkerID,
-			event.JobID,
-			event.Provider,
-			event.ModelID,
+			sanitizeCSVField(event.WorkerID),
+			sanitizeCSVField(event.JobID),
+			sanitizeCSVField(event.Provider),
+			sanitizeCSVField(event.ModelID),
 			fmt.Sprintf("%d", event.TotalTokens),
 			costStr,
-			event.TaskCategory,
-			string(event.OutputStatus),
+			sanitizeCSVField(event.TaskCategory),
+			sanitizeCSVField(string(event.OutputStatus)),
 		}); err != nil {
 			return
 		}
@@ -1150,4 +1150,15 @@ func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Req
 	_ = encoder.Encode(export)
 
 	h.audit(r, tenantID, "export.tenant_json", "tenant:"+tenantID, map[string]interface{}{"format": "json"})
+}
+
+func sanitizeCSVField(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@':
+		return "'" + s
+	}
+	return s
 }
