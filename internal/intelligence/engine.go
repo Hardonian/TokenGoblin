@@ -278,7 +278,19 @@ func (e *Engine) DetectZombieAgents(events []domain.TokenEvent) []domain.ZombieA
 func (e *Engine) DetectCostLeaks(events []domain.TokenEvent) []domain.CostLeak {
 	var leaks []domain.CostLeak
 
-	// 1. Retry storms: >3 events with same idempotency key
+	leaks = append(leaks, e.detectRetryStorms(events)...)
+	leaks = append(leaks, e.detectContextPadding(events)...)
+	leaks = append(leaks, e.detectCacheMisses(events)...)
+
+	sort.Slice(leaks, func(i, j int) bool {
+		return leaks[i].CostUSD > leaks[j].CostUSD
+	})
+
+	return leaks
+}
+
+func (e *Engine) detectRetryStorms(events []domain.TokenEvent) []domain.CostLeak {
+	var leaks []domain.CostLeak
 	idempotencyBuckets := make(map[string]int)
 	idempotencyCost := make(map[string]float64)
 	for i := range events {
@@ -301,8 +313,11 @@ func (e *Engine) DetectCostLeaks(events []domain.TokenEvent) []domain.CostLeak {
 			})
 		}
 	}
+	return leaks
+}
 
-	// 2. Context window padding: input tokens consistently high
+func (e *Engine) detectContextPadding(events []domain.TokenEvent) []domain.CostLeak {
+	var leaks []domain.CostLeak
 	// Model context windows (approximate)
 	contextWindows := map[string]int{
 		"gpt-4o":            128000,
@@ -352,8 +367,11 @@ func (e *Engine) DetectCostLeaks(events []domain.TokenEvent) []domain.CostLeak {
 			})
 		}
 	}
+	return leaks
+}
 
-	// 3. Cache miss opportunities: repeated prompts without cached tokens
+func (e *Engine) detectCacheMisses(events []domain.TokenEvent) []domain.CostLeak {
+	var leaks []domain.CostLeak
 	type cacheStats struct {
 		totalEvents      int
 		uncachedEvents   int
@@ -398,11 +416,6 @@ func (e *Engine) DetectCostLeaks(events []domain.TokenEvent) []domain.CostLeak {
 			Severity:    "medium",
 		})
 	}
-
-	sort.Slice(leaks, func(i, j int) bool {
-		return leaks[i].CostUSD > leaks[j].CostUSD
-	})
-
 	return leaks
 }
 
