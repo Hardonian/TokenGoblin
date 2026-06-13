@@ -446,6 +446,38 @@ func (r *PostgresRepository) ListRecommendationStates(ctx context.Context, tenan
 	return states, wrapDBErr(rows.Err())
 }
 
+func (r *PostgresRepository) upsertTenant(ctx context.Context, tx pgx.Tx, tenantID string, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT(tenant_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+	`, tenantID, tenantID, now, now)
+	return err
+}
+
+func (r *PostgresRepository) upsertWorker(ctx context.Context, tx pgx.Tx, tenantID, workerID, workerName string, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO workers (tenant_id, worker_id, name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT(tenant_id, worker_id) DO UPDATE SET
+			name = EXCLUDED.name,
+			updated_at = EXCLUDED.updated_at
+	`, tenantID, workerID, workerName, now, now)
+	return err
+}
+
+func (r *PostgresRepository) upsertJob(ctx context.Context, tx pgx.Tx, tenantID, jobID, workerID, taskCategory string, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO jobs (tenant_id, job_id, worker_id, name, task_category, status, started_at, ended_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT(tenant_id, job_id) DO UPDATE SET
+			worker_id = EXCLUDED.worker_id,
+			task_category = EXCLUDED.task_category,
+			updated_at = EXCLUDED.updated_at
+	`, tenantID, jobID, workerID, jobID, taskCategory, "active", nil, nil, now, now)
+	return err
+}
+
 func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -458,17 +490,7 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		now = time.Now().UTC()
 	}
 
-	tenant := domain.Tenant{
-		TenantID:  event.TenantID,
-		Name:      event.TenantID,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO tenants (tenant_id, name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT(tenant_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
-	`, tenant.TenantID, tenant.Name, tenant.CreatedAt, tenant.UpdatedAt); err != nil {
+	if err := r.upsertTenant(ctx, tx, event.TenantID, now); err != nil {
 		return wrapDBErr(err)
 	}
 
@@ -476,13 +498,7 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 	if workerName == "" {
 		workerName = event.WorkerID
 	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO workers (tenant_id, worker_id, name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT(tenant_id, worker_id) DO UPDATE SET
-			name = EXCLUDED.name,
-			updated_at = EXCLUDED.updated_at
-	`, event.TenantID, event.WorkerID, workerName, now, now); err != nil {
+	if err := r.upsertWorker(ctx, tx, event.TenantID, event.WorkerID, workerName, now); err != nil {
 		return wrapDBErr(err)
 	}
 
@@ -494,14 +510,7 @@ func (r *PostgresRepository) SaveTokenEvent(ctx context.Context, event domain.To
 		taskCategory = "uncategorized"
 	}
 	if event.JobID != "" {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO jobs (tenant_id, job_id, worker_id, name, task_category, status, started_at, ended_at, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-			ON CONFLICT(tenant_id, job_id) DO UPDATE SET
-				worker_id = EXCLUDED.worker_id,
-				task_category = EXCLUDED.task_category,
-				updated_at = EXCLUDED.updated_at
-		`, event.TenantID, event.JobID, event.WorkerID, event.JobID, taskCategory, "active", nil, nil, now, now); err != nil {
+		if err := r.upsertJob(ctx, tx, event.TenantID, event.JobID, event.WorkerID, taskCategory, now); err != nil {
 			return wrapDBErr(err)
 		}
 	}
