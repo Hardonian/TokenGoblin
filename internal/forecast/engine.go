@@ -3,7 +3,6 @@ package forecast
 import (
 	"fmt"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
@@ -37,17 +36,19 @@ func (e *Engine) ForecastMonthlySpend(tenantID string, events []domain.TokenEven
 	daysRemaining := daysInMonth - daysElapsed
 
 	// Build daily spend data
-	dailyMap := make(map[string]*dailyAccum)
+	// Use array instead of map for O(1) day-based bucketing without string allocs
+	dailyMap := make([]dailyAccum, 32)
+	activeDays := 0
 	for i := range events {
 		ev := &events[i]
 		if ev.Timestamp.Before(monthStart) || !ev.Timestamp.Before(monthEnd) {
 			continue
 		}
-		dateStr := ev.Timestamp.Format("2006-01-02")
-		da, ok := dailyMap[dateStr]
-		if !ok {
-			da = &dailyAccum{}
-			dailyMap[dateStr] = da
+
+		day := ev.Timestamp.Day()
+		da := &dailyMap[day]
+		if da.events == 0 {
+			activeDays++
 		}
 		if ev.CostEstimateUSD != nil {
 			da.cost += *ev.CostEstimateUSD
@@ -59,7 +60,17 @@ func (e *Engine) ForecastMonthlySpend(tenantID string, events []domain.TokenEven
 	var dailyTrend []domain.DailySpend
 	currentSpend := 0.0
 	totalEvents := 0
-	for dateStr, da := range dailyMap {
+	dailyValues := make([]float64, 0, activeDays)
+
+	for day := 1; day <= 31; day++ {
+		da := dailyMap[day]
+		if da.events == 0 {
+			continue
+		}
+
+		dayDate := time.Date(currentYear, currentMonth, day, 0, 0, 0, 0, time.UTC)
+		dateStr := dayDate.Format("2006-01-02")
+
 		dailyTrend = append(dailyTrend, domain.DailySpend{
 			Date:    dateStr,
 			CostUSD: da.cost,
@@ -67,20 +78,13 @@ func (e *Engine) ForecastMonthlySpend(tenantID string, events []domain.TokenEven
 		})
 		currentSpend += da.cost
 		totalEvents += da.events
+		dailyValues = append(dailyValues, da.cost)
 	}
-	sort.Slice(dailyTrend, func(i, j int) bool {
-		return dailyTrend[i].Date < dailyTrend[j].Date
-	})
 
 	// Calculate daily average and standard deviation
 	dailyAvg := 0.0
 	if daysElapsed > 0 {
 		dailyAvg = currentSpend / daysElapsed
-	}
-
-	dailyValues := make([]float64, 0, len(dailyMap))
-	for _, da := range dailyMap {
-		dailyValues = append(dailyValues, da.cost)
 	}
 	stdDev := calculateStdDev(dailyValues, dailyAvg)
 
@@ -102,7 +106,7 @@ func (e *Engine) ForecastMonthlySpend(tenantID string, events []domain.TokenEven
 		futureDaily = append(futureDaily, domain.DailySpend{
 			Date:     futureDate.Format("2006-01-02"),
 			CostUSD:  dailyAvg,
-			Events:   totalEvents / max(len(dailyMap), 1),
+			Events:   totalEvents / max(activeDays, 1),
 			IsFuture: true,
 		})
 	}
