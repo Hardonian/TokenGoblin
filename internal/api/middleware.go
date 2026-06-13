@@ -157,16 +157,15 @@ func getRole(r *http.Request) string {
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		allowedOrigin := origin
-		if allowedOrigin != "" && !isAllowedOrigin(allowedOrigin) {
-			allowedOrigin = ""
+
+		w.Header().Set("Vary", "Origin")
+		if origin != "" && isAllowedOrigin(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 
-		w.Header().Add("Vary", "Origin")
-		w.Header().Add("Access-Control-Allow-Origin", allowedOrigin)
-		w.Header().Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id")
-		w.Header().Add("Access-Control-Expose-Headers", "Retry-After, X-Request-ID")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id")
+		w.Header().Set("Access-Control-Expose-Headers", "Retry-After, X-Request-ID")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
