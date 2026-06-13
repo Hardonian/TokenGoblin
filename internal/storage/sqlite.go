@@ -161,6 +161,7 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
 
 		`CREATE TABLE IF NOT EXISTS api_keys (
+			key_id TEXT PRIMARY KEY,
 			tenant_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			key_hash TEXT NOT NULL,
@@ -169,8 +170,8 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			last_used_at TEXT,
 			is_revoked INTEGER NOT NULL DEFAULT 0,
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
-		);`,
-		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);`,
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
 		`CREATE TABLE IF NOT EXISTS tenant_members (
 			tenant_id TEXT NOT NULL,
 			subject_id TEXT NOT NULL,
@@ -1148,7 +1149,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey sql.NullString
+		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey, fingerprint sql.NullString
 		var cost, externalCost, reviewScore sql.NullFloat64
 		var costIsDegraded int
 		var occurredAt, createdAt string
@@ -1158,7 +1159,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
 			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
-			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey, &event.Fingerprint); err != nil {
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey, &fingerprint); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		event.JobID = jobID.String
@@ -1189,6 +1190,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
 		}
 		event.IdempotencyKey = idempotencyKey.String
+		event.Fingerprint = fingerprint.String
 		events = append(events, event)
 	}
 	return events, wrapDBErr(rows.Err())
