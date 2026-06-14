@@ -5,6 +5,9 @@ import { formatMoney, formatInt } from "@/components/shared";
 import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoblinSpinner } from "@/components/GoblinSpinner";
+import { DemoMode } from "@/components/DemoMode";
+import { DesignPartnerDashboard } from "@/components/DesignPartnerDashboard";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 // ------------------------------------------------------------------
 // API Types
@@ -404,9 +407,11 @@ export default function CommandCenter() {
             </table>
           </div>
         </div>
-        
       </div>
-      
+       {/* Demo Mode & Onboarding */}
+       <DemoMode />
+       <DesignPartnerDashboard />
+       <OnboardingTour isOpen={true} onClose={() => {}} onComplete={() => {}} />
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide {
           0% { transform: translateX(-100%); }
