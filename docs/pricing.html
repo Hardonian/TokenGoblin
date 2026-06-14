@@ -51,6 +51,11 @@
       <p class="subtitle">Free tier includes basic visibility. Pro tier for teams that need forecasting, leak detection, and routing optimization.</p>
     </header>
 
+    <!-- NOTE: The buy.stripe.com links below are static Stripe Payment Links that
+         bypass the Go backend entirely. The backend checkout flow (which uses
+         STRIPE_SECRET_KEY + STRIPE_PRICE_* env vars) is separate and handled by
+         the API. Do NOT change these links without also updating the
+         corresponding backend price IDs. -->
     <div class="pricing-grid">
       <div class="card">
         <span class="free-badge">FREE</span>
