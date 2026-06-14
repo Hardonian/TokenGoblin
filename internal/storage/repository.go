@@ -52,6 +52,9 @@ type Repository interface {
 	UpsertBudget(ctx context.Context, budget domain.Budget) error
 	ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error)
 
+	// Health check
+	Ping(ctx context.Context) error
+
 	Close() error
 }
 
@@ -219,5 +222,9 @@ func (r *UnavailableRepository) ListBudgets(ctx context.Context, tenantID string
 }
 
 func (r *UnavailableRepository) Close() error {
+	return r.Cause
+}
+
+func (r *UnavailableRepository) Ping(ctx context.Context) error {
 	return r.Cause
 }
