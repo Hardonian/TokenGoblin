@@ -1148,7 +1148,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 	var events []domain.TokenEvent
 	for rows.Next() {
 		var event domain.TokenEvent
-		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey sql.NullString
+		var jobID, sessionID, runID, costCode, externalCurrency, promptExcerpt, outputExcerpt, promptReference, outputReference, tags, idempotencyKey, fingerprint sql.NullString
 		var cost, externalCost, reviewScore sql.NullFloat64
 		var costIsDegraded int
 		var occurredAt, createdAt string
@@ -1158,7 +1158,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			&event.TotalTokens, &cost, &event.CostCurrency, &costIsDegraded, &costCode,
 			&externalCost, &externalCurrency, &event.LatencyMs, &event.TaskCategory,
 			&event.OutputStatus, &reviewScore, &occurredAt, &createdAt, &promptExcerpt,
-			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey, &event.Fingerprint); err != nil {
+			&outputExcerpt, &promptReference, &outputReference, &tags, &idempotencyKey, &fingerprint); err != nil {
 			return nil, wrapDBErr(err)
 		}
 		event.JobID = jobID.String
@@ -1189,6 +1189,7 @@ func scanTokenEvents(rows *sql.Rows) ([]domain.TokenEvent, error) {
 			_ = json.Unmarshal([]byte(tags.String), &event.Tags)
 		}
 		event.IdempotencyKey = idempotencyKey.String
+		event.Fingerprint = fingerprint.String
 		events = append(events, event)
 	}
 	return events, wrapDBErr(rows.Err())
