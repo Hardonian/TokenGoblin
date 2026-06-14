@@ -161,13 +161,13 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs (tenant_id, status);`,
 
 		`CREATE TABLE IF NOT EXISTS api_keys (
+			key_id TEXT PRIMARY KEY,
 			tenant_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			key_hash TEXT NOT NULL,
-			role TEXT NOT NULL DEFAULT 'admin',
 			created_at TEXT NOT NULL,
 			last_used_at TEXT,
-			is_revoked INTEGER NOT NULL DEFAULT 0,
+			is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);`,
