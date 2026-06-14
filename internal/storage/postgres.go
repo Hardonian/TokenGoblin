@@ -99,6 +99,10 @@ func (r *PostgresRepository) Close() error {
 	return nil
 }
 
+func (r *PostgresRepository) Ping(ctx context.Context) error {
+	return r.pool.Ping(ctx)
+}
+
 func (r *PostgresRepository) UpsertTenant(ctx context.Context, tenant domain.Tenant) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO tenants (tenant_id, name, tier, usage_limit_usd, stripe_customer_id, stripe_subscription_id, created_at, updated_at)

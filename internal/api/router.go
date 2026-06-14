@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -15,6 +16,25 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux := http.NewServeMux()
 	handler := NewIngestionHandler(service, repo)
 	billingHandler := NewBillingHandler(repo)
+
+	// Health & Readiness (no auth required)
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		// Check database connectivity
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := repo.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("not ready: " + err.Error()))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready"))
+	})
 
 	// Prometheus Metrics
 	mux.Handle("/metrics", promhttp.Handler())
