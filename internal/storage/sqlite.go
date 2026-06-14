@@ -807,7 +807,7 @@ func (r *SQLiteRepository) ListAPIKeys(ctx context.Context, tenantID string) ([]
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []domain.APIKey
 	for rows.Next() {
