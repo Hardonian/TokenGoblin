@@ -227,7 +227,7 @@ func GetBillingStatus(ctx context.Context, repo storage.Repository, tenantID str
 
 	currentMonthCost, err := repo.GetTenantCurrentMonthCost(ctx, tenantID)
 	if err != nil {
-		if err == storage.ErrUnavailable {
+		if errors.Is(err, storage.ErrUnavailable) {
 			currentMonthCost = 0
 		} else {
 			return nil, fmt.Errorf("get current month cost: %w", err)

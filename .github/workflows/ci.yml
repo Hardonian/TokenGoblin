@@ -1,98 +1,143 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: '1.23'
 
 jobs:
-  build-test:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup toolchain
+
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Setup Node
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify go.mod
+        run: go mod verify
+
+      - name: Run go fmt
+        run: gofmt -l -e .
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Build binary
+        run: CGO_ENABLED=0 go build -o token-goblin ./cmd/server
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-goblin
+          path: token-goblin
+          retention-days: 7
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - name: Build & Test
-        run: |
-          make build 2>/dev/null || cargo build --workspace 2>/dev/null || go build ./... 2>/dev/null || npm ci && npm run build 2>/dev/null || true
-          make test 2>/dev/null || cargo test --workspace 2>/dev/null || go test ./... 2>/dev/null || npm test 2>/dev/null || true
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.61
-      - name: Go vet
-        run: go vet ./...
-      - name: Go vulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
-      - name: npm audit
-        run: cd frontend && npm audit --audit-level=high || true
-      - name: TypeScript check
-        run: cd frontend && npx tsc --noEmit
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run lint
+        run: pnpm run lint
+
+      - name: Run typecheck
+        run: pnpm run typecheck
+
+      - name: Run tests
+        run: pnpm test --if-present
+
+      - name: Build Next.js
+        run: pnpm build
+
+  docker:
+    needs: [build-and-test, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend Docker image
+        run: docker build -f Dockerfile.backend -t tokengoblin/backend:test .
+
+      - name: Build frontend Docker image
+        run: docker build -f Dockerfile.frontend -t tokengoblin/frontend:test .
 
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          fetch-depth: 0
-      - uses: trufflesecurity/trufflehog@main
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+
+      - name: Run gosec
+        uses: securego/gosec@master
+        with:
+          args: '-exclude=G104,G204 ./...'
+
+      - name: Check for hardcoded secrets
+        uses: trufflesecurity/trufflehog@main
         with:
           path: ./
           base: main
           head: HEAD
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          format: spdx-json
-          output-file: sbom.spdx.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.spdx.json
-      - name: Semgrep security scan
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/ci
-            p/secrets
-            p/audit-trail
-            p/command-injection
-            p/path-traversal
-            p/weak-crypto
-            p/sql-injection
-            p/xss
 
-  reproducibility:
+  release:
+    needs: [build-and-test, frontend, docker, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build in clean environment
-        run: |
-          make build 2>/dev/null || cargo build --release --workspace --locked 2>/dev/null || go build -trimpath -ldflags="-s -w" ./... 2>/dev/null || npm ci && npm run build 2>/dev/null || true
-          find . -name "*.exe" -o -name "*.bin" -o -name "dist" -type f -executable 2>/dev/null | head -5 | xargs -I{} sha256sum {} > build-hash.txt || echo "no binaries" > build-hash.txt
-      - uses: actions/upload-artifact@v4
         with:
-          name: build-hash
-          path: build-hash.txt
+          fetch-depth: 0
 
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build deterministic Docker image
-        if: hashFiles('Dockerfile') != ''
-        run: |
-          docker build --no-cache --pull -t $(basename ${{ github.repository }}):local .
-          docker save $(basename ${{ github.repository }}):local | sha256sum > docker-hash.txt
-      - uses: actions/upload-artifact@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          name: docker-hash
-          path: docker-hash.txt
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
