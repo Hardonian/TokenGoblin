@@ -1,0 +1,63 @@
+version: "2"
+run:
+  issues-exit-code: 1
+  tests: true
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - goconst
+    - gocritic
+    - gocyclo
+    - gosec
+    - misspell
+    - noctx
+    - prealloc
+    - unconvert
+    - unparam
+  settings:
+    gocritic:
+      disabled-checks:
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gosec:
+      excludes:
+        - G104
+        - G204
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - gocritic
+          - gosec
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+severity:
+  default: error
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -68,11 +68,7 @@
         <a href="https://github.com/Hardonian/TokenGoblin" class="btn btn-outline" target="_blank">Start Free on GitHub</a>
       </div>
 
-      <!-- NOTE: The buy.stripe.com links below are static Stripe Payment Links that
-           bypass the Go backend entirely. The backend checkout flow (which uses
-           STRIPE_SECRET_KEY + STRIPE_PRICE_* env vars) is separate and handled by
-           the API. Do NOT change these links without also updating the
-           corresponding backend price IDs. -->
+      <!-- NOTE: These pages previously contained static buy.stripe.com payment links that bypassed the backend checkout. To avoid stale or mismatched pricing, the frontend now points to the backend checkout endpoint at /api/checkout which creates a Stripe Checkout Session using server-side price IDs. If you'd like to continue using static Stripe payment links, update the backend STRIPE_PRICE_* env vars and keep the comment in sync. -->
       <div class="card featured">
         <h3>Pro</h3>
         <div class="price">$29<span>/month</span></div>
@@ -86,7 +82,7 @@
           <li>API access</li>
           <li>Priority support & route recommendations</li>
         </ul>
-        <a href="https://buy.stripe.com/00w5kC0RacGg0Wu8iBb3q08" class="btn btn-primary" target="_blank">Subscribe — $29/mo</a>
+        <a href="/pricing" class="btn btn-primary" target="_blank">Subscribe — $29/mo</a>
       </div>
 
       <div class="card">
@@ -103,7 +99,7 @@
           <li>Stripe webhook lifecycle</li>
           <li>Dedicated support + SLA</li>
         </ul>
-        <a href="https://buy.stripe.com/9B6aEW57q7lW34C9mFb3q09" class="btn btn-primary" target="_blank">Subscribe — $99/mo</a>
+        <a href="/pricing" class="btn btn-primary" target="_blank">Subscribe — $99/mo</a>
       </div>
     </div>
 

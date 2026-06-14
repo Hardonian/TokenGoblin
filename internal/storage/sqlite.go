@@ -68,6 +68,10 @@ func (r *SQLiteRepository) Close() error {
 	return r.db.Close()
 }
 
+func (r *SQLiteRepository) Ping(ctx context.Context) error {
+	return r.db.PingContext(ctx)
+}
+
 func (r *SQLiteRepository) migrate(ctx context.Context) error {
 	statements := []string{
 		`PRAGMA foreign_keys = ON;`,
