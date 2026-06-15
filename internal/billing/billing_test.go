@@ -333,7 +333,7 @@ func TestValidateStripeOwnership(t *testing.T) {
 				t.Error("Expected error but got none")
 			}
 			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("Unexpected error: %w", err)
 			}
 		})
 	}

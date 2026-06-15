@@ -14,7 +14,7 @@ func TestProcessVerifiedStripeEventUpdatesTenantPlan(t *testing.T) {
 	ctx := context.Background()
 	repo, err := storage.OpenSQLite(ctx, ":memory:")
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -28,7 +28,7 @@ func TestProcessVerifiedStripeEventUpdatesTenantPlan(t *testing.T) {
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}); err != nil {
-		t.Fatalf("seed tenant: %v", err)
+		t.Fatalf("seed tenant: %w", err)
 	}
 
 	result, err := ProcessVerifiedStripeEvent(ctx, repo, VerifiedStripeEvent{
@@ -39,7 +39,7 @@ func TestProcessVerifiedStripeEventUpdatesTenantPlan(t *testing.T) {
 		SubscriptionStatus: "active",
 	}, now.Add(time.Hour))
 	if err != nil {
-		t.Fatalf("process event: %v", err)
+		t.Fatalf("process event: %w", err)
 	}
 	if !result.Applied || result.Tier != TierPremium || result.UsageLimitUSD != 100 {
 		t.Fatalf("expected premium applied result, got %+v", result)
@@ -47,7 +47,7 @@ func TestProcessVerifiedStripeEventUpdatesTenantPlan(t *testing.T) {
 
 	tenant, err := repo.GetTenant(ctx, "tenant-a")
 	if err != nil {
-		t.Fatalf("get tenant: %v", err)
+		t.Fatalf("get tenant: %w", err)
 	}
 	if tenant.Tier != TierPremium || tenant.StripeSubscriptionID != "sub_123" {
 		t.Fatalf("tenant billing not updated: %+v", tenant)
@@ -58,7 +58,7 @@ func TestProcessVerifiedStripeEventDeletesSubscription(t *testing.T) {
 	ctx := context.Background()
 	repo, err := storage.OpenSQLite(ctx, ":memory:")
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -73,7 +73,7 @@ func TestProcessVerifiedStripeEventDeletesSubscription(t *testing.T) {
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}); err != nil {
-		t.Fatalf("seed tenant: %v", err)
+		t.Fatalf("seed tenant: %w", err)
 	}
 
 	result, err := ProcessVerifiedStripeEvent(ctx, repo, VerifiedStripeEvent{
@@ -83,7 +83,7 @@ func TestProcessVerifiedStripeEventDeletesSubscription(t *testing.T) {
 		SubscriptionID: "sub_123",
 	}, now.Add(time.Hour))
 	if err != nil {
-		t.Fatalf("process event: %v", err)
+		t.Fatalf("process event: %w", err)
 	}
 	if !result.Applied || result.Tier != TierFree || result.StripeSubscriptionID != "" {
 		t.Fatalf("expected free deleted result, got %+v", result)
@@ -94,7 +94,7 @@ func TestProcessVerifiedStripeEventRejectsCustomerMismatch(t *testing.T) {
 	ctx := context.Background()
 	repo, err := storage.OpenSQLite(ctx, ":memory:")
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -108,7 +108,7 @@ func TestProcessVerifiedStripeEventRejectsCustomerMismatch(t *testing.T) {
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}); err != nil {
-		t.Fatalf("seed tenant: %v", err)
+		t.Fatalf("seed tenant: %w", err)
 	}
 
 	_, err = ProcessVerifiedStripeEvent(ctx, repo, VerifiedStripeEvent{

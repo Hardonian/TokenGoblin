@@ -15,7 +15,7 @@ func BenchmarkIngestTokenEventBatch(b *testing.B) {
 	ctx := context.Background()
 	repo, err := storage.OpenSQLite(ctx, ":memory:")
 	if err != nil {
-		b.Fatalf("open sqlite: %v", err)
+		b.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -31,7 +31,7 @@ func BenchmarkIngestTokenEventBatch(b *testing.B) {
 		UpdatedAt:     time.Now(),
 	})
 	if err != nil {
-		b.Fatalf("upsert tenant: %v", err)
+		b.Fatalf("upsert tenant: %w", err)
 	}
 
 	batchSize := 100
@@ -61,7 +61,7 @@ func BenchmarkIngestTokenEventBatch(b *testing.B) {
 		}()
 		_, err := service.IngestTokenEventBatch(ctx, "tenant-a", events)
 		if err != nil {
-			b.Fatalf("ingest batch: %v", err)
+			b.Fatalf("ingest batch: %w", err)
 		}
 	}
 }

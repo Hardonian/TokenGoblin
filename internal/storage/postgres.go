@@ -208,7 +208,7 @@ func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID 
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var points []domain.PricePoint
 	for rows.Next() {
 		var point domain.PricePoint
@@ -283,7 +283,7 @@ func (r *PostgresRepository) ListAPIKeys(ctx context.Context, tenantID string) (
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []domain.APIKey
 	for rows.Next() {
@@ -335,7 +335,7 @@ func (r *PostgresRepository) ListTenantMembers(ctx context.Context, tenantID str
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var members []domain.TenantMember
 	for rows.Next() {
 		var member domain.TenantMember
@@ -381,7 +381,7 @@ func (r *PostgresRepository) ListAuditEvents(ctx context.Context, tenantID strin
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var events []domain.AuditEvent
 	for rows.Next() {
 		var event domain.AuditEvent
@@ -431,7 +431,7 @@ func (r *PostgresRepository) ListRecommendationStates(ctx context.Context, tenan
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var states []domain.RecommendationState
 	for rows.Next() {
 		var state domain.RecommendationState
@@ -721,7 +721,7 @@ func (r *PostgresRepository) ListOutputAnalyses(ctx context.Context, tenantID st
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanOutputAnalysesPostgres(rows)
 }
 
@@ -737,7 +737,7 @@ func (r *PostgresRepository) ListOutputAnalysesByWorker(ctx context.Context, ten
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanOutputAnalysesPostgres(rows)
 }
 
@@ -753,7 +753,7 @@ func (r *PostgresRepository) ListTokenEvents(ctx context.Context, tenantID strin
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanTokenEventsPostgres(rows)
 }
 
@@ -769,7 +769,7 @@ func (r *PostgresRepository) ListTokenEventsBefore(ctx context.Context, tenantID
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanTokenEventsPostgres(rows)
 }
 
@@ -788,7 +788,7 @@ func (r *PostgresRepository) ListAnomalySignals(ctx context.Context, tenantID st
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var signals []domain.AnomalySignal
 	for rows.Next() {
@@ -957,7 +957,7 @@ func (r *PostgresRepository) GetRecommendationDecisions(ctx context.Context, ten
 	if err != nil {
 		return nil, wrapDBErr(err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	decisions := make(map[string]string)
 	for rows.Next() {
 		var recID, status string

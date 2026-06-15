@@ -16,7 +16,7 @@ func main() {
 	ctx := context.Background()
 	repo, err := storage.OpenFromEnv(ctx)
 	if err != nil {
-		log.Fatalf("open storage: %v", err)
+		log.Fatalf("open storage: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -31,7 +31,7 @@ func main() {
 		tenantID = demo.DefaultTenantID
 	}
 	if err := demo.Seed(ctx, repo, service, tenantID); err != nil {
-		log.Fatalf("seed demo: %v", err)
+		log.Fatalf("seed demo: %w", err)
 	}
 	log.Printf("seeded demo tenant %q with %d usage events", tenantID, len(demo.Events(tenantID)))
 }

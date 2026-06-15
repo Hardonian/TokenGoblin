@@ -14,7 +14,7 @@ func TestAllowIngestion(t *testing.T) {
 		var rl *RateLimiter
 		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
 		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
+			t.Fatalf("expected no error, got %w", err)
 		}
 		if !allowed {
 			t.Errorf("expected allowed=true for nil RateLimiter")
@@ -25,7 +25,7 @@ func TestAllowIngestion(t *testing.T) {
 		rl := NewRateLimiter(nil)
 		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
 		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
+			t.Fatalf("expected no error, got %w", err)
 		}
 		if !allowed {
 			t.Errorf("expected allowed=true for nil limiter")
@@ -36,7 +36,7 @@ func TestAllowIngestion(t *testing.T) {
 		rl := &RateLimiter{}
 		allowed, err := rl.AllowIngestion(context.Background(), "tenant1")
 		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
+			t.Fatalf("expected no error, got %w", err)
 		}
 		if !allowed {
 			t.Errorf("expected allowed=true for nil limiter")
@@ -46,7 +46,7 @@ func TestAllowIngestion(t *testing.T) {
 	t.Run("rate limiting enforces limits", func(t *testing.T) {
 		mr, err := miniredis.Run()
 		if err != nil {
-			t.Fatalf("failed to start miniredis: %v", err)
+			t.Fatalf("failed to start miniredis: %w", err)
 		}
 		defer mr.Close()
 
@@ -69,7 +69,7 @@ func TestAllowIngestion(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			allowed, err := rl.AllowIngestion(ctx, tenantID)
 			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
+				t.Fatalf("expected no error, got %w", err)
 			}
 			if allowed {
 				allowedCount++
@@ -96,7 +96,7 @@ func TestAllowIngestion(t *testing.T) {
 	t.Run("redis error returns false and error", func(t *testing.T) {
 		mr, err := miniredis.Run()
 		if err != nil {
-			t.Fatalf("failed to start miniredis: %v", err)
+			t.Fatalf("failed to start miniredis: %w", err)
 		}
 
 		client := redis.NewClient(&redis.Options{

@@ -104,30 +104,30 @@ func TestCalculateMaturityScore(t *testing.T) {
 		workers        int
 		expected       int
 	}{
-		{"zeros", 0, 0.0, 0.0, 0.0, 0, 25}, // 0 (events) + 0 (quality) + 25 (efficiency, wasteRatio=0) + 0 (workers) = 25
+		{"zeros", 0, 0.0, 0.0, 0.0, 0, 25},                 // 0 (events) + 0 (quality) + 25 (efficiency, wasteRatio=0) + 0 (workers) = 25
 		{"all maximums", 10001, 1.0, 0.0, 1000.0, 21, 100}, // 25 (events) + 25 (quality) + 25 (efficiency) + 25 (workers) = 100
 
 		// Volume (assuming other factors are 0 except efficiency with wasteRatio=0 totalSpend=0 which yields 25)
-		{"volume 1-10", 5, 0.0, 0.0, 0.0, 0, 30}, // 5 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 30
-		{"volume 11-100", 15, 0.0, 0.0, 0.0, 0, 35}, // 10 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 35
-		{"volume 101-1000", 105, 0.0, 0.0, 0.0, 0, 40}, // 15 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 40
+		{"volume 1-10", 5, 0.0, 0.0, 0.0, 0, 30},          // 5 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 30
+		{"volume 11-100", 15, 0.0, 0.0, 0.0, 0, 35},       // 10 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 35
+		{"volume 101-1000", 105, 0.0, 0.0, 0.0, 0, 40},    // 15 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 40
 		{"volume 1001-10000", 1005, 0.0, 0.0, 0.0, 0, 45}, // 20 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 45
-		{"volume >10000", 10005, 0.0, 0.0, 0.0, 0, 50}, // 25 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 50
+		{"volume >10000", 10005, 0.0, 0.0, 0.0, 0, 50},    // 25 (volume) + 0 (quality) + 25 (efficiency) + 0 (workers) = 50
 
 		// Quality
 		{"quality 50%", 0, 0.5, 0.0, 0.0, 0, 37}, // 0 (volume) + 12 (quality) + 25 (efficiency) + 0 (workers) = 37
 
 		// Efficiency
-		{"efficiency 50% waste", 0, 0.0, 500.0, 1000.0, 0, 12}, // 0 (volume) + 0 (quality) + 12 (efficiency: 1 - 0.5 * 25) + 0 (workers) = 12
-		{"efficiency 100% waste", 0, 0.0, 1000.0, 1000.0, 0, 0}, // 0 (volume) + 0 (quality) + 0 (efficiency: 1 - 1.0 * 25) + 0 (workers) = 0
+		{"efficiency 50% waste", 0, 0.0, 500.0, 1000.0, 0, 12},   // 0 (volume) + 0 (quality) + 12 (efficiency: 1 - 0.5 * 25) + 0 (workers) = 12
+		{"efficiency 100% waste", 0, 0.0, 1000.0, 1000.0, 0, 0},  // 0 (volume) + 0 (quality) + 0 (efficiency: 1 - 1.0 * 25) + 0 (workers) = 0
 		{"efficiency >100% waste", 0, 0.0, 1500.0, 1000.0, 0, 0}, // Math.min limits waste to 1.0 => 0
 
 		// Adoption
-		{"workers 1-2", 0, 0.0, 0.0, 0.0, 1, 30}, // 0 (volume) + 0 (quality) + 25 (efficiency) + 5 (workers) = 30
-		{"workers 3-5", 0, 0.0, 0.0, 0.0, 3, 35}, // 0 (volume) + 0 (quality) + 25 (efficiency) + 10 (workers) = 35
-		{"workers 6-10", 0, 0.0, 0.0, 0.0, 6, 40}, // 0 (volume) + 0 (quality) + 25 (efficiency) + 15 (workers) = 40
+		{"workers 1-2", 0, 0.0, 0.0, 0.0, 1, 30},    // 0 (volume) + 0 (quality) + 25 (efficiency) + 5 (workers) = 30
+		{"workers 3-5", 0, 0.0, 0.0, 0.0, 3, 35},    // 0 (volume) + 0 (quality) + 25 (efficiency) + 10 (workers) = 35
+		{"workers 6-10", 0, 0.0, 0.0, 0.0, 6, 40},   // 0 (volume) + 0 (quality) + 25 (efficiency) + 15 (workers) = 40
 		{"workers 11-20", 0, 0.0, 0.0, 0.0, 11, 45}, // 0 (volume) + 0 (quality) + 25 (efficiency) + 20 (workers) = 45
-		{"workers >20", 0, 0.0, 0.0, 0.0, 21, 50}, // 0 (volume) + 0 (quality) + 25 (efficiency) + 25 (workers) = 50
+		{"workers >20", 0, 0.0, 0.0, 0.0, 21, 50},   // 0 (volume) + 0 (quality) + 25 (efficiency) + 25 (workers) = 50
 
 		{"capped at 100", 100000, 2.0, 0.0, 1000.0, 50, 100}, // > 100 should cap at 100
 	}

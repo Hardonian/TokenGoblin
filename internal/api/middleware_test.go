@@ -11,11 +11,11 @@ import (
 
 func TestCORSMiddleware(t *testing.T) {
 	if err := os.Setenv("ALLOWED_ORIGINS", "https://allowed.com,http://another.com"); err != nil {
-		t.Fatalf("failed to set env: %v", err)
+		t.Fatalf("failed to set env: %w", err)
 	}
 	defer func() {
 		if err := os.Unsetenv("ALLOWED_ORIGINS"); err != nil {
-			t.Fatalf("failed to unset env: %v", err)
+			t.Fatalf("failed to unset env: %w", err)
 		}
 	}()
 
@@ -76,7 +76,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(tc.method, "/", nil)
+			req := httptest.NewRequestWithContext(context.Background(), tc.method, "/", nil)
 			if tc.origin != "" {
 				req.Header.Set("Origin", tc.origin)
 			}

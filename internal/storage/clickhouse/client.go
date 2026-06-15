@@ -35,9 +35,9 @@ func DefaultConfig() ClickHouseConfig {
 
 // ClickHouseClient wraps the ClickHouse driver with connection pooling
 type ClickHouseClient struct {
-	conn    any // driver.Conn when using clickhouse-go
-	mu      sync.RWMutex
-	closed  bool
+	conn   any // driver.Conn when using clickhouse-go
+	mu     sync.RWMutex
+	closed bool
 }
 
 // NewClient creates a new ClickHouse client with connection pooling
@@ -92,14 +92,14 @@ type ClickHouseRepository interface {
 	// Event ingestion
 	InsertTokenEvents(ctx Context, events []TokenEvent) error
 	InsertUsageAggregates(ctx Context, aggregates []UsageAggregate) error
-	
+
 	// Query operations
 	GetCostByTenant(ctx Context, tenantID string, start, end time.Time) ([]CostSummary, error)
 	GetCostByModel(ctx Context, tenantID string, start, end time.Time) ([]ModelCostSummary, error)
 	GetCostByFeature(ctx Context, tenantID string, start, end time.Time) ([]FeatureCostSummary, error)
 	GetAnomalies(ctx Context, tenantID string, start, end time.Time) ([]AnomalyRecord, error)
 	GetZombieAgents(ctx Context, tenantID string, threshold float64, window time.Duration) ([]ZombieAgentRecord, error)
-	
+
 	// Schema management
 	InitSchema(ctx Context) error
 	Migrate(ctx Context, version int) error
@@ -107,33 +107,33 @@ type ClickHouseRepository interface {
 
 // TokenEvent represents a token usage event for ingestion
 type TokenEvent struct {
-	ID            string
-	TenantID      string
-	UserID        string
-	Model         string
-	Feature       string
-	PromptTokens  int
-	CompletionTokens int
-	TotalTokens   int
-	CostUSD       float64
-	Timestamp     time.Time
+	ID                string
+	TenantID          string
+	UserID            string
+	Model             string
+	Feature           string
+	PromptTokens      int
+	CompletionTokens  int
+	TotalTokens       int
+	CostUSD           float64
+	Timestamp         time.Time
 	PromptFingerprint string
-	Metadata      map[string]string
+	Metadata          map[string]string
 }
 
 // UsageAggregate represents pre-aggregated usage metrics
 type UsageAggregate struct {
-	TenantID      string
-	PeriodStart   time.Time
-	PeriodEnd     time.Time
-	Model         string
-	Feature       string
-	RequestCount  int64
-	TotalTokens   int64
-	PromptTokens  int64
+	TenantID         string
+	PeriodStart      time.Time
+	PeriodEnd        time.Time
+	Model            string
+	Feature          string
+	RequestCount     int64
+	TotalTokens      int64
+	PromptTokens     int64
 	CompletionTokens int64
-	CostUSD       float64
-	UniqueUsers   int64
+	CostUSD          float64
+	UniqueUsers      int64
 }
 
 // CostSummary represents cost aggregation by tenant
@@ -148,10 +148,10 @@ type CostSummary struct {
 
 // ModelCostSummary represents cost aggregation by model
 type ModelCostSummary struct {
-	Model        string
-	TotalCostUSD float64
-	TotalTokens  int64
-	RequestCount int64
+	Model         string
+	TotalCostUSD  float64
+	TotalTokens   int64
+	RequestCount  int64
 	AvgCostPerReq float64
 }
 

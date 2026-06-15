@@ -2,13 +2,13 @@ package storage
 
 import (
 	"context"
-	"strings"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"

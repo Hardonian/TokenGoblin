@@ -11,7 +11,7 @@ func TestGenerateAPIKey(t *testing.T) {
 
 	apiKey, compoundToken, err := GenerateAPIKey(tenantID, name)
 	if err != nil {
-		t.Fatalf("unexpected error generating api key: %v", err)
+		t.Fatalf("unexpected error generating api key: %w", err)
 	}
 
 	if apiKey.TenantID != tenantID {
@@ -47,7 +47,7 @@ func TestGenerateAPIKey(t *testing.T) {
 func TestVerifyAPIKey(t *testing.T) {
 	apiKey, rawToken, err := GenerateAPIKey("test", "test")
 	if err != nil {
-		t.Fatalf("error generating key: %v", err)
+		t.Fatalf("error generating key: %w", err)
 	}
 
 	validParts := strings.Split(rawToken, ".")

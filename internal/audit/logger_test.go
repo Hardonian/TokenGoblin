@@ -43,11 +43,11 @@ func TestLogger_LogEvent_Success(t *testing.T) {
 	logger := NewLogger(repo, nil)
 
 	event := Event{
-		ID:       "test-id",
-		TenantID: "tenant-1",
-		Type:     EventAPIKeyCreated,
-		Actor:    "user-1",
-		Metadata: map[string]interface{}{"key": "value"},
+		ID:        "test-id",
+		TenantID:  "tenant-1",
+		Type:      EventAPIKeyCreated,
+		Actor:     "user-1",
+		Metadata:  map[string]interface{}{"key": "value"},
 		Timestamp: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 

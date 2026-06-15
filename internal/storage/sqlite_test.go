@@ -16,7 +16,7 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "old.sqlite")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("open raw sqlite: %v", err)
+		t.Fatalf("open raw sqlite: %w", err)
 	}
 	_, err = db.Exec(`
 		CREATE TABLE tenants (
@@ -68,13 +68,13 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 		);
 	`)
 	if err != nil {
-		t.Fatalf("create old schema: %v", err)
+		t.Fatalf("create old schema: %w", err)
 	}
 	_ = db.Close()
 
 	repo, err := OpenSQLite(context.Background(), dbPath)
 	if err != nil {
-		t.Fatalf("open repaired sqlite: %v", err)
+		t.Fatalf("open repaired sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -96,7 +96,7 @@ func TestOpenSQLiteRepairsOlderSchema(t *testing.T) {
 		OutputExcerpt:  "Verified concise output.",
 		IdempotencyKey: "idem-1",
 	}); err != nil {
-		t.Fatalf("save after repair: %v", err)
+		t.Fatalf("save after repair: %w", err)
 	}
 }
 

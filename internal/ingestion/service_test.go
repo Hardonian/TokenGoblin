@@ -34,7 +34,7 @@ func TestIngestTokenEventComputesInternalCostAndStoresExternalEstimate(t *testin
 		ReviewScore:      ptr(90),
 	})
 	if err != nil {
-		t.Fatalf("ingest: %v", err)
+		t.Fatalf("ingest: %w", err)
 	}
 	if result.Event.CostEstimateUSD == nil {
 		t.Fatal("expected internal cost")
@@ -48,7 +48,7 @@ func TestIngestTokenEventComputesInternalCostAndStoresExternalEstimate(t *testin
 	waitForEventCount(t, repo, "tenant-a", 1)
 	events, err := repo.ListTokenEvents(ctx, "tenant-a", 10)
 	if err != nil {
-		t.Fatalf("list events: %v", err)
+		t.Fatalf("list events: %w", err)
 	}
 	if len(events) != 1 {
 		t.Fatalf("expected one event, got %d", len(events))
@@ -92,7 +92,7 @@ func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 		CompletionTokens: 50,
 	})
 	if err != nil {
-		t.Fatalf("ingest: %v", err)
+		t.Fatalf("ingest: %w", err)
 	}
 	if len(result.Degraded) == 0 || result.Degraded[0].Code != "unknown_model_pricing" {
 		t.Fatalf("expected unknown pricing degradation, got %#v", result.Degraded)
@@ -100,7 +100,7 @@ func TestIngestUnknownPricingCreatesDegradedAnomaly(t *testing.T) {
 	waitForAnomalyCount(t, repo, "tenant-a", 1)
 	anomalies, err := repo.ListAnomalySignals(ctx, "tenant-a", 10)
 	if err != nil {
-		t.Fatalf("list anomalies: %v", err)
+		t.Fatalf("list anomalies: %w", err)
 	}
 	if len(anomalies) != 1 || anomalies[0].Type != domain.AnomalyUnknownModelPricing {
 		t.Fatalf("expected unknown pricing anomaly, got %#v", anomalies)
@@ -124,12 +124,12 @@ func TestIngestPersistsOutputAnalysis(t *testing.T) {
 		OutputStatus:  domain.OutputAccepted,
 	})
 	if err != nil {
-		t.Fatalf("ingest: %v", err)
+		t.Fatalf("ingest: %w", err)
 	}
 	waitForAnalysisCount(t, repo, "tenant-a", 1)
 	analyses, err := repo.ListOutputAnalyses(ctx, "tenant-a", 10)
 	if err != nil {
-		t.Fatalf("list analyses: %v", err)
+		t.Fatalf("list analyses: %w", err)
 	}
 	if len(analyses) != 1 {
 		t.Fatalf("expected one analysis, got %d", len(analyses))
@@ -143,7 +143,7 @@ func TestIngestTokenEventReusesQueuedCostCalculation(t *testing.T) {
 	ctx := context.Background()
 	baseRepo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = baseRepo.Close() }()
 
@@ -162,7 +162,7 @@ func TestIngestTokenEventReusesQueuedCostCalculation(t *testing.T) {
 		OutputTokens: 50,
 	})
 	if err != nil {
-		t.Fatalf("ingest: %v", err)
+		t.Fatalf("ingest: %w", err)
 	}
 	waitForEventCount(t, repo, "tenant-a", 1)
 
@@ -175,7 +175,7 @@ func testService(t *testing.T) (*ExecutionService, storage.Repository) {
 	t.Helper()
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	service := NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {
 		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

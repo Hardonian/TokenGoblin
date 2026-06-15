@@ -22,7 +22,7 @@ func TestTokenUsageRouteRejectsCrossTenantWrites(t *testing.T) {
 	defer closeRepo()
 
 	body := []byte(`{"event_id":"evt-1","tenant_id":"tenant-b","worker_id":"worker-a","provider":"demo","model_id":"efficient-model","prompt_tokens":1}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
 
@@ -33,7 +33,7 @@ func TestTokenUsageRouteRejectsCrossTenantWrites(t *testing.T) {
 	}
 	var envelope Envelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf("decode response: %w", err)
 	}
 	if envelope.Error == nil || envelope.Error.Code != "tenant_mismatch" {
 		t.Fatalf("expected tenant mismatch envelope, got %#v", envelope)
@@ -44,7 +44,7 @@ func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
 	repo := storage.NewUnavailableRepository(storage.ErrUnavailable)
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service, repo, nil)
-	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/overview", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/dashboard/overview", nil)
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
 
@@ -55,7 +55,7 @@ func TestDashboardReadDegradesWhenDatabaseUnavailable(t *testing.T) {
 	}
 	var envelope Envelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf("decode response: %w", err)
 	}
 	if !envelope.OK || envelope.Status != "degraded" {
 		t.Fatalf("expected degraded ok envelope, got %#v", envelope)
@@ -77,7 +77,7 @@ func TestV2EndpointsDegradeWhenDatabaseUnavailable(t *testing.T) {
 
 	for _, endpoint := range endpoints {
 		t.Run(endpoint, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, endpoint, nil)
 			req.Header.Set("x-tenant-id", "tenant-a")
 			rec := httptest.NewRecorder()
 
@@ -88,7 +88,7 @@ func TestV2EndpointsDegradeWhenDatabaseUnavailable(t *testing.T) {
 			}
 			var envelope Envelope
 			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
-				t.Fatalf("decode response: %v", err)
+				t.Fatalf("decode response: %w", err)
 			}
 			if !envelope.OK || envelope.Status != "degraded" {
 				t.Fatalf("expected degraded ok envelope, got %#v", envelope)
@@ -125,7 +125,7 @@ func TestTokenUsageRouteIngestsStructuredPayload(t *testing.T) {
 	defer closeRepo()
 
 	body := []byte(`{"event_id":"evt-2","worker_id":"worker-a","provider":"demo","model_id":"efficient-model","prompt_tokens":1000,"completion_tokens":100,"output_status":"accepted","review_score":88}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
 
@@ -136,7 +136,7 @@ func TestTokenUsageRouteIngestsStructuredPayload(t *testing.T) {
 	}
 	var envelope Envelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf("decode response: %w", err)
 	}
 	if !envelope.OK || envelope.Status != "degraded" {
 		t.Fatalf("expected degraded envelope with buffered, got %#v", envelope)
@@ -158,7 +158,7 @@ func TestNewEndpoints(t *testing.T) {
 	defer closeRepo()
 
 	// 1. Test GET /api/pricing
-	req := httptest.NewRequest(http.MethodGet, "/api/pricing", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/pricing", nil)
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -168,14 +168,14 @@ func TestNewEndpoints(t *testing.T) {
 	}
 	var envelope Envelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode pricing: %v", err)
+		t.Fatalf("decode pricing: %w", err)
 	}
 	if !envelope.OK || envelope.Status != "success" {
 		t.Fatalf("expected ok envelope, got %#v", envelope)
 	}
 
 	// 2. Test POST /api/dashboard/seed
-	reqSeed := httptest.NewRequest(http.MethodPost, "/api/dashboard/seed", nil)
+	reqSeed := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/dashboard/seed", nil)
 	reqSeed.Header.Set("x-tenant-id", "tenant-a")
 	recSeed := httptest.NewRecorder()
 	mux.ServeHTTP(recSeed, reqSeed)
@@ -185,7 +185,7 @@ func TestNewEndpoints(t *testing.T) {
 	}
 
 	// 3. Test DELETE /api/dashboard/reset
-	reqReset := httptest.NewRequest(http.MethodDelete, "/api/dashboard/reset", nil)
+	reqReset := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/api/dashboard/reset", nil)
 	reqReset.Header.Set("x-tenant-id", "tenant-a")
 	recReset := httptest.NewRecorder()
 	mux.ServeHTTP(recReset, reqReset)
@@ -200,7 +200,7 @@ func TestWorkerReviewAndReportEndpoints(t *testing.T) {
 	defer closeRepo()
 
 	body := []byte(`{"event_id":"evt-review","worker_id":"worker-review","provider":"demo","model_id":"efficient-model","input_tokens":100,"output_tokens":500,"prompt_excerpt":"Write an answer.","output_excerpt":"This repeats without evidence. This repeats without evidence.","output_status":"accepted"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/ingest/token-usage", bytes.NewReader(body))
 	req.Header.Set("x-tenant-id", "tenant-a")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -209,7 +209,7 @@ func TestWorkerReviewAndReportEndpoints(t *testing.T) {
 	}
 	time.Sleep(150 * time.Millisecond)
 
-	reviewReq := httptest.NewRequest(http.MethodGet, "/api/dashboard/workers/worker-review", nil)
+	reviewReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/dashboard/workers/worker-review", nil)
 	reviewReq.Header.Set("x-tenant-id", "tenant-a")
 	reviewRec := httptest.NewRecorder()
 	mux.ServeHTTP(reviewRec, reviewReq)
@@ -217,7 +217,7 @@ func TestWorkerReviewAndReportEndpoints(t *testing.T) {
 		t.Fatalf("expected review 200, got %d body=%s", reviewRec.Code, reviewRec.Body.String())
 	}
 
-	reportReq := httptest.NewRequest(http.MethodGet, "/api/dashboard/report.md", nil)
+	reportReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/dashboard/report.md", nil)
 	reportReq.Header.Set("x-tenant-id", "tenant-a")
 	reportRec := httptest.NewRecorder()
 	mux.ServeHTTP(reportRec, reportReq)
@@ -234,7 +234,7 @@ func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
 	defer closeRepo()
 
 	updateBody := []byte(`{"status":"accepted","note":"Use for low-risk classification."}`)
-	stateReq := httptest.NewRequest(http.MethodPost, "/api/dashboard/recommendations/rec_test/status", bytes.NewReader(updateBody))
+	stateReq := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/dashboard/recommendations/rec_test/status", bytes.NewReader(updateBody))
 	stateReq.Header.Set("x-tenant-id", "tenant-a")
 	stateRec := httptest.NewRecorder()
 	mux.ServeHTTP(stateRec, stateReq)
@@ -243,7 +243,7 @@ func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
 	}
 
 	memberBody := []byte(`{"subject_id":"user_1","email":"ops@example.com","role":"analyst"}`)
-	memberReq := httptest.NewRequest(http.MethodPost, "/api/tenant/members", bytes.NewReader(memberBody))
+	memberReq := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/tenant/members", bytes.NewReader(memberBody))
 	memberReq.Header.Set("x-tenant-id", "tenant-a")
 	memberRec := httptest.NewRecorder()
 	mux.ServeHTTP(memberRec, memberReq)
@@ -251,7 +251,7 @@ func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
 		t.Fatalf("expected member upsert 200, got %d body=%s", memberRec.Code, memberRec.Body.String())
 	}
 
-	auditReq := httptest.NewRequest(http.MethodGet, "/api/audit/events", nil)
+	auditReq := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/audit/events", nil)
 	auditReq.Header.Set("x-tenant-id", "tenant-a")
 	auditRec := httptest.NewRecorder()
 	mux.ServeHTTP(auditRec, auditReq)
@@ -260,7 +260,7 @@ func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
 	}
 	var envelope Envelope
 	if err := json.Unmarshal(auditRec.Body.Bytes(), &envelope); err != nil {
-		t.Fatalf("decode audit: %v", err)
+		t.Fatalf("decode audit: %w", err)
 	}
 	if envelope.Status != "success" {
 		t.Fatalf("expected audit success with persisted events, got %#v", envelope)
@@ -270,7 +270,7 @@ func TestRecommendationStateTenantMembersAndAudit(t *testing.T) {
 func TestViewerAPIKeyCannotMutateTenant(t *testing.T) {
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -283,21 +283,21 @@ func TestViewerAPIKeyCannotMutateTenant(t *testing.T) {
 		UpdatedAt: time.Now().UTC(),
 	}
 	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
-		t.Fatalf("seed tenant-a: %v", err)
+		t.Fatalf("seed tenant-a: %w", err)
 	}
 
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	apiKey, token, err := moat.GenerateAPIKey("tenant-a", "viewer")
 	if err != nil {
-		t.Fatalf("generate key: %v", err)
+		t.Fatalf("generate key: %w", err)
 	}
 	apiKey.Role = domain.RoleViewer
 	if err := repo.SaveAPIKey(context.Background(), apiKey); err != nil {
-		t.Fatalf("save key: %v", err)
+		t.Fatalf("save key: %w", err)
 	}
 	mux := NewRouter(service, repo, nil)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/dashboard/reset", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/api/dashboard/reset", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -311,7 +311,7 @@ func testRouter(t *testing.T) (http.Handler, func()) {
 	t.Helper()
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 
 	// Seed tenant-a
@@ -323,7 +323,7 @@ func testRouter(t *testing.T) (http.Handler, func()) {
 		UpdatedAt: time.Now().UTC(),
 	}
 	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
-		t.Fatalf("seed tenant-a: %v", err)
+		t.Fatalf("seed tenant-a: %w", err)
 	}
 
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{})).WithClock(func() time.Time {
@@ -336,7 +336,7 @@ func testRouter(t *testing.T) (http.Handler, func()) {
 func TestStripeWebhookHandler(t *testing.T) {
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -351,13 +351,13 @@ func TestStripeWebhookHandler(t *testing.T) {
 		UpdatedAt:        time.Now().UTC(),
 	}
 	if err := repo.UpsertTenant(context.Background(), tenant); err != nil {
-		t.Fatalf("seed tenant: %v", err)
+		t.Fatalf("seed tenant: %w", err)
 	}
 
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service, repo, nil)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader([]byte(`{"type":"customer.subscription.created"}`)))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/webhooks/stripe", bytes.NewReader([]byte(`{"type":"customer.subscription.created"}`)))
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, req)
@@ -368,7 +368,7 @@ func TestStripeWebhookHandler(t *testing.T) {
 
 	updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
 	if err != nil {
-		t.Fatalf("get tenant: %v", err)
+		t.Fatalf("get tenant: %w", err)
 	}
 	if updated.Tier != "free" || updated.StripeSubscriptionID != "" {
 		t.Fatalf("Go webhook route should not mutate billing state: tier=%s subscription=%s", updated.Tier, updated.StripeSubscriptionID)
@@ -380,7 +380,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		t.Fatalf("open sqlite: %w", err)
 	}
 	defer func() { _ = repo.Close() }()
 
@@ -394,7 +394,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}); err != nil {
-		t.Fatalf("seed tenant: %v", err)
+		t.Fatalf("seed tenant: %w", err)
 	}
 
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
@@ -407,7 +407,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 		"subscription_id": "sub_stripe_abc",
 		"subscription_status": "active"
 	}`)
-	req := httptest.NewRequest(http.MethodPost, "/internal/billing/stripe-event", bytes.NewReader(payload))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/internal/billing/stripe-event", bytes.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer internal-secret")
 	rec := httptest.NewRecorder()
 
@@ -418,7 +418,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 	}
 	updated, err := repo.GetTenant(context.Background(), "tenant-stripe-test")
 	if err != nil {
-		t.Fatalf("get tenant: %v", err)
+		t.Fatalf("get tenant: %w", err)
 	}
 	if updated.Tier != "premium" || updated.UsageLimitUSD != 100 || updated.StripeSubscriptionID != "sub_stripe_abc" {
 		t.Fatalf("billing lifecycle not applied: %+v", updated)

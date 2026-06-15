@@ -17,7 +17,7 @@ func TestValidateServerEnvAllowsLocalDemoMode(t *testing.T) {
 	t.Setenv("TG_ALLOW_DEMO_AUTH", "1")
 
 	if err := ValidateServerEnv(); err != nil {
-		t.Fatalf("expected local demo mode to pass: %v", err)
+		t.Fatalf("expected local demo mode to pass: %w", err)
 	}
 }
 
