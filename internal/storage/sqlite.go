@@ -68,6 +68,10 @@ func (r *SQLiteRepository) Close() error {
 	return r.db.Close()
 }
 
+func (r *SQLiteRepository) Ping(ctx context.Context) error {
+	return r.db.PingContext(ctx)
+}
+
 func (r *SQLiteRepository) migrate(ctx context.Context) error {
 	statements := []string{
 		`PRAGMA foreign_keys = ON;`,
@@ -169,8 +173,8 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			last_used_at TEXT,
 			is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
-		);`,
-		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);`,
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
 		`CREATE TABLE IF NOT EXISTS tenant_members (
 			tenant_id TEXT NOT NULL,
 			subject_id TEXT NOT NULL,

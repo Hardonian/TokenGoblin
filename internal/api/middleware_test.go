@@ -10,8 +10,14 @@ import (
 )
 
 func TestCORSMiddleware(t *testing.T) {
-	os.Setenv("ALLOWED_ORIGINS", "https://allowed.com,http://another.com")
-	defer os.Unsetenv("ALLOWED_ORIGINS")
+	if err := os.Setenv("ALLOWED_ORIGINS", "https://allowed.com,http://another.com"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("ALLOWED_ORIGINS"); err != nil {
+			t.Fatalf("failed to unset env: %v", err)
+		}
+	}()
 
 	handler := CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

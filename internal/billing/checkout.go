@@ -61,9 +61,12 @@ func stripePost(path string, data url.Values) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stripe request failed: %w", err)
 	}
-	defer resp.Body.Close()
-
 	respBody, err := io.ReadAll(resp.Body)
+	// Attempt to close the response body, log on error
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		slog.Warn("failed to close response body", "error", closeErr)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("read stripe response: %w", err)
 	}
