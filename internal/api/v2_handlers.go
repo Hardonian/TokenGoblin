@@ -450,3 +450,69 @@ type modelStats struct {
 	AvgLatencyMs   float64 `json:"avg_latency_ms"`
 	CostPerOutcome float64 `json:"cost_per_outcome"`
 }
+
+// ═══════════════════════════════════════════════════════════
+// Scholar Endpoints (Self-Improving Analytics)
+// ═══════════════════════════════════════════════════════════
+
+// HandleScholarTrain triggers the data mining process to discover new slop phrases.
+// POST /api/admin/scholar/train
+func (h *V2Handler) HandleScholarTrain(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	scholar := intelligence.NewScholarEngine(h.repo)
+	if err := scholar.Train(r.Context(), tenantID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("scholar_train_failed", err.Error()),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   map[string]string{"message": "Scholar training completed."},
+	})
+}
+
+// HandleScholarInsights returns what the Scholar has learned about a tenant.
+// GET /v2/intelligence/insights
+func (h *V2Handler) HandleScholarInsights(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodError(w)
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	scholar := intelligence.NewScholarEngine(h.repo)
+	insights, err := scholar.GenerateInsights(r.Context(), tenantID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("scholar_insights_failed", err.Error()),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data:   insights,
+	})
+}
+

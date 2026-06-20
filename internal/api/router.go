@@ -141,6 +141,8 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v2/intelligence/duplicates", wrap(v2.HandleDuplicates))
 	mux.Handle("/v2/intelligence/cost-leaks", wrap(v2.HandleCostLeaks))
 	mux.Handle("/v2/intelligence/hallucination-map", wrap(v2.HandleHallucinationMap))
+	mux.Handle("/v2/intelligence/insights", wrap(v2.HandleScholarInsights))
+	mux.Handle("/api/admin/scholar/train", wrapAdmin(v2.HandleScholarTrain))
 
 	// Forecasting Engine endpoints
 	mux.Handle("/v2/forecasts/spend", wrap(v2.HandleSpendForecast))

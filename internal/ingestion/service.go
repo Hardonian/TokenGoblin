@@ -51,13 +51,22 @@ type ExecutionService struct {
 }
 
 func NewService(repo storage.Repository, registry cost.Registry) *ExecutionService {
+	alerter := moat.NewWebhookAlerter()
+	alerter.URLResolver = func(tenantID string) string {
+		tenant, err := repo.GetTenant(context.Background(), tenantID)
+		if err != nil || tenant == nil {
+			return ""
+		}
+		return tenant.AlertWebhookURL
+	}
+
 	return &ExecutionService{
 		repo:       repo,
 		pricing:    registry,
 		eventQueue: make(chan domain.TokenEvent, 1000),
 		now:        time.Now,
 		thresholds: anomaly.DefaultThresholds(),
-		alerter:    moat.NewWebhookAlerter(),
+		alerter:    alerter,
 	}
 }
 
