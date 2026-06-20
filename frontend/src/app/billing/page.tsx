@@ -4,15 +4,14 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createCheckoutSession, getBillingStatus } from "@/lib/billing";
 import { SiteFooter } from "@/components/layout";
+import { useAuth, authFetcher } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function BillingInner() {
   const search = useSearchParams();
-  const tenantParam = search.get("tenant_id");
-  const cookieTenant = typeof document !== "undefined" ? document.cookie.match(/(^| )tg_tenant_id=([^;]+)/)?.[2] : null;
-  const effectiveTenant = tenantParam || cookieTenant || "";
+  const { tenantId: effectiveTenant, apiKey } = useAuth();
   const [status, setStatus] = useState<{
     tenant_id: string;
     tier: string;
@@ -31,18 +30,27 @@ function BillingInner() {
   
 
   const load = useCallback(async () => {
-    if (!effectiveTenant) return;
+    if (!effectiveTenant || !apiKey) return;
     
     setError(null);
     try {
-      const data = await getBillingStatus(effectiveTenant);
-      setStatus(data);
+      const res = await fetch("/api/billing/status", {
+        headers: {
+          "x-tenant-id": effectiveTenant,
+          "Authorization": `Bearer ${apiKey}`
+        }
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        throw new Error(payload.error?.message || "Billing status failed");
+      }
+      setStatus(payload.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Billing status failed");
     } finally {
       
     }
-  }, [effectiveTenant]);
+  }, [effectiveTenant, apiKey]);
 
   useEffect(() => {
     if (!effectiveTenant) return;
@@ -85,6 +93,7 @@ function BillingInner() {
         headers: {
           "content-type": "application/json",
           "x-tenant-id": effectiveTenant,
+          "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({ return_url: `${window.location.origin}/billing` }),
       });
