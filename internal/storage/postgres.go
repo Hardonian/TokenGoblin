@@ -1040,3 +1040,19 @@ func (r *PostgresRepository) UpsertBudget(ctx context.Context, budget domain.Bud
 func (r *PostgresRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
 	return nil, errors.New("not implemented")
 }
+
+func (r *PostgresRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
+	return nil, errors.New("not implemented in postgres")
+}
+
+func (r *PostgresRepository) UpsertTuningProfile(ctx context.Context, profile domain.TuningProfile) error {
+	return errors.New("not implemented in postgres")
+}
+
+func (r *PostgresRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
+	return nil, errors.New("not implemented in postgres")
+}
+
+func (r *PostgresRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
+	return errors.New("not implemented in postgres")
+}

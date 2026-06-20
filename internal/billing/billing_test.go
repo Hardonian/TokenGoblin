@@ -194,6 +194,19 @@ func (m *MockRepository) Close() error {
 	return nil
 }
 
+func (m *MockRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
+	return nil, nil
+}
+func (m *MockRepository) UpsertTuningProfile(ctx context.Context, profile domain.TuningProfile) error {
+	return nil
+}
+func (m *MockRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
+	return nil, nil
+}
+func (m *MockRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
+	return nil
+}
+
 func (m *MockRepository) Ping(ctx context.Context) error {
 	return nil
 }
