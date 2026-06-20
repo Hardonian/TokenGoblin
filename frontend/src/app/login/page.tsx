@@ -9,6 +9,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const { login } = useAuth();
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -16,18 +18,23 @@ export default function LoginPage() {
 
     try {
       const res = await fetch("/api/tenant/login", {
-        method: "POST",
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ api_key: apiKey }),
+          "Authorization": `Bearer ${apiKey}`
+        }
       });
 
       const data = await res.json();
-      if (!data.ok) {
-        throw new Error(data.error?.message || "Login failed");
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error?.message || "Login failed - Invalid API Key");
       }
 
+      // Backend returns tenant_id in Data payload
+      const tenantId = data.data?.tenant_id;
+      if (!tenantId) throw new Error("No tenant ID returned from server");
+
+      login(apiKey, tenantId);
       router.push("/");
     } catch (err) {
       setError((err as Error).message);
