@@ -15,6 +15,7 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/config"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
+	"github.com/Hardonian/TokenGoblin/internal/intelligence"
 	"github.com/Hardonian/TokenGoblin/internal/moat"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 	"github.com/redis/go-redis/v9"
@@ -114,6 +115,15 @@ func main() {
 	// Start Retention Worker (30 days retention default for MVP)
 	retentionWorker := ingestion.NewRetentionWorker(repo, logger, 30)
 	go retentionWorker.Start(ctx)
+
+	// Start Intelligence Workers
+	dataLakeExporter := intelligence.NewDataLakeExporter(repo, "")
+	dataLakeExporter.Start()
+	defer dataLakeExporter.Stop()
+
+	autoTuner := intelligence.NewAutoTuner(repo)
+	autoTuner.Start()
+	defer autoTuner.Stop()
 
 	rateLimiter := moat.NewRateLimiter(redisClient)
 	mux := api.NewRouter(ingestionService, repo, rateLimiter)

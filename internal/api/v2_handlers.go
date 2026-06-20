@@ -207,7 +207,8 @@ func (h *V2Handler) HandleRefinePrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refined := intelligence.RefinePrompt(req.Prompt)
+	profile, _ := h.repo.GetTuningProfile(r.Context(), tenantID)
+	refined := intelligence.RefinePrompt(req.Prompt, profile)
 	origLen := len(req.Prompt)
 	refLen := len(refined)
 	var pct float64
