@@ -55,6 +55,56 @@ func (h *V2Handler) HandleWasteReport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: report})
 }
 
+// HandleRefinePrompt accepts a raw prompt and returns a minified, refined version.
+// POST /v2/intelligence/refine
+func (h *V2Handler) HandleRefinePrompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	_, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Prompt string `json:"prompt"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Request body must include 'prompt' field."),
+		})
+		return
+	}
+
+	if req.Prompt == "" {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_request", "prompt is required."),
+		})
+		return
+	}
+
+	refined := intelligence.RefinePrompt(req.Prompt)
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data: map[string]interface{}{
+			"original_length": len(req.Prompt),
+			"refined_length":  len(refined),
+			"refined_prompt":  refined,
+			"savings_percent": float64(len(req.Prompt)-len(refined)) / float64(len(req.Prompt)) * 100,
+		},
+	})
+}
+
 // HandlePromptGraveyard returns prompts consuming cost with zero value.
 // GET /v2/intelligence/prompt-graveyard
 func (h *V2Handler) HandlePromptGraveyard(w http.ResponseWriter, r *http.Request) {

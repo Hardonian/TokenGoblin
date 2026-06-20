@@ -135,6 +135,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 
 	// Intelligence Engine endpoints
 	mux.Handle("/v2/intelligence/waste", wrap(v2.HandleWasteReport))
+	mux.Handle("/v2/intelligence/refine", wrap(v2.HandleRefinePrompt))
 	mux.Handle("/v2/intelligence/prompt-graveyard", wrap(v2.HandlePromptGraveyard))
 	mux.Handle("/v2/intelligence/zombie-agents", wrap(v2.HandleZombieAgents))
 	mux.Handle("/v2/intelligence/duplicates", wrap(v2.HandleDuplicates))
