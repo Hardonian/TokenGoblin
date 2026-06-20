@@ -69,6 +69,17 @@ type ModelStats = {
   cost_per_outcome: number;
 };
 
+type TokenEvent = {
+  event_id: string;
+  worker_id: string;
+  provider: string;
+  model_id: string;
+  total_tokens: number;
+  cost_estimate_usd: number;
+  task_category: string;
+  occurred_at: string;
+};
+
 // ------------------------------------------------------------------
 // Fetcher
 // ------------------------------------------------------------------
@@ -96,11 +107,13 @@ export default function CommandCenter() {
   const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>(tenantId ? "/v2/intelligence/zombie-agents" : null, authFetcher);
   const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>(tenantId ? "/v2/intelligence/prompt-graveyard" : null, authFetcher);
   const { data: mdData, mutate: mutMD } = useSWR<{ models: ModelStats[] }>(tenantId ? "/v2/analytics/models" : null, authFetcher);
+  const { data: eventsData, mutate: mutEvents } = useSWR<{ events: TokenEvent[] }>(tenantId ? "/api/dashboard/events" : null, authFetcher, { refreshInterval: 5000 });
 
   const costLeaks = clData?.cost_leaks || [];
   const zombieAgents = zaData?.zombie_agents || [];
   const models = mdData?.models || [];
-  const loading = authLoading || (!scorecard && !forecast && !clData && !zaData && !graveyard && !mdData);
+  const events = eventsData?.events || [];
+  const loading = authLoading || (!scorecard && !forecast && !clData && !zaData && !graveyard && !mdData && !eventsData);
 
   const loadAll = () => {
     mutSC();
@@ -109,6 +122,7 @@ export default function CommandCenter() {
     mutZA();
     mutGY();
     mutMD();
+    mutEvents();
   };
 
   const seedDemo = async () => {
@@ -362,24 +376,71 @@ export default function CommandCenter() {
           </div>
         </div>
 
-        {/* BOTTOM SECTION: MODEL PERFORMANCE GRID */}
-        <div className="border border-[#333] bg-black">
-          <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
-            <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">{/* Model_Matrix */}</h2>
+        {/* BOTTOM SECTION: LIVE EVENT FEED & MODEL MATRIX */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Live Event Feed */}
+          <div className="border border-[#333] bg-black">
+            <div className="border-b border-[#333] px-4 py-3 flex justify-between items-center bg-[#0a0a0a]">
+              <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-green-500 animate-pulse"></span>
+                [LIVE] Token_Firehose
+              </h2>
+            </div>
+            <div className="p-0 overflow-x-auto h-[400px] overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333] sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Worker / Model</th>
+                    <th className="px-4 py-3 font-normal text-right">Tokens</th>
+                    <th className="px-4 py-3 font-normal text-right">Cost</th>
+                    <th className="px-4 py-3 font-normal text-right">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#222]">
+                  {events.slice(0, 20).map((e, i) => (
+                    <tr key={e.event_id || i} className="hover:bg-[#0a0a0a] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="text-zinc-200 font-bold">{e.worker_id}</div>
+                        <div className="text-[10px] text-zinc-500 uppercase">{e.model_id}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-zinc-400">{formatInt(e.total_tokens)}</td>
+                      <td className="px-4 py-3 text-right text-[#ffb000]">${formatMoney(e.cost_estimate_usd)}</td>
+                      <td className="px-4 py-3 text-right text-zinc-500">
+                        {new Date(e.occurred_at).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {events.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-zinc-600 uppercase tracking-widest">
+                        {'>>'} Waiting for events...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333]">
-                <tr>
-                  <th className="px-4 py-3 font-normal">Provider/ID</th>
-                  <th className="px-4 py-3 font-normal text-right">Vol</th>
-                  <th className="px-4 py-3 font-normal text-right">Spend</th>
-                  <th className="px-4 py-3 font-normal text-right">Cost/Call</th>
-                  <th className="px-4 py-3 font-normal text-right text-white">Cost/Outcome</th>
-                  <th className="px-4 py-3 font-normal text-right">Quality</th>
-                  <th className="px-4 py-3 font-normal text-right">Lag</th>
-                </tr>
-              </thead>
+
+          {/* Model Matrix */}
+          <div className="border border-[#333] bg-black">
+            <div className="border-b border-[#333] px-4 py-3 bg-[#0a0a0a]">
+              <h2 className="text-zinc-300 font-bold tracking-widest text-sm uppercase">{/* Model_Matrix */}</h2>
+            </div>
+            <div className="overflow-x-auto h-[400px] overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#111] text-zinc-500 uppercase tracking-wider border-b border-[#333] sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Provider/ID</th>
+                    <th className="px-4 py-3 font-normal text-right">Vol</th>
+                    <th className="px-4 py-3 font-normal text-right">Spend</th>
+                    <th className="px-4 py-3 font-normal text-right">Cost/Call</th>
+                    <th className="px-4 py-3 font-normal text-right text-white">Cost/Outcome</th>
+                    <th className="px-4 py-3 font-normal text-right">Quality</th>
+                    <th className="px-4 py-3 font-normal text-right">Lag</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-[#222]">
                 {models.map((m, i) => (
                   <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
