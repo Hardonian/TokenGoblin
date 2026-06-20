@@ -154,11 +154,20 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			tags_json TEXT,
 			idempotency_key TEXT,
 			fingerprint TEXT,
+			is_exported BOOLEAN NOT NULL DEFAULT FALSE,
 			PRIMARY KEY (tenant_id, event_id),
 			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
 			FOREIGN KEY (tenant_id, worker_id) REFERENCES workers(tenant_id, worker_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_model ON token_usage_events (tenant_id, model_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_token_usage_is_exported ON token_usage_events (is_exported);`,
+		`CREATE TABLE IF NOT EXISTS tuning_profiles (
+			tenant_id TEXT PRIMARY KEY,
+			aggressiveness REAL NOT NULL DEFAULT 1.0,
+			ignored_keywords TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+		);`,
 
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_fingerprint ON token_usage_events (tenant_id, fingerprint);`,
 
