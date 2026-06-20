@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authFetcher, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { apiKey, tenantId } = useAuth();
