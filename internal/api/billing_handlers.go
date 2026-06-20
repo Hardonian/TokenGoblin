@@ -255,6 +255,48 @@ func (h *BillingHandler) HandleTenantLogin(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// HandleUpdateWebhook updates the tenant's alert webhook URL.
+func (h *BillingHandler) HandleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	tenantID, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		WebhookURL string `json:"webhook_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Invalid JSON body."),
+		})
+		return
+	}
+
+	if err := h.Repo.UpdateTenantWebhook(r.Context(), tenantID, req.WebhookURL); err != nil {
+		writeJSON(w, http.StatusInternalServerError, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("db_error", err.Error()),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data: map[string]interface{}{
+			"webhook_url": req.WebhookURL,
+		},
+	})
+}
+
 // HandleListAPIKeys lists all API keys for the tenant.
 func (h *BillingHandler) HandleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

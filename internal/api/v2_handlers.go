@@ -233,6 +233,51 @@ func (h *V2Handler) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
+// HandleRefinePrompt receives a raw prompt, uses the refiner logic to strip slop, and returns stats.
+// POST /v2/intelligence/refine
+func (h *V2Handler) HandleRefinePrompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodError(w)
+		return
+	}
+
+	_, ok := tenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Prompt string `json:"prompt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Envelope{
+			OK:     false,
+			Status: "error",
+			Error:  issue("invalid_json", "Invalid JSON body."),
+		})
+		return
+	}
+
+	refined := intelligence.RefinePrompt(req.Prompt)
+	origLen := len(req.Prompt)
+	refLen := len(refined)
+	var pct float64
+	if origLen > 0 {
+		pct = float64(origLen-refLen) / float64(origLen) * 100.0
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		OK:     true,
+		Status: "success",
+		Data: map[string]interface{}{
+			"refined_prompt":  refined,
+			"original_length": origLen,
+			"refined_length":  refLen,
+			"savings_percent": pct,
+		},
+	})
+}
+
 // HandleCostLeaks returns patterns of silent invisible spending.
 // GET /v2/intelligence/cost-leaks
 func (h *V2Handler) HandleCostLeaks(w http.ResponseWriter, r *http.Request) {

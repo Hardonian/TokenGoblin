@@ -118,6 +118,13 @@ func (r *PostgresRepository) UpsertTenant(ctx context.Context, tenant domain.Ten
 	return wrapDBErr(err)
 }
 
+func (r *PostgresRepository) UpdateTenantWebhook(ctx context.Context, tenantID, webhookURL string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE tenants SET alert_webhook_url = $1 WHERE tenant_id = $2
+	`, webhookURL, tenantID)
+	return wrapDBErr(err)
+}
+
 func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error) {
 	var t domain.Tenant
 	var stripeCust, stripeSub *string

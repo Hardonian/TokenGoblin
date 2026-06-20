@@ -467,6 +467,13 @@ func (r *SQLiteRepository) UpsertTenant(ctx context.Context, tenant domain.Tenan
 	return wrapDBErr(err)
 }
 
+func (r *SQLiteRepository) UpdateTenantWebhook(ctx context.Context, tenantID, webhookURL string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE tenants SET alert_webhook_url = ? WHERE tenant_id = ?
+	`, webhookURL, tenantID)
+	return wrapDBErr(err)
+}
+
 func (r *SQLiteRepository) GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error) {
 	var t domain.Tenant
 	var stripeCust, stripeSub sql.NullString

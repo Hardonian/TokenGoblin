@@ -13,6 +13,7 @@ var ErrUnavailable = errors.New("database unavailable")
 // Repository defines the persistent schema surface used by the execution layer.
 type Repository interface {
 	UpsertTenant(ctx context.Context, tenant domain.Tenant) error
+	UpdateTenantWebhook(ctx context.Context, tenantID, webhookURL string) error
 	GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error)
 	GetTenantByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*domain.Tenant, error)
 	GetTenantByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (*domain.Tenant, error)
@@ -74,6 +75,10 @@ func (r *UnavailableRepository) err() error {
 }
 
 func (r *UnavailableRepository) UpsertTenant(context.Context, domain.Tenant) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) UpdateTenantWebhook(context.Context, string, string) error {
 	return r.err()
 }
 

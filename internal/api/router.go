@@ -115,6 +115,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 
 	// API Key Routes (requires auth)
 	mux.Handle("/api/tenant/login", AuthMiddleware(repo, http.HandlerFunc(billingHandler.HandleTenantLogin)))
+	mux.Handle("/api/tenant/webhook", wrapAdmin(http.HandlerFunc(billingHandler.HandleUpdateWebhook)))
 	mux.Handle("/api/tenant/keys", wrapAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -136,10 +137,11 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	// Intelligence Engine endpoints
 	mux.Handle("/v2/intelligence/waste", wrap(v2.HandleWasteReport))
 	mux.Handle("/v2/intelligence/refine", wrap(v2.HandleRefinePrompt))
-	mux.Handle("/v2/intelligence/prompt-graveyard", wrap(v2.HandlePromptGraveyard))
-	mux.Handle("/v2/intelligence/zombie-agents", wrap(v2.HandleZombieAgents))
-	mux.Handle("/v2/intelligence/duplicates", wrap(v2.HandleDuplicates))
-	mux.Handle("/v2/intelligence/cost-leaks", wrap(v2.HandleCostLeaks))
+	mux.Handle("/v2/intelligence/prompt-graveyard", AuthMiddleware(repo, http.HandlerFunc(v2.HandlePromptGraveyard)))
+	mux.Handle("/v2/intelligence/zombie-agents", AuthMiddleware(repo, http.HandlerFunc(v2.HandleZombieAgents)))
+	mux.Handle("/v2/intelligence/duplicates", AuthMiddleware(repo, http.HandlerFunc(v2.HandleDuplicates)))
+	mux.Handle("/v2/intelligence/cost-leaks", AuthMiddleware(repo, http.HandlerFunc(v2.HandleCostLeaks)))
+	mux.Handle("/v2/intelligence/refine", AuthMiddleware(repo, http.HandlerFunc(v2.HandleRefinePrompt)))
 	mux.Handle("/v2/intelligence/hallucination-map", wrap(v2.HandleHallucinationMap))
 	mux.Handle("/v2/intelligence/insights", wrap(v2.HandleScholarInsights))
 	mux.Handle("/api/admin/scholar/train", wrapAdmin(v2.HandleScholarTrain))

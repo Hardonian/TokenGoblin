@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { GoblinMascot } from "./GoblinMascot";
+import { SettingsModal } from "./SettingsModal";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -23,6 +24,7 @@ const navLinks = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#333] bg-black">
@@ -68,6 +70,12 @@ export function Header() {
               </Link>
             )
           )}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="text-xs text-zinc-500 hover:text-[#ffb000] transition-colors tracking-wider"
+          >
+            [SETTINGS]
+          </button>
         </nav>
       </div>
 
@@ -96,8 +104,18 @@ export function Header() {
               </Link>
             )
           )}
+          <button
+            onClick={() => {
+              setOpen(false);
+              setSettingsOpen(true);
+            }}
+            className="px-2 py-2 text-sm text-zinc-400 hover:text-[#ffb000] transition-colors uppercase tracking-widest text-left"
+          >
+            &gt; Settings
+          </button>
         </nav>
       </div>
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }
