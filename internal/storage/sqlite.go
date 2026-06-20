@@ -1454,3 +1454,125 @@ func (r *SQLiteRepository) UpsertBudget(ctx context.Context, budget domain.Budge
 func (r *SQLiteRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
 	return nil, errors.New("not implemented")
 }
+
+func (s *SQLiteRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
+	query := `SELECT tenant_id, aggressiveness, ignored_keywords, updated_at FROM tuning_profiles WHERE tenant_id = ?`
+	row := s.db.QueryRowContext(ctx, query, tenantID)
+
+	var p domain.TuningProfile
+	var keywords string
+	var updated string
+
+	err := row.Scan(&p.TenantID, &p.Aggressiveness, &keywords, &updated)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if keywords != "" {
+		err = json.Unmarshal([]byte(keywords), &p.IgnoredKeywords)
+		if err != nil {
+			return nil, err
+		}
+	}
+	p.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
+	return &p, nil
+}
+
+func (s *SQLiteRepository) UpsertTuningProfile(ctx context.Context, p domain.TuningProfile) error {
+	query := `
+		INSERT INTO tuning_profiles (tenant_id, aggressiveness, ignored_keywords, updated_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(tenant_id) DO UPDATE SET
+			aggressiveness=excluded.aggressiveness,
+			ignored_keywords=excluded.ignored_keywords,
+			updated_at=excluded.updated_at
+	`
+	keywordsBytes, _ := json.Marshal(p.IgnoredKeywords)
+	
+	_, err := s.db.ExecContext(ctx, query, p.TenantID, p.Aggressiveness, string(keywordsBytes), time.Now().Format(time.RFC3339))
+	return err
+}
+
+func (s *SQLiteRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
+	query := `
+		SELECT 
+			tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id, 
+			provider, model_id, prompt_tokens, completion_tokens, cached_tokens, 
+			input_tokens, output_tokens, total_tokens, cost_estimate_usd, cost_currency, 
+			cost_is_degraded, cost_degraded_code, latency_ms, task_category, 
+			output_status, review_score, occurred_at, prompt_excerpt, output_excerpt, 
+			prompt_reference, output_reference, tags_json, idempotency_key, fingerprint, is_exported
+		FROM token_usage_events
+		WHERE is_exported = FALSE
+		ORDER BY occurred_at ASC
+		LIMIT ?
+	`
+	rows, err := s.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []domain.TokenEvent
+	for rows.Next() {
+		var e domain.TokenEvent
+		var occurredAt string
+		var costUSD, score *float64
+		var job, session, run, degCode, pExcerpt, oExcerpt, pRef, oRef, tags, idem, fp sql.NullString
+		var isDegraded bool
+
+		if err := rows.Scan(
+			&e.TenantID, &e.EventID, &e.WorkerID, &e.WorkerName, &job, &session, &run,
+			&e.Provider, &e.ModelID, &e.PromptTokens, &e.CompletionTokens, &e.CachedTokens,
+			&e.InputTokens, &e.OutputTokens, &e.TotalTokens, &costUSD, &e.CostCurrency,
+			&isDegraded, &degCode, &e.LatencyMs, &e.TaskCategory,
+			&e.OutputStatus, &score, &occurredAt, &pExcerpt, &oExcerpt,
+			&pRef, &oRef, &tags, &idem, &fp, &e.IsExported,
+		); err != nil {
+			return nil, err
+		}
+
+		e.Timestamp, _ = time.Parse(time.RFC3339, occurredAt)
+		e.JobID = job.String
+		e.SessionID = session.String
+		e.RunID = run.String
+		e.CostEstimateUSD = costUSD
+		e.CostIsDegraded = isDegraded
+		e.CostDegradedCode = degCode.String
+		e.ReviewScore = score
+		e.PromptExcerpt = pExcerpt.String
+		e.OutputExcerpt = oExcerpt.String
+		e.PromptReference = pRef.String
+		e.OutputReference = oRef.String
+		e.IdempotencyKey = idem.String
+		e.Fingerprint = fp.String
+
+		if tags.Valid && tags.String != "" {
+			e.TagsJSON = json.RawMessage(tags.String)
+		}
+		events = append(events, e)
+	}
+
+	return events, rows.Err()
+}
+
+func (s *SQLiteRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
+	if len(eventIDs) == 0 {
+		return nil
+	}
+
+	// Simple IN clause construction
+	placeholders := strings.Repeat("?,", len(eventIDs)-1) + "?"
+	query := fmt.Sprintf("UPDATE token_usage_events SET is_exported = TRUE WHERE event_id IN (%s)", placeholders)
+	
+	args := make([]interface{}, len(eventIDs))
+	for i, id := range eventIDs {
+		args[i] = id
+	}
+
+	_, err := s.db.ExecContext(ctx, query, args...)
+	return err
+}
