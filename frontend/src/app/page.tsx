@@ -91,7 +91,7 @@ type TokenEvent = {
 
 export default function CommandCenter() {
   const { apiKey, tenantId, isLoading: authLoading } = useAuth();
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, ] = useState<string | null>(null);
   
   // Real check for enterprise tier (we will add logic later, defaulting to true for now so we can see the data)
   const isPro = true;

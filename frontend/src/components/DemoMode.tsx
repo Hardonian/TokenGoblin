@@ -249,6 +249,8 @@ export function DemoMode() {
           </Button>
 
           <select 
+            aria-label="Simulation Speed"
+            title="Simulation Speed"
             value={speed} 
             onChange={(e) => setSpeed(Number(e.target.value))}
             className="bg-[#111] border border-[#333] text-white text-xs px-2 py-1 rounded"
@@ -260,6 +262,8 @@ export function DemoMode() {
           </select>
 
           <select 
+            aria-label="Event Filter"
+            title="Event Filter"
             value={filterStatus} 
             onChange={(e) => setFilterStatus(e.target.value as any)}
             className="bg-[#111] border border-[#333] text-white text-xs px-2 py-1 rounded"
