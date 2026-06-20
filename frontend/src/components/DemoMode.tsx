@@ -16,7 +16,8 @@ import {
   ArrowRight,
   Check,
   X,
-  Sparkles
+  Sparkles,
+  Download
 } from "lucide-react";
 
 import { formatMoney } from "@/components/shared";
@@ -314,7 +315,7 @@ export function DemoMode() {
         />
         <MetricCard 
           title="ZOMBIE AGENTS" 
-          value={metrics.zombieAgents} 
+          value={metrics.zombieAgents.toString()} 
           icon={Brain} 
           color="#8b5cf6"
         />
@@ -506,7 +507,7 @@ function MetricCard({
 }: { 
   title: string; 
   value: string; 
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<any>;
   color: string;
   trend?: string;
 }) {
@@ -650,15 +651,6 @@ function CategoryCostTable({ events }: { events: DemoEvent[] }) {
   );
 }
 
-function Download({ children, ...props }: { children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <svg {...props} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-      <polyline points="7 10 12 15 17 10"></polyline>
-      <line x1="12" y1="15" x2="12" y2="3"></line>
-    </svg>
-  );
-}
 
 function Button({ children, variant, size, className, ...props }: any) {
   return <button className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${variant === 'ghost' ? 'hover:bg-[#111] text-zinc-400' : variant === 'outline' ? 'border border-[#333] hover:border-zinc-500' : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]'} ${className}`} {...props}>{children}</button>
