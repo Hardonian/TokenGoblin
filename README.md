@@ -46,19 +46,19 @@ npm run dev
 
 ## Environment Variables
 
-| Variable                              | Required           | Description                                                               |
-| ------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `DATABASE_URL`                        | Optional           | SQLite path (default: `file:token_goblin.db`) or Postgres DSN             |
-| `STRIPE_SECRET_KEY`                   | Required (Billing) | Stripe secret key for backend API calls                                   |
-| `STRIPE_WEBHOOK_SECRET`               | Required (Billing) | Stripe webhook signing secret to verify Stripe events                     |
-| `STRIPE_PRICE_PRO`                    | Required (Billing) | Stripe Price ID for Pro plan (backend)                                    |
-| `STRIPE_PRICE_ENTERPRISE`             | Required (Billing) | Stripe Price ID for Enterprise plan (backend)                             |
-| `TG_INTERNAL_WEBHOOK_SECRET`          | Required (Billing) | Internal secret for Stripe webhook forwarding                             |
-| `PORT`                                | Optional           | API server port (default: 8080)                                           |
-| `TG_ENV`                              | Optional           | Environment mode (set to `production` to enforce API key auth)            |
-| `NEXT_PUBLIC_TG_API_BASE`             | Required (Vercel)  | API base URL (e.g. `https://api.yourdomain.com`)                          |
-| `NEXT_PUBLIC_STRIPE_PRICE_PRO`        | Required (Vercel)  | Stripe Price ID for Pro (frontend UI checkout)                            |
-| `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` | Required (Vercel)  | Stripe Price ID for Enterprise (frontend UI checkout)                     |
+| Variable                              | Required           | Description                                                    |
+| ------------------------------------- | ------------------ | -------------------------------------------------------------- |
+| `DATABASE_URL`                        | Optional           | SQLite path (default: `file:token_goblin.db`) or Postgres DSN  |
+| `STRIPE_SECRET_KEY`                   | Required (Billing) | Stripe secret key for backend API calls                        |
+| `STRIPE_WEBHOOK_SECRET`               | Required (Billing) | Stripe webhook signing secret to verify Stripe events          |
+| `STRIPE_PRICE_PRO`                    | Required (Billing) | Stripe Price ID for Pro plan (backend)                         |
+| `STRIPE_PRICE_ENTERPRISE`             | Required (Billing) | Stripe Price ID for Enterprise plan (backend)                  |
+| `TG_INTERNAL_WEBHOOK_SECRET`          | Required (Billing) | Internal secret for Stripe webhook forwarding                  |
+| `PORT`                                | Optional           | API server port (default: 8080)                                |
+| `TG_ENV`                              | Optional           | Environment mode (set to `production` to enforce API key auth) |
+| `NEXT_PUBLIC_TG_API_BASE`             | Required (Vercel)  | API base URL (e.g. `https://api.yourdomain.com`)               |
+| `NEXT_PUBLIC_STRIPE_PRICE_PRO`        | Required (Vercel)  | Stripe Price ID for Pro (frontend UI checkout)                 |
+| `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` | Required (Vercel)  | Stripe Price ID for Enterprise (frontend UI checkout)          |
 
 > [!IMPORTANT]
 > When deploying the frontend to Vercel, you must configure `NEXT_PUBLIC_TG_API_BASE`, `NEXT_PUBLIC_STRIPE_PRICE_PRO`, and `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE` directly in the Vercel dashboard. Vercel ignores `vercel.json` for runtime secrets.

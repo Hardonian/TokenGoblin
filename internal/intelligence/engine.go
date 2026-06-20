@@ -285,6 +285,7 @@ func (e *Engine) DetectCostLeaks(events []domain.TokenEvent) []domain.CostLeak {
 	leaks = append(leaks, e.detectRetryStorms(events)...)
 	leaks = append(leaks, e.detectContextPadding(events)...)
 	leaks = append(leaks, e.detectCacheMisses(events)...)
+	leaks = append(leaks, e.detectPromptSlop(events)...)
 
 	sort.Slice(leaks, func(i, j int) bool {
 		return leaks[i].CostUSD > leaks[j].CostUSD
@@ -420,6 +421,53 @@ func (e *Engine) detectCacheMisses(events []domain.TokenEvent) []domain.CostLeak
 			Severity:    "medium",
 		})
 	}
+	return leaks
+}
+
+func (e *Engine) detectPromptSlop(events []domain.TokenEvent) []domain.CostLeak {
+	var leaks []domain.CostLeak
+	slopCount := 0
+	slopCost := 0.0
+
+	slopPhrases := []string{
+		"please ", "thank you", "as an ai", "i'm sorry", "could you kindly",
+		"i would appreciate", "make sure to",
+	}
+
+	for i := range events {
+		ev := &events[i]
+		if ev.PromptExcerpt == "" {
+			continue
+		}
+
+		lowerPrompt := strings.ToLower(ev.PromptExcerpt)
+		isSlop := false
+		for _, phrase := range slopPhrases {
+			if strings.Contains(lowerPrompt, phrase) {
+				isSlop = true
+				break
+			}
+		}
+
+		if isSlop {
+			slopCount++
+			if ev.CostEstimateUSD != nil {
+				// Attribute 5% of the cost to unnecessary conversational slop
+				slopCost += *ev.CostEstimateUSD * 0.05
+			}
+		}
+	}
+
+	if slopCount > 0 && slopCost > 0.1 {
+		leaks = append(leaks, domain.CostLeak{
+			Type:        "conversational_slop",
+			Description: fmt.Sprintf("Goblin detected polite AI slop: %d prompts contained unnecessary conversational filler (e.g. 'please', 'thank you'). Goblins don't need manners, they need tokens!", slopCount),
+			CostUSD:     slopCost,
+			EventCount:  slopCount,
+			Severity:    "low",
+		})
+	}
+
 	return leaks
 }
 

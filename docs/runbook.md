@@ -3,6 +3,7 @@
 ## Service: tokengoblin
 
 ### Deployment
+
 ```bash
 # Build
 make build 2>/dev/null || cargo build --release 2>/dev/null || go build ./... 2>/dev/null || npm run build
@@ -15,19 +16,21 @@ docker compose up -d
 ```
 
 ### Health Checks
+
 - `GET /health` - liveness probe
 - `GET /ready` - readiness probe (checks DB/dependencies)
 
 ### Common Issues
 
-| Symptom | Diagnosis | Resolution |
-|---------|-----------|------------|
-| 500 errors | Check traces/logs | Look for span errors |
-| High latency | Check metrics | Identify slow queries/ops |
-| OOM kills | Check memory metrics | Tune build flags |
-| Connection pool exhausted | Check pool metrics | Increase pool size |
+| Symptom                   | Diagnosis            | Resolution                |
+| ------------------------- | -------------------- | ------------------------- |
+| 500 errors                | Check traces/logs    | Look for span errors      |
+| High latency              | Check metrics        | Identify slow queries/ops |
+| OOM kills                 | Check memory metrics | Tune build flags          |
+| Connection pool exhausted | Check pool metrics   | Increase pool size        |
 
 ### Rollback
+
 ```bash
 # Docker
 docker tag tokengoblin:previous tokengoblin:latest
@@ -38,6 +41,7 @@ kubectl rollout undo deployment/tokengoblin
 ```
 
 ### Logs
+
 ```bash
 # Structured JSON logs
 docker logs -f tokengoblin | jq .
@@ -47,12 +51,14 @@ docker logs tokengoblin | grep "trace_id=\"abc123\""
 ```
 
 ### Database
+
 ```bash
 # Run migrations
 # (Add your migration commands here)
 ```
 
 ### Performance Tuning
+
 - Binary size: `./scripts/binary_size_audit.sh`
 - Load test: `./scripts/load_test.sh`
 - Chaos test: `./scripts/chaos_test.sh`

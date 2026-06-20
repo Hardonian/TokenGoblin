@@ -42,23 +42,23 @@ func DefaultConfig() Config {
 
 // Stats tracks backpressure metrics
 type Stats struct {
-	TotalRequests       int64
-	AcceptedRequests    int64
-	RejectedRequests    int64
-	QueuedRequests      int64
-	CircuitOpens        int64
-	CircuitCloses       int64
-	AvgQueueWaitTime    time.Duration
-	CurrentQueueDepth   int
-	CurrentConcurrency  int
-	ErrorRate           float64
+	TotalRequests      int64
+	AcceptedRequests   int64
+	RejectedRequests   int64
+	QueuedRequests     int64
+	CircuitOpens       int64
+	CircuitCloses      int64
+	AvgQueueWaitTime   time.Duration
+	CurrentQueueDepth  int
+	CurrentConcurrency int
+	ErrorRate          float64
 }
 
 // RateLimiter implements token bucket rate limiting
 type RateLimiter struct {
-	mu       sync.Mutex
-	tokens   float64
-	maxTokens float64
+	mu         sync.Mutex
+	tokens     float64
+	maxTokens  float64
 	refillRate float64 // tokens per second
 	lastRefill time.Time
 }
@@ -201,10 +201,10 @@ type ReleaseFunc func()
 
 // Errors
 var (
-	ErrCircuitOpen   = &BackpressureError{Code: "CIRCUIT_OPEN", Message: "Circuit breaker is open"}
-	ErrRateLimited   = &BackpressureError{Code: "RATE_LIMITED", Message: "Request rate limit exceeded"}
-	ErrQueueFull     = &BackpressureError{Code: "QUEUE_FULL", Message: "Request queue is full"}
-	ErrTimeout       = &BackpressureError{Code: "TIMEOUT", Message: "Request timed out waiting for capacity"}
+	ErrCircuitOpen = &BackpressureError{Code: "CIRCUIT_OPEN", Message: "Circuit breaker is open"}
+	ErrRateLimited = &BackpressureError{Code: "RATE_LIMITED", Message: "Request rate limit exceeded"}
+	ErrQueueFull   = &BackpressureError{Code: "QUEUE_FULL", Message: "Request queue is full"}
+	ErrTimeout     = &BackpressureError{Code: "TIMEOUT", Message: "Request timed out waiting for capacity"}
 )
 
 type BackpressureError struct {

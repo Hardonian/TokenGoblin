@@ -80,6 +80,7 @@
 ## Stateless API Tier Design
 
 ### API Service Responsibilities
+
 1. **Authentication & Authorization** - JWT validation, API key verification, tenant isolation
 2. **Request Validation** - Schema validation, payload size limits, sanity checks
 3. **Transformation** - Normalize input to internal event format
@@ -106,14 +107,15 @@ GET    /v1/readyz                 # Readiness (CH connectivity)
 
 ### Horizontal Scaling Strategy
 
-| Component | Scaling Trigger | Max Replicas | Scale-down Delay |
-|-----------|----------------|--------------|------------------|
-| API Pods | CPU > 70%, RPS > 5k/pod, Queue depth > 1000 | 50 | 5 min |
-| Ingestion Workers | Message bus lag > 10k, Batch wait > 5s | 20 | 2 min |
-| ClickHouse Shards | Storage > 70%, Query latency p99 > 5s | 10 | Manual |
-| Query Routers | Concurrent queries > 200, CPU > 60% | 20 | 3 min |
+| Component         | Scaling Trigger                             | Max Replicas | Scale-down Delay |
+| ----------------- | ------------------------------------------- | ------------ | ---------------- |
+| API Pods          | CPU > 70%, RPS > 5k/pod, Queue depth > 1000 | 50           | 5 min            |
+| Ingestion Workers | Message bus lag > 10k, Batch wait > 5s      | 20           | 2 min            |
+| ClickHouse Shards | Storage > 70%, Query latency p99 > 5s       | 10           | Manual           |
+| Query Routers     | Concurrent queries > 200, CPU > 60%         | 20           | 3 min            |
 
 ### Stateless Guarantees
+
 - **No local state** - All state in ClickHouse, Redis, or message bus
 - **Session affinity NOT required** - Any pod handles any request
 - **Idempotent ingestion** - Client-generated event IDs enable deduplication
@@ -184,11 +186,11 @@ ENGINE = Distributed(cluster, default, token_events, tenant_id);
 
 ### Sharding Strategy
 
-| Approach | Pros | Cons | Best For |
-|----------|------|------|----------|
-| `tenant_id` | Tenant isolation, even distribution for many tenants | Hot tenants cause skew | Multi-tenant SaaS |
-| `tenant_id + model` | Better distribution for model-heavy tenants | More complex | Model analytics focus |
-| Hash-based | Uniform distribution | Cross-shard queries slower | Very high volume |
+| Approach            | Pros                                                 | Cons                       | Best For              |
+| ------------------- | ---------------------------------------------------- | -------------------------- | --------------------- |
+| `tenant_id`         | Tenant isolation, even distribution for many tenants | Hot tenants cause skew     | Multi-tenant SaaS     |
+| `tenant_id + model` | Better distribution for model-heavy tenants          | More complex               | Model analytics focus |
+| Hash-based          | Uniform distribution                                 | Cross-shard queries slower | Very high volume      |
 
 **Recommendation**: `tenant_id` with consistent hashing + virtual nodes (100 per physical shard)
 
@@ -211,26 +213,26 @@ Read Path:
 
 ### Capacity Planning
 
-| Metric | Small | Medium | Large |
-|--------|-------|--------|-------|
-| Events/day | 10M | 100M | 1B+ |
-| Tenants | 100 | 1,000 | 10,000 |
-| Shards | 3 | 6 | 12+ |
-| Replicas/shard | 2 | 3 | 3 |
-| Storage/shard | 500GB | 2TB | 10TB+ |
-| RAM/node | 64GB | 128GB | 256GB |
-| CPU/node | 16 cores | 32 cores | 64 cores |
+| Metric         | Small    | Medium   | Large    |
+| -------------- | -------- | -------- | -------- |
+| Events/day     | 10M      | 100M     | 1B+      |
+| Tenants        | 100      | 1,000    | 10,000   |
+| Shards         | 3        | 6        | 12+      |
+| Replicas/shard | 2        | 3        | 3        |
+| Storage/shard  | 500GB    | 2TB      | 10TB+    |
+| RAM/node       | 64GB     | 128GB    | 256GB    |
+| CPU/node       | 16 cores | 32 cores | 64 cores |
 
 ### Compression & Retention
 
 ```sql
 -- Column compression
-SETTINGS 
+SETTINGS
     compression_codec = 'ZSTD(3)',  -- Best ratio for text
     compress_by_default = true;
 
 -- Tiered storage (hot/warm/cold)
-ALTER TABLE token_events 
+ALTER TABLE token_events
 MODIFY SETTING storage_policy = 'tiered';
 
 -- TTL for auto-cleanup
@@ -291,13 +293,13 @@ HAVING sample_size > 100;
 
 ### Backpressure Signals
 
-| Layer | Signal | Action |
-|-------|--------|--------|
-| Edge | 429 Too Many Requests | Client backs off |
-| API | Queue depth > 80% | Return 503, pause ingestion |
-| Message Bus | Consumer lag > 100k | Scale workers, alert |
-| Workers | CH write latency > 5s | Reduce batch size, increase workers |
-| ClickHouse | Merge lag, disk space | Scale shards, TTL cleanup |
+| Layer       | Signal                | Action                              |
+| ----------- | --------------------- | ----------------------------------- |
+| Edge        | 429 Too Many Requests | Client backs off                    |
+| API         | Queue depth > 80%     | Return 503, pause ingestion         |
+| Message Bus | Consumer lag > 100k   | Scale workers, alert                |
+| Workers     | CH write latency > 5s | Reduce batch size, increase workers |
+| ClickHouse  | Merge lag, disk space | Scale shards, TTL cleanup           |
 
 ### Deduplication Strategy
 
@@ -345,13 +347,13 @@ func (w *Worker) Deduplicate(batch []Event) []Event {
 
 ### Query Optimization
 
-| Query Type | Strategy |
-|------------|----------|
-| Tenant cost summary | Pre-aggregated `usage_aggregates` table |
-| Time-range costs | Partition pruning + materialized views |
+| Query Type              | Strategy                                   |
+| ----------------------- | ------------------------------------------ |
+| Tenant cost summary     | Pre-aggregated `usage_aggregates` table    |
+| Time-range costs        | Partition pruning + materialized views     |
 | Model/feature breakdown | LowCardinality columns + secondary indexes |
-| Anomalies | Dedicated `anomalies` table + MV |
-| Exports | Async job → object storage → signed URL |
+| Anomalies               | Dedicated `anomalies` table + MV           |
+| Exports                 | Async job → object storage → signed URL    |
 
 ### Caching Strategy
 
@@ -389,20 +391,20 @@ spec:
   template:
     spec:
       containers:
-      - name: api
-        image: tokengoblin/api:v1.2.0
-        resources:
-          requests:
-            cpu: "500m"
-            memory: "512Mi"
-          limits:
-            cpu: "2000m"
-            memory: "2Gi"
-        env:
-        - name: CH_CLUSTER
-          value: "clickhouse-cluster"
-        - name: KAFKA_BROKERS
-          value: "kafka:9092"
+        - name: api
+          image: tokengoblin/api:v1.2.0
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          env:
+            - name: CH_CLUSTER
+              value: "clickhouse-cluster"
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
 ---
 # HPA
 apiVersion: autoscaling/v2
@@ -417,19 +419,19 @@ spec:
   minReplicas: 3
   maxReplicas: 50
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Pods
-    pods:
-      metric:
-        name: http_requests_per_second
-      target:
-        type: AverageValue
-        averageValue: "5000"
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "5000"
 ```
 
 ### ClickHouse Keeper (Coordination)
@@ -446,48 +448,49 @@ spec:
 
 ### Key Metrics
 
-| Category | Metrics |
-|----------|---------|
-| **Ingestion** | events_received_total, events_inserted_total, ingestion_latency_p99, batch_size_avg, backpressure_rejections |
-| **API** | request_duration_p99, request_rate, error_rate, queue_depth, circuit_breaker_state |
-| **ClickHouse** | query_duration_p99, merge_lag, replication_lag, disk_usage, memory_usage, parts_count |
-| **Business** | cost_per_tenant, anomaly_count, zombie_agent_count, export_jobs_completed |
+| Category       | Metrics                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Ingestion**  | events_received_total, events_inserted_total, ingestion_latency_p99, batch_size_avg, backpressure_rejections |
+| **API**        | request_duration_p99, request_rate, error_rate, queue_depth, circuit_breaker_state                           |
+| **ClickHouse** | query_duration_p99, merge_lag, replication_lag, disk_usage, memory_usage, parts_count                        |
+| **Business**   | cost_per_tenant, anomaly_count, zombie_agent_count, export_jobs_completed                                    |
 
 ### Critical Alerts
 
 ```yaml
 # PrometheusRule
 groups:
-- name: tokengoblin-critical
-  rules:
-  - alert: IngestionBackpressureCritical
-    expr: ingestion_backpressure_level > 2
-    for: 5m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Ingestion pipeline under critical backpressure"
+  - name: tokengoblin-critical
+    rules:
+      - alert: IngestionBackpressureCritical
+        expr: ingestion_backpressure_level > 2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ingestion pipeline under critical backpressure"
 
-  - alert: ClickHouseReplicationLagHigh
-    expr: clickhouse_replication_lag_seconds > 30
-    for: 2m
-    labels:
-      severity: warning
-    annotations:
-      summary: "ClickHouse replication lag > 30s"
+      - alert: ClickHouseReplicationLagHigh
+        expr: clickhouse_replication_lag_seconds > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ClickHouse replication lag > 30s"
 
-  - alert: APIErrorRateHigh
-    expr: rate(api_errors_total[5m]) / rate(api_requests_total[5m]) > 0.05
-    for: 3m
-    labels:
-      severity: critical
-    annotations:
-      summary: "API error rate > 5%"
+      - alert: APIErrorRateHigh
+        expr: rate(api_errors_total[5m]) / rate(api_requests_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate > 5%"
 ```
 
 ## Implementation Phases
 
 ### Phase 1: Foundation (Week 1-2)
+
 - [ ] ClickHouse cluster provisioning (3 shards, 3 replicas)
 - [ ] Schema deployment + materialized views
 - [ ] Basic API pod with health endpoints
@@ -495,6 +498,7 @@ groups:
 - [ ] CI/CD for API deployments
 
 ### Phase 2: Resilience (Week 3-4)
+
 - [ ] Backpressure controller implementation
 - [ ] Circuit breaker integration
 - [ ] Retry logic with exponential backoff
@@ -502,6 +506,7 @@ groups:
 - [ ] Load testing (100k events/sec target)
 
 ### Phase 3: Query Layer (Week 5-6)
+
 - [ ] Query router (chproxy or custom)
 - [ ] Redis response caching
 - [ ] Export job framework
@@ -509,6 +514,7 @@ groups:
 - [ ] Anomaly/zombie agent APIs
 
 ### Phase 4: Production Hardening (Week 7-8)
+
 - [ ] Multi-region ClickHouse replication
 - [ ] Disaster recovery runbooks
 - [ ] Cost optimization (tiered storage, compression)
@@ -517,14 +523,14 @@ groups:
 
 ## Cost Optimization
 
-| Technique | Estimated Savings |
-|-----------|-------------------|
-| ZSTD compression | 60-70% storage reduction |
+| Technique                   | Estimated Savings                |
+| --------------------------- | -------------------------------- |
+| ZSTD compression            | 60-70% storage reduction         |
 | Tiered storage (SSD→HDD→S3) | 40% cost reduction for cold data |
-| Materialized views | 90% query latency reduction |
-| Partition pruning | 50% scan reduction |
-| LowCardinality columns | 30% storage for enum-like fields |
-| TTL auto-cleanup | Eliminates manual cleanup ops |
+| Materialized views          | 90% query latency reduction      |
+| Partition pruning           | 50% scan reduction               |
+| LowCardinality columns      | 30% storage for enum-like fields |
+| TTL auto-cleanup            | Eliminates manual cleanup ops    |
 
 ---
 

@@ -8,46 +8,46 @@ import (
 
 // IngestionConfig configures the ingestion pipeline
 type IngestionConfig struct {
-	BatchSize          int           // Events per batch
-	BatchTimeout       time.Duration // Max time to wait for batch to fill
-	BufferSize         int           // Channel buffer size
-	MaxRetries         int           // Max retry attempts
-	RetryBackoff       time.Duration // Initial backoff duration
-	MaxBackoff         time.Duration // Max backoff duration
-	WorkerCount        int           // Number of worker goroutines
-	RateLimitRPS       int           // Rate limit (requests per second)
-	EnableDeduplication bool         // Enable prompt fingerprint deduplication
+	BatchSize           int           // Events per batch
+	BatchTimeout        time.Duration // Max time to wait for batch to fill
+	BufferSize          int           // Channel buffer size
+	MaxRetries          int           // Max retry attempts
+	RetryBackoff        time.Duration // Initial backoff duration
+	MaxBackoff          time.Duration // Max backoff duration
+	WorkerCount         int           // Number of worker goroutines
+	RateLimitRPS        int           // Rate limit (requests per second)
+	EnableDeduplication bool          // Enable prompt fingerprint deduplication
 }
 
 // DefaultConfig returns sensible defaults
 func DefaultConfig() IngestionConfig {
 	return IngestionConfig{
-		BatchSize:          1000,
-		BatchTimeout:       5 * time.Second,
-		BufferSize:         10000,
-		MaxRetries:         3,
-		RetryBackoff:       100 * time.Millisecond,
-		MaxBackoff:         30 * time.Second,
-		WorkerCount:        4,
-		RateLimitRPS:       10000,
+		BatchSize:           1000,
+		BatchTimeout:        5 * time.Second,
+		BufferSize:          10000,
+		MaxRetries:          3,
+		RetryBackoff:        100 * time.Millisecond,
+		MaxBackoff:          30 * time.Second,
+		WorkerCount:         4,
+		RateLimitRPS:        10000,
 		EnableDeduplication: true,
 	}
 }
 
 // Event represents a token usage event
 type Event struct {
-	ID            string
-	TenantID      string
-	UserID        string
-	Model         string
-	Feature       string
-	PromptTokens  int64
-	CompletionTokens int64
-	TotalTokens   int64
-	CostUSD       float64
-	Timestamp     time.Time
+	ID                string
+	TenantID          string
+	UserID            string
+	Model             string
+	Feature           string
+	PromptTokens      int64
+	CompletionTokens  int64
+	TotalTokens       int64
+	CostUSD           float64
+	Timestamp         time.Time
 	PromptFingerprint string
-	Metadata      map[string]string
+	Metadata          map[string]string
 }
 
 // EventBatch is a batch of events ready for insertion
@@ -84,7 +84,7 @@ type PipelineStats struct {
 
 // BackpressureSignal signals when the pipeline is under pressure
 type BackpressureSignal struct {
-	Level         string     // "normal", "elevated", "critical"
+	Level         string // "normal", "elevated", "critical"
 	QueueDepth    int
 	ProcessingLag time.Duration
 	Timestamp     time.Time

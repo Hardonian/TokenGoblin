@@ -42,10 +42,10 @@ Day 3: Polish + launch
 
 ## Pricing
 
-| Tier | Price | Features |
-|------|-------|----------|
-| Free | $0 | 1 Stripe account, basic dashboard |
-| Pro | $19/mo | Alerts, multiple accounts, team access |
+| Tier  | Price  | Features                                          |
+| ----- | ------ | ------------------------------------------------- |
+| Free  | $0     | 1 Stripe account, basic dashboard                 |
+| Pro   | $19/mo | Alerts, multiple accounts, team access            |
 | Scale | $49/mo | API access, custom integrations, priority support |
 
 ## Revenue Projection
@@ -59,11 +59,11 @@ Day 3: Polish + launch
 
 ## Competitive Landscape
 
-| Competitor | Price | Weakness |
-|-----------|-------|----------|
-| Runway (app) | $49/mo | Complex, over-engineered |
-| Baremetrics | $59/mo | Expensive, too many features |
-| Spreadsheets | Free | Manual, error-prone, stale |
+| Competitor   | Price  | Weakness                     |
+| ------------ | ------ | ---------------------------- |
+| Runway (app) | $49/mo | Complex, over-engineered     |
+| Baremetrics  | $59/mo | Expensive, too many features |
+| Spreadsheets | Free   | Manual, error-prone, stale   |
 
 **Our edge:** Simpler, cheaper, real-time alerts.
 
@@ -92,11 +92,11 @@ Day 3: Polish + launch
 
 ## Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Stripe API changes | Abstract behind interface, monitor changelog |
-| Low willingness to pay | Free tier hooks them, alerts create urgency |
-| Competition | Move fast, own the "simple" positioning |
+| Risk                   | Mitigation                                   |
+| ---------------------- | -------------------------------------------- |
+| Stripe API changes     | Abstract behind interface, monitor changelog |
+| Low willingness to pay | Free tier hooks them, alerts create urgency  |
+| Competition            | Move fast, own the "simple" positioning      |
 
 ## Next Steps
 

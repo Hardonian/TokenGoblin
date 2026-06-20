@@ -23,7 +23,7 @@ export function GoblinSpinner() {
         </motion.div>
       </div>
       <p className="text-[#10b981] font-mono text-xs uppercase tracking-widest animate-pulse">
-        Eating Tokens...
+        Goblin Hoarding Tokens...
       </p>
     </div>
   );

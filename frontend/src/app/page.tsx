@@ -128,12 +128,12 @@ export default function CommandCenter() {
       <header className="border-b border-[#333] bg-black sticky top-0 z-30">
         <div className="max-w-[1400px] mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
-            <div className="text-[#ffb000] font-black text-xl">
-              [TG_CMD]
+            <div className="text-[#10b981] font-black text-xl">
+              [GOBLIN_CAVERN_OS]
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-widest uppercase">System Overview</h1>
-              <p className="text-xs text-zinc-500 uppercase tracking-[0.2em]">Live Telemetry Active</p>
+              <h1 className="text-lg font-bold text-white tracking-widest uppercase">Chief Goblin&apos;s War Room</h1>
+              <p className="text-xs text-[#ffb000] uppercase tracking-[0.2em]">Sniffing Tokens in Real-time</p>
             </div>
           </div>
           
@@ -190,8 +190,8 @@ export default function CommandCenter() {
         
         {/* TOP ROW: EXECUTIVE SCORECARD */}
         <div>
-          <div className="text-xs text-zinc-600 uppercase tracking-[0.3em] mb-4 border-b border-[#333] pb-2">
-            :: Executive_Telemetry
+          <div className="text-xs text-[#10b981] uppercase tracking-[0.3em] mb-4 border-b border-[#333] pb-2">
+            :: The_Hoard_Status
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <ScoreCard 
@@ -227,9 +227,9 @@ export default function CommandCenter() {
               <div className="border-b border-[#333] px-4 py-3 flex justify-between items-center bg-[#0a0a0a]">
                 <h2 className="text-zinc-300 font-bold tracking-widest text-sm flex items-center gap-2 uppercase">
                   <span className="w-1.5 h-1.5 bg-red-500 animate-pulse"></span>
-                  Cost_Leaks.log
+                  Waste_Sniffer_Active
                 </h2>
-                <span className="text-xs text-zinc-600 uppercase">Engine_v2.0</span>
+                <span className="text-xs text-zinc-600 uppercase">Goblin_Nose_v2.0</span>
               </div>
               <div className="p-4">
                 {costLeaks.length === 0 ? (
@@ -271,10 +271,10 @@ export default function CommandCenter() {
               <div className="p-0 overflow-x-auto relative">
                 {!isPro && (
                   <div className="absolute inset-0 z-10 backdrop-blur-[4px] bg-black/60 flex flex-col items-center justify-center p-6 text-center">
-                    <span className="text-[#ffb000] text-3xl mb-2">🔒</span>
-                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Enterprise Feature</h3>
-                    <p className="text-zinc-400 text-xs mb-4">Upgrade to view full graveyard forensics.</p>
-                    <a href="/billing" className="bg-[#ffb000] text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-[#ff8c00]">Upgrade Now</a>
+                    <span className="text-[#10b981] text-3xl mb-2">🧌</span>
+                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Chief Demands a Toll!</h3>
+                    <p className="text-zinc-400 text-xs mb-4">You need a Hoarder Subscription to see the Graveyard Forensics.</p>
+                    <a href="/pricing" className="bg-[#10b981] text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-[#059669]">Pay the Chief</a>
                   </div>
                 )}
                 <table className="w-full text-xs text-left">
@@ -323,10 +323,10 @@ export default function CommandCenter() {
               <div className="p-4 relative min-h-[200px]">
                 {!isPro && (
                   <div className="absolute inset-0 z-10 backdrop-blur-[4px] bg-black/60 flex flex-col items-center justify-center p-6 text-center">
-                    <span className="text-red-500 text-3xl mb-2">🧟</span>
-                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Pro Feature Locked</h3>
-                    <p className="text-zinc-400 text-xs mb-4">Zombie agent forensics require Pro.</p>
-                    <a href="/billing" className="bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-zinc-200">Unlock Pro</a>
+                    <span className="text-[#10b981] text-3xl mb-2">🧟‍♂️</span>
+                    <h3 className="text-white font-bold uppercase tracking-widest mb-2">Toll Required</h3>
+                    <p className="text-zinc-400 text-xs mb-4">Only Hoarders can track down Zombie Agents.</p>
+                    <a href="/pricing" className="bg-white text-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-zinc-200">Unlock Hoarder Tier</a>
                   </div>
                 )}
                 {zombieAgents.length === 0 ? (

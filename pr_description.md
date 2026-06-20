@@ -1,6 +1,7 @@
 🎯 **What:** This PR addresses a testing gap by adding unit tests for the `HashPrompt` function in `internal/intelligence/engine.go`. `HashPrompt` is a pure function responsible for normalizing and hashing strings, and was previously lacking explicit test coverage.
 
 📊 **Coverage:** The new `TestHashPrompt` table-driven test covers:
+
 - Basic hashing (happy path).
 - Whitespace trimming (leading, trailing, and mixed).
 - Lowercase conversion (case insensitivity).

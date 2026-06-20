@@ -14,6 +14,7 @@
 ## Week 1: Soft Launch
 
 ### Day 1-2: Deploy & Test
+
 ```bash
 # Option A: Fly.io (recommended for Go)
 fly launch --dockerfile Dockerfile
@@ -27,11 +28,13 @@ fly deploy
 ```
 
 ### Day 3-4: Content
-- Write "Show HN" post: "TokenGoblin — Open-source AI spend observability"
+
+- Write "Show HN" post: "TokenGoblin — Let our goblins sniff out your AI spend waste"
 - Prepare Reddit posts for r/SaaS, r/startups, r/Artificial, r/LocalLLaMA
-- Create Twitter/X thread: "We built a tool that tracks AI token costs across agents"
+- Create Twitter/X thread: "We built a goblin cavern to hoard your tokens and sniff out zombie AI agents"
 
 ### Day 5-7: Launch
+
 - Post on Hacker News (Show HN)
 - Post on Indie Hackers
 - Share in relevant Discord servers (AI agent communities)
@@ -40,11 +43,13 @@ fly deploy
 ## Week 2: Content Marketing
 
 ### Blog Posts (write 2-3)
-1. "How We Cut Our AI Spend by 40% with TokenGoblin"
-2. "The Hidden Cost of AI Agents: A Token-by-Token Analysis"
-3. "Open-Source vs. Paid: Building an AI Observability Stack"
+
+1. "How We Fed Our Token Hoard by Cutting AI Spend 40%"
+2. "The Chief Goblin's Guide to Slaying Zombie Agents"
+3. "Open-Source vs. Paid: Building a Goblin War Room"
 
 ### Distribution
+
 - Dev.to (cross-post from blog)
 - Medium (cross-post)
 - LinkedIn (target: CTOs, engineering managers)
@@ -53,18 +58,20 @@ fly deploy
 ## Week 3-4: Product Hunt & Partnerships
 
 ### Product Hunt Launch
+
 - Prepare screenshots, demo video (Loom), tagline
 - Coordinate with friends for initial upvotes
 - Engage with all comments
 
 ### Partnerships
+
 - Reach out to AI agent frameworks (CrewAI, AutoGen, LangGraph)
 - Offer integration guides
 - Guest post on their blogs
 
 ## Conversion Funnel Optimization
 
-```
+```text
 Visitor → Pricing Page (40% of visitors)
        → Signup (10% of pricing visitors = 4% conversion)
        → Ingest Data (60% of signups = 2.4% of visitors)
@@ -77,17 +84,18 @@ Target: 1000 visitors/day → 1.2 Pro signups/day → $35/day → $1050/month
 
 ## Pricing Strategy
 
-| Tier | Price | Target |
-|------|-------|--------|
-| Free | $0 | Hook: get users ingesting data |
-| Pro | $29/mo | Core revenue: small teams, startups |
-| Enterprise | $99/mo | Scale: larger teams, custom needs |
+| Tier                 | Price  | Target                               |
+| -------------------- | ------ | ------------------------------------ |
+| Scout (Free)         | $0     | Hook: get lone goblins sniffing data |
+| Hoarder (Pro)        | $29/mo | Core revenue: token-hungry startups  |
+| Warlord (Enterprise) | $99/mo | Scale: massive agent armies          |
 
 **Annual discount:** 20% off (shown on pricing page toggle)
 
 ## Key Metrics Dashboard
 
 Track weekly:
+
 - Signups (target: 5/day by week 2, 20/day by month 2)
 - Free → Pro conversion (target: 5%)
 - MRR growth (target: $500 by month 1, $2000 by month 3)
@@ -96,11 +104,11 @@ Track weekly:
 
 ## Competitive Positioning
 
-| Competitor | Weakness | Our Edge |
-|-----------|----------|----------|
-| OpenAI Usage Dashboard | OpenAI only | Multi-provider, agent-focused |
-| LangSmith | Complex, expensive | Simple, affordable, self-hosted |
-| Custom spreadsheets | Manual, error-prone | Automated, real-time |
+| Competitor             | Weakness            | Our Edge                        |
+| ---------------------- | ------------------- | ------------------------------- |
+| OpenAI Usage Dashboard | OpenAI only         | Multi-provider, agent-focused   |
+| LangSmith              | Complex, expensive  | Simple, affordable, self-hosted |
+| Custom spreadsheets    | Manual, error-prone | Automated, real-time            |
 
 ## 90-Day Milestones
 

@@ -145,8 +145,14 @@ func (r Registry) Calculate(ctx context.Context, event domain.TokenEvent, fetche
 		}
 	}
 
-	cachedTokens := min(max(event.CachedTokens, 0), max(event.InputTokens, 0))
-	uncachedInput := max(event.InputTokens-cachedTokens, 0)
+	inputTokens := event.InputTokens
+	if inputTokens == 0 && event.PromptExcerpt != "" {
+		// Heuristic: ~4 chars per token for English
+		inputTokens = len(event.PromptExcerpt) / 4
+	}
+
+	cachedTokens := min(max(event.CachedTokens, 0), max(inputTokens, 0))
+	uncachedInput := max(inputTokens-cachedTokens, 0)
 	inputCost := float64(uncachedInput) * point.InputCostPerMillion / 1_000_000
 	cachedCost := float64(cachedTokens) * point.CachedInputCostPerMillion / 1_000_000
 	outputCost := float64(max(event.OutputTokens, 0)) * point.OutputCostPerMillion / 1_000_000

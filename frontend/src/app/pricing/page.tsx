@@ -11,10 +11,10 @@ export const dynamic = "force-dynamic";
 const plans = [
   {
     id: "free",
-    name: "FREE",
+    name: "SCOUT",
     price: "$0",
     period: "forever",
-    description: "Exploratory visibility for small operators.",
+    description: "For lone goblins testing the waters and sniffing tokens.",
     features: [
       "1 tenant",
       "10,000 events/mo",
@@ -27,10 +27,10 @@ const plans = [
   },
   {
     id: "pro",
-    name: "PRO",
+    name: "HOARDER",
     price: "$29",
     period: "per month",
-    description: "Forecasting and cost-leak analysis for active AI fleets.",
+    description: "For serious token hoarders building robust AI fleets.",
     features: [
       "5 tenants",
       "100,000 events/mo",
@@ -43,10 +43,10 @@ const plans = [
   },
   {
     id: "enterprise",
-    name: "ENTERPRISE",
+    name: "WARLORD",
     price: "$99",
     period: "per month",
-    description: "Unlimited observability for platform teams.",
+    description: "For Goblin Warlords commanding massive agent armies.",
     features: [
       "Unlimited tenants",
       "Unlimited events",
@@ -275,16 +275,16 @@ export default function PricingPage() {
         <div className="grid md:grid-cols-2 gap-8">
           {[
             {
-              q: "What happens if I exceed my event limit?",
-              a: "We’ll warn you before you burn the limit. Free operators see degraded estimates. Paid operators stay online with higher caps.",
+              q: "What happens if my token appetite grows?",
+              a: "The Chief Goblin will warn you. Scouts get slower sniffing, Hoarders and Warlords feast uninterrupted.",
             },
             {
-              q: "Can I cancel anytime?",
-              a: "Yes. Cancellation is immediate, and your data remains available in read-only mode for 30 days.",
+              q: "Can I flee the cavern anytime?",
+              a: "Yes. Cancellation is immediate, and your token hoard remains available in read-only mode for 30 days.",
             },
             {
-              q: "Is there an API?",
-              a: "Yes. All plans include API access. Pro and Enterprise get higher rate limits and output-level tooling.",
+              q: "Is there a magical API?",
+              a: "Yes. All plans include API access. Hoarders and Warlords get higher rate limits and output-level tooling.",
             },
             {
               q: "Do you integrate with StripedBank and Settler?",
