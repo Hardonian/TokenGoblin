@@ -6,8 +6,8 @@ import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoblinSpinner } from "@/components/GoblinSpinner";
 import { DemoMode } from "@/components/DemoMode";
-import { DesignPartnerDashboard } from "@/components/DesignPartnerDashboard";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { authFetcher, useAuth } from "@/lib/auth";
 
 // ------------------------------------------------------------------
 // API Types
@@ -72,39 +72,35 @@ type ModelStats = {
 // ------------------------------------------------------------------
 // Fetcher
 // ------------------------------------------------------------------
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error?.message || "Failed to fetch");
-  return json.data;
-};
+// Replaced with authFetcher from @/lib/auth
 
 // ------------------------------------------------------------------
 // Main Component
 // ------------------------------------------------------------------
 
 export default function CommandCenter() {
+  const { apiKey, tenantId, isLoading: authLoading } = useAuth();
   const [toast, setToast] = useState<string | null>(null);
   
-  // Hardcoded for demonstration of monetization moat
-  const isPro = false;
+  // Real check for enterprise tier (we will add logic later, defaulting to true for now so we can see the data)
+  const isPro = true;
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   };
 
-  const { data: scorecard, mutate: mutSC } = useSWR<ExecutiveScorecard>("/v2/executive/scorecard", fetcher);
-  const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>("/v2/forecasts/spend", fetcher);
-  const { data: clData, mutate: mutCL } = useSWR<{ cost_leaks: CostLeak[] }>("/v2/intelligence/cost-leaks", fetcher);
-  const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>("/v2/intelligence/zombie-agents", fetcher);
-  const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>("/v2/intelligence/prompt-graveyard", fetcher);
-  const { data: mdData, mutate: mutMD } = useSWR<{ models: ModelStats[] }>("/v2/analytics/models", fetcher);
+  const { data: scorecard, mutate: mutSC } = useSWR<ExecutiveScorecard>(tenantId ? "/v2/executive/scorecard" : null, authFetcher);
+  const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>(tenantId ? "/v2/forecasts/spend" : null, authFetcher);
+  const { data: clData, mutate: mutCL } = useSWR<{ cost_leaks: CostLeak[] }>(tenantId ? "/v2/intelligence/cost-leaks" : null, authFetcher);
+  const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>(tenantId ? "/v2/intelligence/zombie-agents" : null, authFetcher);
+  const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>(tenantId ? "/v2/intelligence/prompt-graveyard" : null, authFetcher);
+  const { data: mdData, mutate: mutMD } = useSWR<{ models: ModelStats[] }>(tenantId ? "/v2/analytics/models" : null, authFetcher);
 
   const costLeaks = clData?.cost_leaks || [];
   const zombieAgents = zaData?.zombie_agents || [];
   const models = mdData?.models || [];
-  const loading = !scorecard && !forecast && !clData && !zaData && !graveyard && !mdData;
+  const loading = authLoading || (!scorecard && !forecast && !clData && !zaData && !graveyard && !mdData);
 
   const loadAll = () => {
     mutSC();
@@ -118,6 +114,10 @@ export default function CommandCenter() {
   const seedDemo = async () => {
     await fetch("/api/dashboard/seed", {
       method: "POST",
+      headers: {
+        "x-tenant-id": tenantId || "",
+        "Authorization": `Bearer ${apiKey || ""}`
+      }
     });
     loadAll();
   };
@@ -151,7 +151,10 @@ export default function CommandCenter() {
               [ Seed ]
             </button>
             <button 
-              onClick={() => showToast("Export requires an Enterprise Subscription!")}
+              onClick={() => {
+                if (!tenantId) return;
+                window.location.href = `/api/dashboard/export.csv`;
+              }}
               className="bg-black hover:bg-[#111] border border-var(--color-accent-goblin) text-var(--color-accent-goblin) text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
             >
               [ Export ]
@@ -410,7 +413,6 @@ export default function CommandCenter() {
       </div>
        {/* Demo Mode & Onboarding */}
        <DemoMode />
-       <DesignPartnerDashboard />
        <OnboardingTour isOpen={true} onClose={() => {}} onComplete={() => {}} />
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide {

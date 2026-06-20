@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerTenant } from "@/lib/billing";
+import { useAuth } from "@/lib/auth";
 import { SiteFooter } from "@/components/layout";
 import Link from "next/link";
 
@@ -24,13 +25,11 @@ export default function SignupPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!result) return;
-    const timer = setTimeout(() => {
-      router.push(`/billing?tenant_id=${encodeURIComponent(result.tenant_id)}`);
-    }, 4000);
-    return () => clearTimeout(timer);
+    // We handle redirect in handleSubmit now
   }, [result, router]);
 
+  const { login } = useAuth();
+  
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -38,6 +37,13 @@ export default function SignupPage() {
     try {
       const data = await registerTenant(tenantId, name);
       setResult(data);
+      // Automatically log them in since we got the api_key back
+      if (data.api_key && data.tenant_id) {
+        login(data.api_key, data.tenant_id);
+        setTimeout(() => {
+          router.push("/");
+        }, 1500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
