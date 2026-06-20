@@ -24,7 +24,7 @@ export default function GoblinRefinerPage() {
     setStats(null);
 
     try {
-      const res = await fetch("http://localhost:8080/v2/intelligence/refine", {
+      const res = await fetch("/v2/intelligence/refine", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
