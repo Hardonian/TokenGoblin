@@ -53,6 +53,11 @@ type Repository interface {
 	UpsertBudget(ctx context.Context, budget domain.Budget) error
 	ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error)
 
+	GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error)
+	UpsertTuningProfile(ctx context.Context, profile domain.TuningProfile) error
+	GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error)
+	MarkEventsExported(ctx context.Context, eventIDs []string) error
+
 	// Health check
 	Ping(ctx context.Context) error
 

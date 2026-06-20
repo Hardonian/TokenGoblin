@@ -131,3 +131,11 @@ type HallucinationCell struct {
 	FailureRate  float64 `json:"failure_rate"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
 }
+
+// TuningProfile controls the aggressiveness of the Token Refiner on a per-tenant basis.
+type TuningProfile struct {
+	TenantID        string    `json:"tenant_id"`
+	Aggressiveness  float64   `json:"aggressiveness"`   // 0.0 (safe) to 1.0 (aggressive)
+	IgnoredKeywords []string  `json:"ignored_keywords"` // patterns to never trim
+	UpdatedAt       time.Time `json:"updated_at"`
+}

@@ -58,6 +58,7 @@ type TokenEvent struct {
 	TagsJSON         json.RawMessage   `json:"tags,omitempty"`
 	IdempotencyKey   string            `json:"idempotency_key,omitempty"`
 	Fingerprint      string            `json:"fingerprint,omitempty"`
+	IsExported       bool              `json:"is_exported"`
 }
 
 func (e TokenEvent) MarshalJSON() ([]byte, error) {
