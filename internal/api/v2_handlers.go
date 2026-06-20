@@ -190,7 +190,7 @@ func (h *V2Handler) HandleRefinePrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, ok := tenantFromRequest(w, r)
+	tenantID, ok := tenantFromRequest(w, r)
 	if !ok {
 		return
 	}

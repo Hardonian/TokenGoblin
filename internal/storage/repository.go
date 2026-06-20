@@ -235,6 +235,22 @@ func (r *UnavailableRepository) Close() error {
 	return r.Cause
 }
 
+func (r *UnavailableRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
+	return nil, r.Cause
+}
+
+func (r *UnavailableRepository) UpsertTuningProfile(ctx context.Context, p domain.TuningProfile) error {
+	return r.Cause
+}
+
+func (r *UnavailableRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
+	return nil, r.Cause
+}
+
+func (r *UnavailableRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
+	return r.Cause
+}
+
 func (r *UnavailableRepository) Ping(ctx context.Context) error {
 	return r.Cause
 }
