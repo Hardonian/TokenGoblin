@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 
@@ -50,8 +49,6 @@ func (t *AutoTuner) loop() {
 }
 
 func (t *AutoTuner) tune() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	// In a real implementation, we'd list all active tenants.
 	// For this demo, let's assume we tune for any tenant that recently had events,
