@@ -477,6 +477,7 @@ export default function CommandCenter() {
             </table>
           </div>
         </div>
+        </div>
       </div>
        {/* Demo Mode & Onboarding */}
        <DemoMode />

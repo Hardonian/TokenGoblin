@@ -2,9 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { createCheckoutSession, getBillingStatus } from "@/lib/billing";
+import { createCheckoutSession } from "@/lib/billing";
 import { SiteFooter } from "@/components/layout";
-import { useAuth, authFetcher } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

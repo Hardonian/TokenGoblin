@@ -25,6 +25,13 @@ func (m *MockRepository) UpsertTenant(ctx context.Context, tenant domain.Tenant)
 	return nil
 }
 
+func (m *MockRepository) UpdateTenantWebhook(ctx context.Context, tenantID string, url string) error {
+	if t, ok := m.tenants[tenantID]; ok {
+		t.AlertWebhookURL = url
+	}
+	return nil
+}
+
 func (m *MockRepository) GetTenant(ctx context.Context, tenantID string) (*domain.Tenant, error) {
 	if t, ok := m.tenants[tenantID]; ok {
 		return t, nil

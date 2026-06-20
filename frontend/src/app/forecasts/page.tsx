@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { authFetcher, useAuth } from "@/lib/auth";
+import { authFetcher } from "@/lib/auth";
 
 type Envelope<T> = {
   ok: boolean;
