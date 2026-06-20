@@ -104,7 +104,7 @@ func (s *StripeSyncer) Start(ctx context.Context) {
 	}
 }
 
-func (s *StripeSyncer) syncAllTenants(ctx context.Context) {
+func (s *StripeSyncer) syncAllTenants(_ context.Context) {
 	s.logger.Info("Starting Stripe usage sync")
 	// In a real implementation, we would query all tenants,
 	// fetch their Stripe IDs, aggregate their usage since the last sync,

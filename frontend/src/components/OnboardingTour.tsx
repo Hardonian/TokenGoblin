@@ -17,8 +17,7 @@ import {
   Brain,
   DollarSign
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 
 const TOUR_STEPS = [
   {
@@ -259,6 +258,22 @@ export function OnboardingTour({ isOpen, onClose, onComplete }: OnboardingTourPr
       )}
     </AnimatePresence>
   );
+}
+
+function Button({ children, variant, size, className, ...props }: any) {
+  return <button className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${variant === 'ghost' ? 'hover:bg-[#111] text-zinc-400' : variant === 'outline' ? 'border border-[#333] hover:border-zinc-500' : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]'} ${className}`} {...props}>{children}</button>
+}
+function Card({ children, className }: any) {
+  return <div className={`border rounded ${className}`}>{children}</div>
+}
+function CardHeader({ children, className }: any) {
+  return <div className={`p-4 border-b ${className}`}>{children}</div>
+}
+function CardTitle({ children, className }: any) {
+  return <h3 className={`font-bold ${className}`}>{children}</h3>
+}
+function CardContent({ children, className }: any) {
+  return <div className={`p-4 ${className}`}>{children}</div>
 }
 
 function FeatureHighlight({ icon: Icon, title, desc }: { icon: React.ComponentType<{ size?: number }>, title: string, desc: string }) {

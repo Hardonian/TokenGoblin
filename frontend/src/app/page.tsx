@@ -96,10 +96,7 @@ export default function CommandCenter() {
   // Real check for enterprise tier (we will add logic later, defaulting to true for now so we can see the data)
   const isPro = true;
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
+
 
   const { data: scorecard, mutate: mutSC } = useSWR<ExecutiveScorecard>(tenantId ? "/v2/executive/scorecard" : null, authFetcher);
   const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>(tenantId ? "/v2/forecasts/spend" : null, authFetcher);
