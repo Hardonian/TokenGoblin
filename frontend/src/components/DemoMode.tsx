@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
+  LucideIcon,
   Play, 
   Pause, 
   RefreshCw, 
   Zap, 
   TrendingUp, 
-  TrendingDown, 
   AlertTriangle,
   DollarSign,
   Brain,
@@ -111,7 +111,6 @@ function generateDemoEvents(count: number): DemoEvent[] {
 
 function calculateMetrics(events: DemoEvent[]): DemoMetrics {
   const accepted = events.filter(e => e.status === "accepted").length;
-  const flagged = events.filter(e => e.status === "flagged").length;
   const totalCost = events.reduce((sum, e) => sum + e.cost, 0);
   const totalTokens = events.reduce((sum, e) => sum + e.totalTokens, 0);
   
@@ -127,7 +126,7 @@ function calculateMetrics(events: DemoEvent[]): DemoMetrics {
   });
   
   const zombieAgents = Object.entries(workerStats)
-    .filter(([_, stats]) => stats.total > 3 && stats.accepted / stats.total < 0.2)
+    .filter(([, stats]) => stats.total > 3 && stats.accepted / stats.total < 0.2)
     .length;
   
   // Top model by cost
@@ -151,20 +150,16 @@ function calculateMetrics(events: DemoEvent[]): DemoMetrics {
 
 export function DemoMode() {
   const [isRunning, setIsRunning] = useState(false);
-  const [events, setEvents] = useState<DemoEvent[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<DemoEvent[]>([]);
+  const [events, setEvents] = useState<DemoEvent[]>(() => generateDemoEvents(50));
   const [speed, setSpeed] = useState(1);
   const [filterStatus, setFilterStatus] = useState<"all" | "accepted" | "rejected" | "flagged">("all");
-  const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
   
   const metrics = calculateMetrics(events);
 
-  // Generate initial batch
-  useEffect(() => {
-    const initial = generateDemoEvents(50);
-    setEvents(initial);
-    setFilteredEvents(initial);
-  }, []);
+  // Derived state for filtered events
+  const filteredEvents = filterStatus === "all" 
+    ? events 
+    : events.filter(e => e.status === filterStatus);
 
   // Animation loop
   useEffect(() => {
@@ -175,18 +170,8 @@ export function DemoMode() {
       setEvents(prev => [newEvent, ...prev].slice(0, 200));
     }, 2000 / speed);
     
-    setIntervalId(interval);
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, [isRunning, speed, intervalId]);
-
-  // Filter events
-  useEffect(() => {
-    if (filterStatus === "all") {
-      setFilteredEvents(events);
-    } else {
-      setFilteredEvents(events.filter(e => e.status === filterStatus));
-    }
-  }, [events, filterStatus]);
+    return () => clearInterval(interval);
+  }, [isRunning, speed]);
 
   const toggleRunning = () => {
     setIsRunning(!isRunning);
@@ -195,12 +180,10 @@ export function DemoMode() {
   const seedData = () => {
     const fresh = generateDemoEvents(100);
     setEvents(fresh);
-    setFilteredEvents(fresh);
   };
 
   const clearData = () => {
     setEvents([]);
-    setFilteredEvents([]);
   };
 
   return (
@@ -266,7 +249,7 @@ export function DemoMode() {
             aria-label="Event Filter"
             title="Event Filter"
             value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value as any)}
+            onChange={(e) => setFilterStatus(e.target.value as "all" | "accepted" | "rejected" | "flagged")}
             className="bg-[#111] border border-[#333] text-white text-xs px-2 py-1 rounded"
           >
             <option value="all">ALL</option>
@@ -507,7 +490,7 @@ function MetricCard({
 }: { 
   title: string; 
   value: string; 
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   color: string;
   trend?: string;
 }) {
@@ -518,7 +501,7 @@ function MetricCard({
       className="p-4 bg-black border border-[#333] rounded-lg"
     >
       <div className="flex items-center justify-between mb-2">
-        <Icon size={16} style={{ color }} />
+        <Icon size={16} color={color} />
         {trend && (
           <span className={`text-[10px] font-bold uppercase tracking-widest ${trend.startsWith("-") ? "text-green-400" : "text-red-400"}`}>
             {trend}
@@ -613,15 +596,15 @@ function CategoryCostTable({ events }: { events: DemoEvent[] }) {
     if (e.status === "accepted") catStats[e.category].accepted += 1;
   });
 
-  const colors: Record<string, string> = {
-    code_generation: "#3b82f6",
-    code_review: "#22c55e",
-    testing: "#eab308",
-    documentation: "#a855f7",
-    debugging: "#ef4444",
-    architecture: "#06b6d4",
-    refactoring: "#f97316",
-    security_audit: "#ec4899",
+  const categoryBgColors: Record<string, string> = {
+    code_generation: "bg-blue-500",
+    code_review: "bg-green-500",
+    testing: "bg-yellow-500",
+    documentation: "bg-purple-500",
+    debugging: "bg-red-500",
+    architecture: "bg-cyan-500",
+    refactoring: "bg-orange-500",
+    security_audit: "bg-pink-500",
   };
 
   return (
@@ -629,12 +612,12 @@ function CategoryCostTable({ events }: { events: DemoEvent[] }) {
       {Object.entries(catStats)
         .sort(([,a], [,b]) => b.cost - a.cost)
         .map(([cat, stats]) => {
-          const color = colors[cat] || "#888";
+          const bgClass = categoryBgColors[cat] || "bg-zinc-500";
           const acceptanceRate = stats.events > 0 ? (stats.accepted / stats.events) * 100 : 0;
           return (
             <div key={cat} className="flex justify-between items-center p-2 bg-[#111] rounded hover:bg-[#1a1a1a] transition-colors">
               <div className="flex items-center gap-3">
-                <span className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
+                <span className={`w-3 h-3 rounded ${bgClass}`} />
                 <span className="text-zinc-300 font-mono text-sm capitalize">{cat.replace("_", " ")}</span>
               </div>
               <div className="text-right">
@@ -651,19 +634,60 @@ function CategoryCostTable({ events }: { events: DemoEvent[] }) {
   );
 }
 
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "ghost" | "outline" | "default" | "secondary";
+  size?: "sm" | "default";
+}
 
-function Button({ children, variant, size, className, ...props }: any) {
-  return <button className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${variant === 'ghost' ? 'hover:bg-[#111] text-zinc-400' : variant === 'outline' ? 'border border-[#333] hover:border-zinc-500' : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]'} ${className}`} {...props}>{children}</button>
+function Button({ children, variant, size, className, ...props }: ButtonProps) {
+  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-[10px]" : "px-4 py-2 text-xs";
+  const variantClass = variant === 'ghost' 
+    ? 'hover:bg-[#111] text-zinc-400' 
+    : variant === 'outline' 
+      ? 'border border-[#333] hover:border-zinc-500 text-zinc-300' 
+      : variant === 'secondary'
+        ? 'bg-zinc-800 text-white hover:bg-zinc-700'
+        : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]';
+  return (
+    <button 
+      className={`font-bold uppercase tracking-widest rounded transition-colors ${sizeClass} ${variantClass} ${className || ''}`} 
+      {...props}
+    >
+      {children}
+    </button>
+  );
 }
-function Card({ children, className }: any) {
-  return <div className={`border rounded ${className}`}>{children}</div>
+
+type CardProps = React.HTMLAttributes<HTMLDivElement>;
+
+function Card({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`border rounded ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
 }
-function CardHeader({ children, className }: any) {
-  return <div className={`p-4 border-b ${className}`}>{children}</div>
+
+function CardHeader({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`p-4 border-b ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
 }
-function CardTitle({ children, className }: any) {
-  return <h3 className={`font-bold ${className}`}>{children}</h3>
+
+function CardTitle({ children, className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3 className={`font-bold ${className || ''}`} {...props}>
+      {children}
+    </h3>
+  );
 }
-function CardContent({ children, className }: any) {
-  return <div className={`p-4 ${className}`}>{children}</div>
+
+function CardContent({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`p-4 ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
 }

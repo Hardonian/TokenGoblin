@@ -69,7 +69,7 @@ export default function BlogPost() {
               </p>
               <p className="text-zinc-400 leading-relaxed mb-6">
                 Deep analysis revealed 3 agents (6% of fleet) were responsible for $4,200/month in spend 
-                with less than 8% acceptance rates. These 'zombie agents' were:
+                with less than 8% acceptance rates. These &apos;zombie agents&apos; were:
               </p>
               <ul className="space-y-3 text-zinc-400">
                 <li className="flex items-center gap-3">

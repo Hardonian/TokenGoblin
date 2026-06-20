@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authFetcher, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 

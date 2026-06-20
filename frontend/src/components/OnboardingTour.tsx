@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
+  LucideIcon,
   Zap, 
   Shield, 
   BarChart2, 
   Target, 
-  ArrowRight, 
-  X, 
   Check, 
   ChevronRight,
   ChevronLeft,
@@ -98,10 +97,6 @@ export function OnboardingTour({ isOpen, onClose, onComplete }: OnboardingTourPr
 
   const totalSteps = TOUR_STEPS.length;
 
-  if (!isOpen) return null;
-
-  const step = TOUR_STEPS[currentStep];
-
   const goNext = useCallback(() => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
@@ -123,6 +118,10 @@ export function OnboardingTour({ isOpen, onClose, onComplete }: OnboardingTourPr
   const skipTour = useCallback(() => {
     onClose();
   }, [onClose]);
+
+  if (!isOpen) return null;
+
+  const step = TOUR_STEPS[currentStep];
 
   return (
     <AnimatePresence mode="wait">
@@ -241,7 +240,7 @@ export function OnboardingTour({ isOpen, onClose, onComplete }: OnboardingTourPr
                     <Check size={32} className="text-black" />
                   </div>
                   <h4 className="text-lg font-bold text-[#ffb000] uppercase tracking-widest mb-2">ONBOARDING COMPLETE</h4>
-                  <p className="text-zinc-400 text-sm">You're ready to start optimizing your AI spend.</p>
+                  <p className="text-zinc-400 text-sm">You&apos;re ready to start optimizing your AI spend.</p>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -260,23 +259,57 @@ export function OnboardingTour({ isOpen, onClose, onComplete }: OnboardingTourPr
   );
 }
 
-function Button({ children, variant, size, className, ...props }: any) {
-  return <button className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${variant === 'ghost' ? 'hover:bg-[#111] text-zinc-400' : variant === 'outline' ? 'border border-[#333] hover:border-zinc-500' : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]'} ${className}`} {...props}>{children}</button>
-}
-function Card({ children, className }: any) {
-  return <div className={`border rounded ${className}`}>{children}</div>
-}
-function CardHeader({ children, className }: any) {
-  return <div className={`p-4 border-b ${className}`}>{children}</div>
-}
-function CardTitle({ children, className }: any) {
-  return <h3 className={`font-bold ${className}`}>{children}</h3>
-}
-function CardContent({ children, className }: any) {
-  return <div className={`p-4 ${className}`}>{children}</div>
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "ghost" | "outline" | "default" | "secondary";
+  size?: "sm" | "default";
 }
 
-function FeatureHighlight({ icon: Icon, title, desc }: { icon: React.ComponentType<{ size?: number }>, title: string, desc: string }) {
+function Button({ children, variant, size, className, ...props }: ButtonProps) {
+  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-[10px]" : "px-4 py-2 text-xs";
+  const variantClass = variant === 'ghost' 
+    ? 'hover:bg-[#111] text-zinc-400' 
+    : variant === 'outline' 
+      ? 'border border-[#333] hover:border-zinc-500 text-zinc-300' 
+      : variant === 'secondary'
+        ? 'bg-zinc-800 text-white hover:bg-zinc-700'
+        : 'bg-[#ffb000] text-black hover:bg-[#ff8c00]';
+  return (
+    <button 
+      className={`font-bold uppercase tracking-widest rounded transition-colors ${sizeClass} ${variantClass} ${className || ''}`} 
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+type CardProps = React.HTMLAttributes<HTMLDivElement>;
+
+function Card({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`border rounded ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`p-4 border-b ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
+}
+
+function CardContent({ children, className, ...props }: CardProps) {
+  return (
+    <div className={`p-4 ${className || ''}`} {...props}>
+      {children}
+    </div>
+  );
+}
+
+function FeatureHighlight({ icon: Icon, title, desc }: { icon: LucideIcon, title: string, desc: string }) {
   return (
     <div className="p-4 bg-[#111] border border-[#222] rounded-lg group hover:border-[#333] transition-colors">
       <Icon size={20} className="#ffb000 mb-2" />

@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedTenant = localStorage.getItem("tg_tenant_id");
     const storedKey = localStorage.getItem("tg_api_key");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedTenant) setTenantId(storedTenant);
     if (storedKey) setApiKey(storedKey);
     setIsLoading(false);

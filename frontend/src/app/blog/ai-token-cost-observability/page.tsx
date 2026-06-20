@@ -132,7 +132,7 @@ export default function BlogPost() {
                 </h3>
                 <p className="text-zinc-400 leading-relaxed">
                   A single autonomous agent making 100 calls/day at 4k tokens/call = 1.2M tokens/month.
-                  At GPT-4o pricing ($5/$15 per 1M), that's $6-18/month per agent. 
+                  At GPT-4o pricing ($5/$15 per 1M), that&apos;s $6-18/month per agent. 
                   100 agents = $600-1,800/month invisible spend.
                 </p>
               </div>
@@ -158,7 +158,7 @@ export default function BlogPost() {
                   Optimization Opportunities
                 </h3>
                 <p className="text-zinc-400 leading-relaxed">
-                  Without observability, you can't optimize. 30-50% of token spend is typically waste: 
+                  Without observability, you can&apos;t optimize. 30-50% of token spend is typically waste: 
                   redundant calls, over-tokened prompts, hallucination loops, and zombie agents 
                   consuming budget without producing value.
                 </p>
@@ -476,7 +476,7 @@ export default function BlogPost() {
             <div className="bg-[#111] border border-[#333] rounded-xl p-6 mb-8">
               <h3 className="text-white font-bold text-xl mb-4">THE COMPRESSION PIPELINE</h3>
               <p className="text-zinc-400 mb-6">
-                TokenGoblin's compression engine analyzes prompt structure and applies deterministic 
+                TokenGoblin&apos;s compression engine analyzes prompt structure and applies deterministic 
                 reductions with quality guarantees:
               </p>
               <div className="space-y-4">
