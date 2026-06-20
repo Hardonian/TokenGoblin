@@ -174,6 +174,12 @@ export default function CommandCenter() {
               [ Export ]
             </button>
             <button 
+              onClick={() => window.location.href = "/pricing/overrides"}
+              className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-zinc-400 text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
+            >
+              [ Overrides ]
+            </button>
+            <button 
               onClick={loadAll}
               className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
