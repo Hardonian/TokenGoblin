@@ -280,7 +280,7 @@ export function DemoMode() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <MetricCard 
           title="TOTAL EVENTS" 
-          value={metrics.totalEvents} 
+          value={metrics.totalEvents.toLocaleString()} 
           icon={Terminal} 
           color="#ffb000"
           trend="+12%"
