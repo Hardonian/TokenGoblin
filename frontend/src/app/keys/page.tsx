@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { authFetcher, useAuth } from "@/lib/auth";
 
 type APIKey = {
   key_id: string;
@@ -18,16 +19,16 @@ export default function KeysPage() {
   const [generatedKey, setGeneratedKey] = useState("");
   const [generating, setGenerating] = useState(false);
 
+  const { apiKey } = useAuth();
+
   useEffect(() => {
-    fetchKeys();
-  }, []);
+    if (apiKey) fetchKeys();
+  }, [apiKey]);
 
   async function fetchKeys() {
     try {
-      const res = await fetch("/api/tenant/keys");
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error?.message || "Failed to fetch keys");
-      setKeys(data.data || []);
+      const data = await authFetcher("/api/tenant/keys");
+      setKeys(data || []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -44,11 +45,14 @@ export default function KeysPage() {
     try {
       const res = await fetch("/api/tenant/keys", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
         body: JSON.stringify({ name: newKeyName || "generated-key" }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error?.message || "Failed to generate key");
+      if (!res.ok || !data.ok) throw new Error(data.error?.message || "Failed to generate key");
       
       setGeneratedKey(data.data.api_key);
       setNewKeyName("");
@@ -66,9 +70,10 @@ export default function KeysPage() {
     try {
       const res = await fetch(`/api/tenant/keys?key_id=${encodeURIComponent(keyId)}`, {
         method: "DELETE",
+        headers: { "Authorization": `Bearer ${apiKey}` },
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error?.message || "Failed to revoke key");
+      if (!res.ok || !data.ok) throw new Error(data.error?.message || "Failed to revoke key");
       
       fetchKeys();
     } catch (err) {

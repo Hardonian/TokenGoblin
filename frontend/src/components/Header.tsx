@@ -15,6 +15,7 @@ const navLinks = [
   { href: "https://github.com/Hardonian/Settler", label: "Settler", external: true },
   { href: "https://github.com/Hardonian/AIAS", label: "AIAS", external: true },
   { href: "/about", label: "About" },
+  { href: "/scholar", label: "Scholar" },
   { href: "/keys", label: "API Keys" },
   { href: "/login", label: "Login" },
   { href: "/signup", label: "Start" },
