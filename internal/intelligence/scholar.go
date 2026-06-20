@@ -2,10 +2,7 @@ package intelligence
 
 import (
 	"context"
-	"sort"
-	"strings"
 
-	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
 )
 

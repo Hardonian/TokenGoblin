@@ -515,4 +515,3 @@ func (h *V2Handler) HandleScholarInsights(w http.ResponseWriter, r *http.Request
 		Data:   insights,
 	})
 }
-

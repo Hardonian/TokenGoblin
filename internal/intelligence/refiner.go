@@ -29,6 +29,10 @@ func RefinePrompt(input string) string {
 		"i am looking for",
 		"i need you to",
 		"it would be great if",
+		// Dynamic patterns simulated from Scholar Engine
+		"i apologize for",
+		"let's think step by step",
+		"please make sure to",
 	}
 
 	for _, phrase := range slopPhrases {
@@ -63,7 +67,7 @@ func RefinePrompt(input string) string {
 
 	// Final trim
 	refined = strings.TrimSpace(refined)
-	
+
 	// Ensure we don't return an empty string if it was all slop (though unlikely)
 	if refined == "" && len(input) > 0 {
 		return input
