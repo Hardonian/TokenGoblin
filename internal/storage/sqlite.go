@@ -160,7 +160,6 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 			FOREIGN KEY (tenant_id, worker_id) REFERENCES workers(tenant_id, worker_id) ON DELETE CASCADE
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_token_usage_tenant_model ON token_usage_events (tenant_id, model_id);`,
-		`CREATE INDEX IF NOT EXISTS idx_token_usage_is_exported ON token_usage_events (is_exported);`,
 		`CREATE TABLE IF NOT EXISTS tuning_profiles (
 			tenant_id TEXT PRIMARY KEY,
 			aggressiveness REAL NOT NULL DEFAULT 1.0,
@@ -382,6 +381,9 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 	if err := r.ensureSQLiteColumns(ctx); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_token_usage_is_exported ON token_usage_events (is_exported);`); err != nil {
+		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
+	}
 	if _, err := r.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_idempotency ON token_usage_events(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`); err != nil {
 		return fmt.Errorf("%w: migrate sqlite: %v", ErrUnavailable, err)
 	}
@@ -409,6 +411,7 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 			"prompt_reference": "TEXT",
 			"output_reference": "TEXT",
 			"fingerprint":      "TEXT",
+			"is_exported":      "BOOLEAN NOT NULL DEFAULT FALSE",
 		},
 		"api_keys": {
 			"role": "TEXT NOT NULL DEFAULT 'admin'",
@@ -1491,7 +1494,7 @@ func (s *SQLiteRepository) UpsertTuningProfile(ctx context.Context, p domain.Tun
 			updated_at=excluded.updated_at
 	`
 	keywordsBytes, _ := json.Marshal(p.IgnoredKeywords)
-	
+
 	_, err := s.db.ExecContext(ctx, query, p.TenantID, p.Aggressiveness, string(keywordsBytes), time.Now().Format(time.RFC3339))
 	return err
 }
@@ -1567,7 +1570,7 @@ func (s *SQLiteRepository) MarkEventsExported(ctx context.Context, eventIDs []st
 	// Simple IN clause construction
 	placeholders := strings.Repeat("?,", len(eventIDs)-1) + "?"
 	query := fmt.Sprintf("UPDATE token_usage_events SET is_exported = TRUE WHERE event_id IN (%s)", placeholders)
-	
+
 	args := make([]interface{}, len(eventIDs))
 	for i, id := range eventIDs {
 		args[i] = id
