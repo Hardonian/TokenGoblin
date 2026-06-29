@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TokenGoblin — AI Spend & Token-Efficiency Observability</title>
+  <style>
+    :root{--bg:#08101d;--card:#121c33;--text:#eef2ff;--dim:#95a5ce;--accent:#6d5efc;--border:#253356;--green:#23c483;--yellow:#f7b955}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:linear-gradient(180deg,#08101d,#111a31);color:var(--text)}
+    .wrap{max-width:1180px;margin:0 auto;padding:34px 20px 90px}.hero{padding:42px 0 16px}.hero h1{font-size:60px;line-height:1.02;margin:0 0 12px}.hero p{font-size:20px;color:var(--dim);max-width:820px}
+    .buttons{display:flex;gap:14px;flex-wrap:wrap;margin:24px 0}.btn{display:inline-block;text-decoration:none;padding:14px 18px;border-radius:12px;font-weight:800}.btn.primary{background:var(--accent);color:#fff}.btn.secondary{border:1px solid var(--border);color:var(--text)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin:26px 0}.card{background:rgba(18,28,51,.94);border:1px solid var(--border);border-radius:18px;padding:22px}.kicker{color:var(--green);font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.muted{color:var(--dim)}
+    .price{font-size:38px;font-weight:900}.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(109,94,252,.18);color:#c8c0ff;font-size:12px;font-weight:800}
+    ul{padding-left:18px;color:var(--dim)} pre{background:#09101f;border:1px solid var(--border);padding:16px;border-radius:14px;white-space:pre-wrap;color:#b8c2e7}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="kicker">AI Spend Observability</div>
+      <h1>TokenGoblin — Catch the little monsters eating your AI spend</h1>
+      <p>Track, analyze, and optimize AI token spending across your autonomous agent workforce. Local-first, privacy-preserving, built for teams running production AI workloads.</p>
+      <div class="buttons">
+        <a class="btn primary" href="https://tokengoblin-frontend.pages.dev">Open Dashboard</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="kicker">Track</div>
+          <h3>Token ingestion</h3>
+          <div class="muted">Ingest token usage from OpenAI, Anthropic, local models, and custom providers via simple API.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Analyze</div>
+          <h3>Spend intelligence</h3>
+          <div class="muted">Break down costs by model, agent, workflow, team, and time. Spot anomalies and drift automatically.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Optimize</div>
+          <h3>Efficiency recommendations</h3>
+          <div class="muted">Get actionable suggestions: model routing, prompt compression, caching, batching, and routing rules.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Stack</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Cloudflare Workers</h3>
+          <div class="muted">API + ingestion + scheduled analytics</div>
+        </div>
+        <div class="card">
+          <h3>Cloudflare D1</h3>
+          <div class="muted">SQLite-compatible serverless database</div>
+        </div>
+        <div class="card">
+          <h3>Cloudflare Pages</h3>
+          <div class="muted">Dashboard + landing page</div>
+        </div>
+        <div class="card">
+          <h3>Go + TypeScript SDKs</h3>
+          <div class="muted">Language-agnostic ingestion clients</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Current status</h2>
+      <pre>Worker: Deployed (tokengoblin-api)
+Dashboard: Pages (tokengoblin-frontend)
+Landing: Pages (tokengoblin-landing)
+D1 Database: token_goblin (configured)
+
+Next:
+- Complete dashboard UI (React + charts)
+- Add Stripe billing integration
+- Build team/workspace isolation
+- Add optimization recommendation engine</pre>
+    </section>
+  </div>
+</body>
+</html>
