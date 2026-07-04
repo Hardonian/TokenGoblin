@@ -1,157 +1,101 @@
 /**
- * Cloudflare Workers API for TokenGoblin
- * "Catch the little monsters eating your AI spend."
- * Free tier: 100K req/day
+ * Cloudflare Worker for TokenGoblin API.
+ * Dependency-free router for LLM token/cost telemetry and spend alerts.
  */
 
-import { Router } from 'itty-router';
-
-const router = Router();
+const SERVICE = 'tokengoblin-api';
+const VERSION = '0.1.0';
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status, headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
+}
+function error(message, status = 400) { return json({ error: message }, status); }
+async function parseJSON(request) { try { return await request.json(); } catch { return {}; } }
+
+async function ensureSchema(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS usage_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key_id TEXT,
+    model TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS spend_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key_id TEXT,
+    threshold REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run();
 }
 
-function error(message, status = 400) {
-  return json({ error: message }, status);
+async function createUsage(request, env) {
+  await ensureSchema(env);
+  const body = await parseJSON(request);
+  const input = Number(body.input_tokens || 0);
+  const output = Number(body.output_tokens || 0);
+  const cost = Number(body.cost || 0);
+  await env.DB.prepare(
+    `INSERT INTO usage_events (api_key_id, model, input_tokens, output_tokens, cost, created_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`
+  ).bind(body.api_key_id || null, body.model || 'unknown', input, output, cost).run();
+  const latest = await env.DB.prepare('SELECT * FROM usage_events ORDER BY id DESC LIMIT 1').first();
+  return json({ service: SERVICE, usage: latest }, 201);
 }
 
-router.get('/health', () => json({
-  status: 'ok', service: 'TokenGoblin', version: '0.1.0',
-  timestamp: new Date().toISOString(),
-}));
+async function usageSummary(env) {
+  await ensureSchema(env);
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS events, COALESCE(SUM(input_tokens),0) AS input_tokens,
+            COALESCE(SUM(output_tokens),0) AS output_tokens, COALESCE(SUM(cost),0) AS cost
+     FROM usage_events`
+  ).first();
+  return json({ service: SERVICE, summary: row });
+}
 
-// ─── API Keys ────────────────────────────────────────────────────
-
-router.get('/api/v1/keys', async (request, env) => {
-  const result = await env.DB.prepare(
-    'SELECT id, name, platform, created_at FROM api_keys ORDER BY created_at DESC LIMIT 50'
-  ).all();
-  return json({ keys: result.results });
-});
-
-router.post('/api/v1/keys', async (request, env) => {
-  const body = await request.json();
-  const { name, platform, prefix } = body;
-  if (!name) return error('name is required');
-
-  const keyHash = 'tg_' + crypto.randomUUID().slice(0, 32);
-  const result = await env.DB.prepare(
-    `INSERT INTO api_keys (name, key_hash, platform, prefix, status, created_at)
-     VALUES (?, ?, ?, ?, 'active', datetime('now'))`
-  ).bind(name, keyHash, prefix || 'tg', prefix || 'tg').run();
-
-  return json({ id: result.meta.last_row_id, name, key: keyHash, message: 'Store this key — it won\'t be shown again' });
-});
-
-// ─── Usage Tracking ──────────────────────────────────────────────
-
-router.post('/api/v1/usage', async (request, env) => {
-  const body = await request.json();
-  const { api_key_id, endpoint, model, tokens_input, tokens_output, cost } = body;
-
-  const result = await env.DB.prepare(
-    `INSERT INTO usage_events (api_key_id, endpoint, model, tokens_input, tokens_output, cost, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
-  ).bind(api_key_id, endpoint || 'unknown', model || 'unknown', tokens_input || 0, tokens_output || 0, cost || 0).run();
-
-  return json({ event_id: result.meta.last_row_id, status: 'recorded' });
-});
-
-router.get('/api/v1/usage/:api_key_id', async (request, env) => {
-  const keyId = parseInt(request.params.api_key_id);
-  const result = await env.DB.prepare(
-    `SELECT endpoint, model, SUM(tokens_input) as tokens_in, SUM(tokens_output) as tokens_out,
-     SUM(cost) as total_cost, COUNT(*) as requests
-     FROM usage_events WHERE api_key_id = ?
-     GROUP BY endpoint, model ORDER BY total_cost DESC`
-  ).bind(keyId).all();
-  return json({ usage: result.results });
-});
-
-// ─── Spend Alerts ────────────────────────────────────────────────
-
-router.post('/api/v1/alerts', async (request, env) => {
-  const body = await request.json();
-  const { api_key_id, threshold, channel } = body;
-  if (!api_key_id || !threshold) return error('api_key_id and threshold are required');
-
-  const result = await env.DB.prepare(
-    `INSERT INTO spend_alerts (api_key_id, threshold, channel, status, created_at)
-     VALUES (?, ?, ?, 'active', datetime('now'))`
-  ).bind(api_key_id, threshold, channel || 'slack').run();
-
-  return json({ alert_id: result.meta.last_row_id, threshold, channel: channel || 'slack' });
-});
-
-// ─── Stats ───────────────────────────────────────────────────────
-
-router.get('/api/v1/stats', async (request, env) => {
-  const keys = await env.DB.prepare('SELECT COUNT(*) as c FROM api_keys').first();
-  const events = await env.DB.prepare('SELECT COUNT(*) as c FROM usage_events').first();
-  const totalCost = await env.DB.prepare('SELECT COALESCE(SUM(cost), 0) as total FROM usage_events').first();
-  const totalTokens = await env.DB.prepare('SELECT COALESCE(SUM(tokens_input + tokens_output), 0) as total FROM usage_events').first();
-
-  return json({
-    api_keys: keys.count,
-    total_events: events.count,
-    total_cost_usd: totalCost.total,
-    total_tokens: totalTokens.total,
-  });
-});
-
-// ─── Webhook (internal) ──────────────────────────────────────────
-
-router.post('/api/v1/webhook/stripe', async (request, env) => {
-  // Handle Stripe webhooks for billing
-  const body = await request.json();
-  if (body.type === 'checkout.session.completed') {
-    // Provision API key or extend subscription
-    return json({ status: 'processed', type: body.type });
-  }
-  return json({ status: 'ignored', type: body.type });
-});
-
-// ─── GitHub Webhook ──────────────────────────────────────────────
-
-router.post('/api/v1/webhook/github', async (request, env) => {
-  const event = request.headers.get('x-github-event');
-  const payload = await request.json();
-  if (event === 'push') return json({ status: 'received', repo: payload.repository?.full_name });
-  return json({ status: 'ignored', event });
-});
-
-// ─── Cron: Spend monitoring ──────────────────────────────────────
+async function listAlerts(env) {
+  await ensureSchema(env);
+  const result = await env.DB.prepare('SELECT * FROM spend_alerts ORDER BY created_at DESC LIMIT 50').all();
+  return json({ service: SERVICE, alerts: result.results || [] });
+}
 
 async function handleCron(event, env) {
-  // Check spend alerts
-  const alerts = await env.DB.prepare(
-    'SELECT * FROM spend_alerts WHERE status = 'active''
-  ).all();
-
+  await ensureSchema(env);
+  const alerts = await env.DB.prepare("SELECT * FROM spend_alerts WHERE status = 'active'").all();
   let triggered = 0;
-  for (const alert of alerts.results) {
+  for (const alert of alerts.results || []) {
     const spend = await env.DB.prepare(
       `SELECT COALESCE(SUM(cost), 0) as total FROM usage_events
        WHERE api_key_id = ? AND created_at >= datetime('now', '-1 day')`
     ).bind(alert.api_key_id).first();
-
-    if (spend.total >= alert.threshold) {
+    if (Number(spend.total) >= Number(alert.threshold)) {
       triggered++;
-      await env.DB.prepare(
-        "UPDATE spend_alerts SET status = 'triggered' WHERE id = ?"
-      ).bind(alert.id).run();
+      await env.DB.prepare("UPDATE spend_alerts SET status = 'triggered' WHERE id = ?").bind(alert.id).run();
     }
   }
-
-  return json({ alerts_checked: alerts.results.length, triggered });
+  return { alerts_checked: (alerts.results || []).length, triggered };
 }
 
-router.all('*', () => error('Not found', 404));
+async function route(request, env) {
+  const url = new URL(request.url);
+  if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+  if (url.pathname === '/' || url.pathname === '/health' || url.pathname === '/api/v1/health') {
+    return json({ status: 'ok', service: SERVICE, version: VERSION, timestamp: new Date().toISOString() });
+  }
+  if (url.pathname === '/api/v1/usage' && request.method === 'POST') return createUsage(request, env);
+  if (url.pathname === '/api/v1/usage' && request.method === 'GET') return usageSummary(env);
+  if (url.pathname === '/api/v1/alerts' && request.method === 'GET') return listAlerts(env);
+  return error('Not found', 404);
+}
 
 export default {
-  async fetch(request, env, ctx) { return router.fetch(request, env, ctx); },
+  async fetch(request, env, ctx) { return route(request, env); },
   async scheduled(event, env, ctx) { ctx.waitUntil(handleCron(event, env)); },
 };

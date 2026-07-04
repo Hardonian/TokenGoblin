@@ -10,7 +10,7 @@ LOG_LEVEL = "INFO"
 [[d1_databases]]
 binding = "DB"
 database_name = "token_goblin"
-database_id = "placeholder-id"
+database_id = "b3498282-4c1a-43cc-9500-c4af38bd0071"
 
 [[routes]]
 pattern = "tokengoblin.example.com"
