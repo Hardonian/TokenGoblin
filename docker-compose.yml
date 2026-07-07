@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8081:8080"
     environment:
       - PORT=8080
       - DATABASE_URL=sqlite:///data/token_goblin.db
@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       - PORT=3000
       - NEXT_PUBLIC_TG_API_BASE=http://backend:8080
