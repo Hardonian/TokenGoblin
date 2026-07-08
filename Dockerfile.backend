@@ -17,7 +17,7 @@ ENV PORT=8080
 ENV DATABASE_URL="file:/data/token_goblin.db"
 ENV TZ=UTC
 
-RUN chown -R 1001:1001 /app /data
+RUN mkdir -p /data && chown -R 1001:1001 /app /data
 USER 1001:1001
 
 VOLUME ["/data"]
