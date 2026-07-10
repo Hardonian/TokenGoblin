@@ -21,7 +21,7 @@ services:
       - token-goblin-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/dashboard/overview", "-H", "x-tenant-id: health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
