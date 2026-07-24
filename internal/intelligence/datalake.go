@@ -84,7 +84,7 @@ func (e *DataLakeExporter) exportBatch() {
 
 	dateStr := time.Now().Format("2006-01-02")
 	filename := filepath.Join(e.sinkDir, "token_events_"+dateStr+".jsonl")
-	
+
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("[DataLake] Failed to open sink file: %v", err)

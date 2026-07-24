@@ -3,9 +3,45 @@ package intelligence
 import (
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 )
+
+var (
+	reSpaces = regexp.MustCompile(`[ \t]+`)
+	reBreaks = regexp.MustCompile(`\n\s*\n`)
+
+	reJSONOpenBrace  = regexp.MustCompile(`\s*\{\s*`)
+	reJSONCloseBrace = regexp.MustCompile(`\s*\}\s*`)
+	reJSONOpenBrack  = regexp.MustCompile(`\s*\[\s*`)
+	reJSONCloseBrack = regexp.MustCompile(`\s*\]\s*`)
+	reJSONColon      = regexp.MustCompile(`\s*:\s*`)
+
+	slopRegexesMu sync.RWMutex
+	slopRegexes   = make(map[string]*regexp.Regexp)
+)
+
+func getSlopRegex(phrase string) *regexp.Regexp {
+	slopRegexesMu.RLock()
+	re, ok := slopRegexes[phrase]
+	slopRegexesMu.RUnlock()
+	if ok {
+		return re
+	}
+
+	slopRegexesMu.Lock()
+	defer slopRegexesMu.Unlock()
+
+	// Double check
+	if re, ok := slopRegexes[phrase]; ok {
+		return re
+	}
+
+	re = regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(phrase) + `\b[ \t]*`)
+	slopRegexes[phrase] = re
+	return re
+}
 
 // RefinePrompt analyzes a prompt, removes conversational slop, trims excess whitespace,
 // and minifies any JSON structures to reduce token count before sending to an LLM.
@@ -54,24 +90,21 @@ func RefinePrompt(input string, profile *domain.TuningProfile) string {
 		}
 
 		// Case insensitive replacement using regex for word boundaries
-		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(phrase) + `\b[ \t]*`)
+		re := getSlopRegex(phrase)
 		refined = re.ReplaceAllString(refined, "")
 	}
 
 	// 3. Compact multiple spaces, tabs, and line breaks
-	reSpaces := regexp.MustCompile(`[ \t]+`)
 	refined = reSpaces.ReplaceAllString(refined, " ")
-
-	reBreaks := regexp.MustCompile(`\n\s*\n`)
 	refined = reBreaks.ReplaceAllString(refined, "\n")
 
 	// 4. JSON minification if aggressiveness is high enough
 	if profile == nil || profile.Aggressiveness >= 0.8 {
-		refined = regexp.MustCompile(`\s*\{\s*`).ReplaceAllString(refined, "{")
-		refined = regexp.MustCompile(`\s*\}\s*`).ReplaceAllString(refined, "}")
-		refined = regexp.MustCompile(`\s*\[\s*`).ReplaceAllString(refined, "[")
-		refined = regexp.MustCompile(`\s*\]\s*`).ReplaceAllString(refined, "]")
-		refined = regexp.MustCompile(`\s*:\s*`).ReplaceAllString(refined, ":")
+		refined = reJSONOpenBrace.ReplaceAllString(refined, "{")
+		refined = reJSONCloseBrace.ReplaceAllString(refined, "}")
+		refined = reJSONOpenBrack.ReplaceAllString(refined, "[")
+		refined = reJSONCloseBrack.ReplaceAllString(refined, "]")
+		refined = reJSONColon.ReplaceAllString(refined, ":")
 	}
 
 	// Final trim
