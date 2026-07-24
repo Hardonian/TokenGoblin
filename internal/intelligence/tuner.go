@@ -55,12 +55,12 @@ func (t *AutoTuner) tune() {
 	// Actually, let's query the most recent ProductivitySummaries or just
 	// let the front-end create an event and trigger a tune.
 	// We'll fake it by scanning a known set of active tenants if possible.
-	
+
 	// Since we don't have a direct ListActiveTenants, we can list budgets as a proxy to get tenant IDs.
 	// Wait, we need a list of tenant IDs. Let's just do a mock run where it logs,
 	// because true auto-tuning requires the data lake output which might be processed externally.
 	log.Println("[AutoTuner] Running tuning cycle...")
-	
+
 	// In the real system, this would:
 	// 1. Read aggregate metrics from the Data Lake (via BigQuery).
 	// 2. Identify tenants with high failure rates (OutputStatus == failed/rejected).
