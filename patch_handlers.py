@@ -1,4 +1,3 @@
-import os
 
 # Update billing_handlers.go
 with open('internal/api/billing_handlers.go', 'r') as f:
