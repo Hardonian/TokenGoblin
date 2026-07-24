@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	_ "modernc.org/sqlite"
 )
+
+var validSqliteTableRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 const defaultDBPath = "./data/tokengoblin.sqlite"
 
@@ -435,6 +438,9 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 }
 
 func (r *SQLiteRepository) sqliteColumnExists(ctx context.Context, table, column string) (bool, error) {
+	if !validSqliteTableRegex.MatchString(table) {
+		return false, fmt.Errorf("invalid table name: %s", table)
+	}
 	rows, err := r.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return false, wrapDBErr(err)
