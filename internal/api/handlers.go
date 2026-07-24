@@ -1101,57 +1101,73 @@ func (h *IngestionHandler) HandleExportTenant(w http.ResponseWriter, r *http.Req
 
 	// Get overview/summary
 	summary, err := h.Service.Overview(r.Context(), tenantID)
-	if err == nil {
-		export["overview"] = summary
-	} else {
+	if err != nil {
 		export["overview_error"] = err.Error()
+	} else {
+		export["overview"] = summary
 	}
 
 	// Get recent events
 	events, err := h.Service.RecentEvents(r.Context(), tenantID, 10000)
-	if err == nil {
+	if err != nil {
+		export["events_error"] = err.Error()
+	} else {
 		export["events"] = events
 	}
 
 	// Get workers
 	workers, err := h.Service.Workers(r.Context(), tenantID)
-	if err == nil {
+	if err != nil {
+		export["workers_error"] = err.Error()
+	} else {
 		export["workers"] = workers
 	}
 
 	// Get anomalies
 	anomalies, err := h.Service.Anomalies(r.Context(), tenantID, 100)
-	if err == nil {
+	if err != nil {
+		export["anomalies_error"] = err.Error()
+	} else {
 		export["anomalies"] = anomalies
 	}
 
 	// Get audit events
 	auditEvents, err := h.Service.AuditEvents(r.Context(), tenantID, 1000)
-	if err == nil {
+	if err != nil {
+		export["audit_events_error"] = err.Error()
+	} else {
 		export["audit_events"] = auditEvents
 	}
 
 	// Get tenant members
 	members, err := h.Service.TenantMembers(r.Context(), tenantID)
-	if err == nil {
+	if err != nil {
+		export["tenant_members_error"] = err.Error()
+	} else {
 		export["tenant_members"] = members
 	}
 
 	// Get pricing
 	pricing, err := h.Service.GetActivePricing(r.Context(), tenantID)
-	if err == nil {
+	if err != nil {
+		export["pricing_error"] = err.Error()
+	} else {
 		export["pricing"] = pricing
 	}
 
 	// Get output analyses
 	analyses, err := h.Service.OutputAnalyses(r.Context(), tenantID, 100)
-	if err == nil {
+	if err != nil {
+		export["output_analyses_error"] = err.Error()
+	} else {
 		export["output_analyses"] = analyses
 	}
 
 	// Get recommendations
 	recs, err := h.Service.Recommendations(r.Context(), tenantID)
-	if err == nil {
+	if err != nil {
+		export["recommendations_error"] = err.Error()
+	} else {
 		export["recommendations"] = recs
 	}
 
