@@ -1579,3 +1579,54 @@ func (s *SQLiteRepository) MarkEventsExported(ctx context.Context, eventIDs []st
 	_, err := s.db.ExecContext(ctx, query, args...)
 	return err
 }
+
+func (r *SQLiteRepository) SaveAnomalySignalBatch(ctx context.Context, signals []domain.AnomalySignal) error {
+    if len(signals) == 0 {
+        return nil
+    }
+
+    tx, err := r.db.BeginTx(ctx, nil)
+    if err != nil {
+        return wrapDBErr(err)
+    }
+    defer rollback(tx)
+
+    stmt, err := tx.PrepareContext(ctx, `
+        INSERT INTO anomaly_signals (
+            tenant_id, anomaly_id, event_id, worker_id, detected_at, severity,
+            type, description, observed_value, threshold_value, details_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(tenant_id, anomaly_id) DO UPDATE SET
+            detected_at = excluded.detected_at,
+            severity = excluded.severity,
+            description = excluded.description,
+            observed_value = excluded.observed_value,
+            threshold_value = excluded.threshold_value,
+            details_json = excluded.details_json,
+            created_at = excluded.created_at
+    `)
+    if err != nil {
+        return wrapDBErr(err)
+    }
+    defer stmt.Close()
+
+    for _, signal := range signals {
+        detailsJSON, err := marshalNullable(signal.Details)
+        if err != nil {
+            return err
+        }
+
+        _, err = stmt.ExecContext(ctx,
+            signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
+            signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
+            signal.ObservedValue, signal.ThresholdValue, detailsJSON,
+            time.Now().UTC(),
+        )
+        if err != nil {
+            return wrapDBErr(err)
+        }
+    }
+
+    return tx.Commit()
+}
