@@ -138,6 +138,15 @@ func (m *MockRepository) SaveAnomalySignal(ctx context.Context, signal domain.An
 	return nil
 }
 
+func (m *MockRepository) SaveAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error {
+	for _, s := range signals {
+		if err := m.SaveAnomalySignal(ctx, s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *MockRepository) SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error {
 	return nil
 }

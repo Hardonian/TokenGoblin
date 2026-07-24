@@ -37,6 +37,7 @@ type Repository interface {
 	SaveTokenEvent(ctx context.Context, event domain.TokenEvent) error
 	SaveCostSnapshot(ctx context.Context, snapshot domain.CostSnapshot) error
 	SaveAnomalySignal(ctx context.Context, signal domain.AnomalySignal) error
+	SaveAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error
 	SaveOutputAnalysis(ctx context.Context, analysis domain.OutputAnalysis) error
 	SaveProductivitySummary(ctx context.Context, summary domain.ProductivitySummary) error
 	ListOutputAnalyses(ctx context.Context, tenantID string, limit int) ([]domain.OutputAnalysis, error)
@@ -176,6 +177,10 @@ func (r *UnavailableRepository) SaveCostSnapshot(context.Context, domain.CostSna
 }
 
 func (r *UnavailableRepository) SaveAnomalySignal(context.Context, domain.AnomalySignal) error {
+	return r.err()
+}
+
+func (r *UnavailableRepository) SaveAnomalySignals(context.Context, []domain.AnomalySignal) error {
 	return r.err()
 }
 

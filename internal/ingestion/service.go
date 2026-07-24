@@ -143,10 +143,8 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 		return err
 	}
 	if len(signals) > 0 {
-		for _, signal := range signals {
-			if err := s.repo.SaveAnomalySignal(ctx, signal); err != nil {
-				return err
-			}
+		if err := s.repo.SaveAnomalySignals(ctx, signals); err != nil {
+			return err
 		}
 
 		// Run alerter asynchronously

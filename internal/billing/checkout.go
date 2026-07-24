@@ -78,8 +78,6 @@ func stripePost(path string, data url.Values) ([]byte, error) {
 	return respBody, nil
 }
 
-
-
 // CreateCheckoutSession creates a Stripe Checkout Session for the tenant and
 // returns the hosted checkout URL and session ID.
 func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantID, successURL, cancelURL, priceID string) (string, string, error) {
