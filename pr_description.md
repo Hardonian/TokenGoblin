@@ -1,12 +1,11 @@
-🎯 **What:** This PR addresses a testing gap by adding unit tests for the `HashPrompt` function in `internal/intelligence/engine.go`. `HashPrompt` is a pure function responsible for normalizing and hashing strings, and was previously lacking explicit test coverage.
+🎯 What
+Removed a chunk of commented-out stub logic from `internal/billing/stripe.go` inside the `syncAllTenants` function.
 
-📊 **Coverage:** The new `TestHashPrompt` table-driven test covers:
+💡 Why
+The stub block was simply dead code. It added noise and didn't serve a useful purpose for maintaining the logic of the system, reducing readability.
 
-- Basic hashing (happy path).
-- Whitespace trimming (leading, trailing, and mixed).
-- Lowercase conversion (case insensitivity).
-- Empty string behavior.
-- Strings containing only whitespace.
-- Hash stability (same input consistently yields the same 64-character SHA-256 hex string).
+✅ Verification
+Ran the `npm run lint` and `npm run test` scripts; all lint checks passed and all unit tests succeeded.
 
-✨ **Result:** Test coverage for `internal/intelligence/engine.go` is improved, documenting and enforcing the normalization behavior (trimming, lowercasing) of the `HashPrompt` utility function.
+✨ Result
+Improved code health and maintainability by keeping source files clean and clear of unused dead code blocks.
