@@ -15,5 +15,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "jest-environment-jsdom": "^30.4.1"
   }
 }
