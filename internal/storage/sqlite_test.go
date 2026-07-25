@@ -9,6 +9,7 @@ import (
 
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
 
@@ -121,4 +122,23 @@ func TestNormalizeRole(t *testing.T) {
 			assert.Equal(t, tt.expected, normalizeRole(tt.role))
 		})
 	}
+}
+
+func TestIsValidSQLIdentifier(t *testing.T) {
+	assert.True(t, isValidSQLIdentifier("tenants"))
+	assert.True(t, isValidSQLIdentifier("token_usage_events"))
+	assert.False(t, isValidSQLIdentifier("token_usage_events; DROP TABLE users;"))
+	assert.False(t, isValidSQLIdentifier("a b"))
+	assert.False(t, isValidSQLIdentifier(""))
+}
+
+func TestSQLiteColumnExists_SQLInjection(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.sqlite")
+	repo, err := OpenSQLite(context.Background(), dbPath)
+	require.NoError(t, err)
+	defer repo.Close()
+
+	_, err = repo.sqliteColumnExists(context.Background(), "tenants; DROP TABLE users;", "id")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid table name")
 }

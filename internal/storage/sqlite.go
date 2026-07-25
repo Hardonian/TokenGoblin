@@ -396,6 +396,19 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 	return nil
 }
 
+
+func isValidSQLIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 	tables := map[string]map[string]string{
 		"tenants": {
@@ -418,7 +431,13 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 		},
 	}
 	for table, columns := range tables {
+		if !isValidSQLIdentifier(table) {
+			return fmt.Errorf("invalid table name: %s", table)
+		}
 		for column, definition := range columns {
+			if !isValidSQLIdentifier(column) {
+				return fmt.Errorf("invalid column name: %s", column)
+			}
 			exists, err := r.sqliteColumnExists(ctx, table, column)
 			if err != nil {
 				return err
@@ -435,6 +454,9 @@ func (r *SQLiteRepository) ensureSQLiteColumns(ctx context.Context) error {
 }
 
 func (r *SQLiteRepository) sqliteColumnExists(ctx context.Context, table, column string) (bool, error) {
+	if !isValidSQLIdentifier(table) {
+		return false, fmt.Errorf("invalid table name: %s", table)
+	}
 	rows, err := r.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return false, wrapDBErr(err)
