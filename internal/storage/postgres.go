@@ -1056,3 +1056,61 @@ func (r *PostgresRepository) GetUnexportedEvents(ctx context.Context, limit int)
 func (r *PostgresRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
 	return errors.New("not implemented in postgres")
 }
+
+func (r *PostgresRepository) SaveAnomalySignalBatch(ctx context.Context, signals []domain.AnomalySignal) error {
+    if len(signals) == 0 {
+        return nil
+    }
+
+    tx, err := r.pool.Begin(ctx)
+    if err != nil {
+        return wrapDBErr(err)
+    }
+    defer tx.Rollback(ctx)
+
+    // Using pgx.Batch
+    batch := &pgx.Batch{}
+
+    for _, signal := range signals {
+        detailsJSON, err := marshalNullable(signal.Details)
+        if err != nil {
+            return err
+        }
+
+        batch.Queue(`
+            INSERT INTO anomaly_signals (
+                tenant_id, anomaly_id, event_id, worker_id, detected_at, severity,
+                type, description, observed_value, threshold_value, details_json, created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT(tenant_id, anomaly_id) DO UPDATE SET
+                detected_at = EXCLUDED.detected_at,
+                severity = EXCLUDED.severity,
+                description = EXCLUDED.description,
+                observed_value = EXCLUDED.observed_value,
+                threshold_value = EXCLUDED.threshold_value,
+                details_json = EXCLUDED.details_json,
+                created_at = EXCLUDED.created_at
+        `,
+            signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
+            signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
+            signal.ObservedValue, signal.ThresholdValue, detailsJSON,
+            time.Now().UTC(),
+        )
+    }
+
+    br := tx.SendBatch(ctx, batch)
+    defer br.Close()
+
+    for i := 0; i < len(signals); i++ {
+        if _, err := br.Exec(); err != nil {
+            return wrapDBErr(err)
+        }
+    }
+
+    if err := br.Close(); err != nil {
+        return wrapDBErr(err)
+    }
+
+    return tx.Commit(ctx)
+}

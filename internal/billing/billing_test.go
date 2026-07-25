@@ -358,3 +358,7 @@ func TestValidateStripeOwnership(t *testing.T) {
 		})
 	}
 }
+
+func (m *MockRepository) SaveAnomalySignalBatch(ctx context.Context, signals []domain.AnomalySignal) error {
+	return nil
+}
