@@ -27,8 +27,8 @@ describe("CommandCenter", () => {
 
   it("renders the header correctly", async () => {
     render(<CommandCenter />);
-    expect(screen.getByText("[TG_CMD]")).toBeInTheDocument();
-    expect(screen.getByText("System Overview")).toBeInTheDocument();
+    expect(screen.getByText("[GOBLIN_CAVERN_OS]")).toBeInTheDocument();
+    expect(screen.getByText("Chief Goblin's War Room")).toBeInTheDocument();
   });
 
   // TODO: Fix SWR mock for fetch test - SWR mocking requires module-level setup
