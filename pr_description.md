@@ -1,12 +1,3 @@
-🎯 **What:** This PR addresses a testing gap by adding unit tests for the `HashPrompt` function in `internal/intelligence/engine.go`. `HashPrompt` is a pure function responsible for normalizing and hashing strings, and was previously lacking explicit test coverage.
-
-📊 **Coverage:** The new `TestHashPrompt` table-driven test covers:
-
-- Basic hashing (happy path).
-- Whitespace trimming (leading, trailing, and mixed).
-- Lowercase conversion (case insensitivity).
-- Empty string behavior.
-- Strings containing only whitespace.
-- Hash stability (same input consistently yields the same 64-character SHA-256 hex string).
-
-✨ **Result:** Test coverage for `internal/intelligence/engine.go` is improved, documenting and enforcing the normalization behavior (trimming, lowercasing) of the `HashPrompt` utility function.
+🎯 What: Added unit tests for `buildCheckoutSuccessURL` and `buildCheckoutCancelURL` in `frontend/src/lib/billing.ts` to cover the untested functions.
+📊 Coverage: Tested normal origins without a trailing slash, origins with a trailing slash, and URL encoding for plans with special characters. Fixed existing tests in frontend/src/app/__tests__/page.test.tsx that were failing because of IntersectionObserver and text match mismatch.
+✨ Result: Successfully filled the test gap ensuring checkout URL builders will remain correct. All front-end tests and backend tests pass.
