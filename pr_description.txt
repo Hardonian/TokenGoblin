@@ -1,0 +1,15 @@
+🧹 [code health improvement description] Refactor HandleExportTenant error handling
+
+🎯 What:
+Refactored the error handling logic in `HandleExportTenant` to use idiomatic Go `if err != nil` checks and added the missing error export logic to all service calls, so all data fetching sections consistently populate an error key in the export payload upon failure.
+
+💡 Why:
+Previously, only the `Overview` fetch included logic to export errors, while all other service calls silently ignored them. Additionally, the existing code structure was non-idiomatic, and the missing logic was flagged as a code health issue. This refactor makes the error handling consistent, preserves important error contexts in the exported output, and aligns with standard Go conventions.
+
+✅ Verification:
+- Ensured all tests (`npm run test`) continue to pass without failures.
+- Ensured formatting and static analysis (`npm run lint`) pass seamlessly.
+- Used `git diff` to verify changes were accurately applied without regression of behavior.
+
+✨ Result:
+The codebase is now significantly cleaner, more idiomatic, and consistently exports errors for debugging purposes across all tenant data fetches.
