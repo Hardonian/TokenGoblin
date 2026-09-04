@@ -1,5 +1,9 @@
 # TokenGoblin — AI Spend & Token-Efficiency Observability
 
+<!-- BEGIN: REPO HERO -->
+![TokenGoblin — hero generated locally on the GPU stack](assets/repo-hero.png)
+<!-- END: REPO HERO -->
+
 Track, analyze, and optimize AI token spending across your autonomous agent workforce.
 
 ## Quick Start
