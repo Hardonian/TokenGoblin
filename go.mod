@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
