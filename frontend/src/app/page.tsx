@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { formatMoney, formatInt } from "@/components/shared";
 import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
@@ -90,7 +91,7 @@ type TokenEvent = {
 // ------------------------------------------------------------------
 
 export default function CommandCenter() {
-  const { apiKey, tenantId, isLoading: authLoading } = useAuth();
+  const { tenantId, isLoading: authLoading } = useAuth();
   const [toast, ] = useState<string | null>(null);
   
   // Real check for enterprise tier (we will add logic later, defaulting to true for now so we can see the data)
@@ -125,10 +126,7 @@ export default function CommandCenter() {
   const seedDemo = async () => {
     await fetch("/api/dashboard/seed", {
       method: "POST",
-      headers: {
-        "x-tenant-id": tenantId || "",
-        "Authorization": `Bearer ${apiKey || ""}`
-      }
+      headers: { "content-type": "application/json" },
     });
     loadAll();
   };
@@ -149,33 +147,30 @@ export default function CommandCenter() {
           </div>
           
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => window.location.href = "/keys"}
+            <Link
+              href="/keys"
               className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-[#ffb000] text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
             >
               [ API Keys ]
-            </button>
+            </Link>
             <button 
               onClick={seedDemo}
               className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-zinc-400 text-xs px-4 py-1.5 transition-all uppercase tracking-widest"
             >
               [ Seed ]
             </button>
-            <button 
-              onClick={() => {
-                if (!tenantId) return;
-                window.location.href = `/api/dashboard/export.csv`;
-              }}
+            <a
+              href={tenantId ? "/api/dashboard/export.csv" : undefined}
               className="bg-black hover:bg-[#111] border border-var(--color-accent-goblin) text-var(--color-accent-goblin) text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
             >
               [ Export ]
-            </button>
-            <button 
-              onClick={() => window.location.href = "/pricing/overrides"}
+            </a>
+            <Link
+              href="/pricing/overrides"
               className="bg-black hover:bg-[#111] border border-[#333] hover:border-zinc-500 text-zinc-400 text-xs px-4 py-1.5 transition-all uppercase tracking-widest mr-2"
             >
               [ Overrides ]
-            </button>
+            </Link>
             <button 
               onClick={loadAll}
               className="bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold text-xs px-4 py-1.5 transition-all uppercase tracking-widest"

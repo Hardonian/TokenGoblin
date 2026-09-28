@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { GoblinMascot } from "@/components/GoblinMascot";
 
 export default function GlobalError({
@@ -10,6 +11,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
   useEffect(() => {
     // Log the error to an error reporting service in production
     console.error("Global boundary caught an error:", error);
@@ -35,7 +37,7 @@ export default function GlobalError({
           [ Retry Render ]
         </button>
         <button
-          onClick={() => window.location.href = '/'}
+          onClick={() => router.push("/")}
           className="bg-[#ffb000] hover:bg-[#ff8c00] text-black px-6 py-3 font-bold uppercase tracking-widest transition-colors"
         >
           [ Reboot System ]

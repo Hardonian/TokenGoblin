@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       status: "success",
       data: payload.data,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         ok: false,

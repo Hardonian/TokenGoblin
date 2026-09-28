@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     response.cookies.set("tg_api_key", payload.data.api_key, cookieOptions);
     response.cookies.set("tg_tenant_id", payload.data.tenant_id, cookieOptions);
     return response;
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         ok: false,

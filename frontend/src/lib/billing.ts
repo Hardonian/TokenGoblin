@@ -95,7 +95,7 @@ export async function createBillingPortalSession(params: {
   return payload.data;
 }
 
-export async function getBillingStatus(tenantId: string) {
+export async function getBillingStatus() {
   const res = await fetch("/api/billing/status", { cache: "no-store" });
 
   const payload = await res.json();

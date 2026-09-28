@@ -55,7 +55,7 @@ export async function GET() {
       status: "success",
       data: payload.data,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         ok: false,
