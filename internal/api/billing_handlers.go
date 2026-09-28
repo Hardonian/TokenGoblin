@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -62,13 +63,17 @@ func (h *BillingHandler) HandleCreateCheckout(w http.ResponseWriter, r *http.Req
 	checkoutURL, sessionID, err := billing.CreateCheckoutSession(r.Context(), h.Repo, tenantID, req.SuccessURL, req.CancelURL, req.PriceID)
 	if err != nil {
 		status := http.StatusInternalServerError
+		message := "Unable to create a checkout session."
 		if err.Error() == "price_id is not an allowed subscription price" {
 			status = http.StatusBadRequest
+			message = err.Error()
+		} else {
+			slog.Error("create checkout session failed", "tenant_id", tenantID, "error", err)
 		}
 		writeJSON(w, status, Envelope{
 			OK:     false,
 			Status: "error",
-			Error:  issue("checkout_failed", err.Error()),
+			Error:  issue("checkout_failed", message),
 		})
 		return
 	}
@@ -122,13 +127,17 @@ func (h *BillingHandler) HandleCreatePortal(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		code := "portal_failed"
 		status := http.StatusInternalServerError
+		message := "Unable to create a billing portal session."
 		if err.Error() == "tenant has no Stripe customer ID; cannot create portal session" {
 			status = http.StatusBadRequest
+			message = err.Error()
+		} else {
+			slog.Error("create billing portal session failed", "tenant_id", tenantID, "error", err)
 		}
 		writeJSON(w, status, Envelope{
 			OK:     false,
 			Status: "error",
-			Error:  issue(code, err.Error()),
+			Error:  issue(code, message),
 		})
 		return
 	}

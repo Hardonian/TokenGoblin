@@ -83,6 +83,33 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+  sdks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+
+      - name: Build and audit TypeScript SDK
+        working-directory: sdks/typescript
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run build
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Compile Python SDK
+        run: python -m compileall -q sdks/python/token_goblin
+
   docker:
     needs: [build-and-test, frontend]
     runs-on: ubuntu-latest
@@ -122,7 +149,7 @@ jobs:
           head: HEAD
 
   release:
-    needs: [build-and-test, frontend, docker, security]
+    needs: [build-and-test, frontend, sdks, docker, security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

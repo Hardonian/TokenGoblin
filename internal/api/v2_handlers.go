@@ -55,6 +55,7 @@ func (h *V2Handler) HandleWasteReport(w http.ResponseWriter, r *http.Request) {
 	report := h.intel.GenerateWasteReport(tenantID, events)
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: report})
 }
+
 // HandlePromptGraveyard returns prompts consuming cost with zero value.
 // GET /v2/intelligence/prompt-graveyard
 func (h *V2Handler) HandlePromptGraveyard(w http.ResponseWriter, r *http.Request) {

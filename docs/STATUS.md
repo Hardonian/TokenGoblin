@@ -1,6 +1,6 @@
 # TokenGoblin Release Status
 
-v0.4.0: PRODUCTION-READY CODEBASE
+v0.4.0: RELEASE-CANDIDATE CODEBASE
 
 - ✅ Go backend: Ingestion, billing, anomaly detection, executive dashboards
 - ✅ Next.js frontend: Pricing, billing portal, dashboard, auth
@@ -21,10 +21,10 @@ VERIFICATION COMMANDS:
 
 - go build ./cmd/server ✓
 - go test ./... ✓
-- pnpm --filter frontend build ✓
+- cd frontend && npm ci && npm run lint && npm run typecheck && npm run test:ci && npm run build ✓
 - python3 scripts/setup_stripe_prices.py --dry-run ✓
 
-STATUS: CODE COMPLETE — NEEDS LIVE STRIPE + DEPLOY
+STATUS: RELEASE CANDIDATE — REQUIRES LIVE STRIPE, CONTACT WEBHOOK, POSTGRES, AND STAGING DEPLOYMENT VERIFICATION
 
 NEXT ACTIONS FOR FIRST $1K MRR:
 

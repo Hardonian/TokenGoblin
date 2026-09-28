@@ -67,31 +67,37 @@ func TestV2EndpointsDegradeWhenDatabaseUnavailable(t *testing.T) {
 	service := ingestion.NewService(repo, cost.LoadRegistry(context.Background(), cost.RegistryConfig{}))
 	mux := NewRouter(service, repo, nil)
 
-	endpoints := []string{
-		"/v2/intelligence/waste",
-		"/v2/intelligence/prompt-graveyard",
-		"/v2/intelligence/cost-leaks",
-		"/v2/forecasts/spend",
-		"/v2/executive/scorecard",
+	cases := []struct {
+		endpoint string
+		status   int
+	}{
+		{"/v2/intelligence/waste", http.StatusOK},
+		{"/v2/intelligence/prompt-graveyard", http.StatusServiceUnavailable},
+		{"/v2/intelligence/cost-leaks", http.StatusServiceUnavailable},
+		{"/v2/forecasts/spend", http.StatusServiceUnavailable},
+		{"/v2/executive/scorecard", http.StatusOK},
 	}
 
-	for _, endpoint := range endpoints {
-		t.Run(endpoint, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+	for _, tc := range cases {
+		t.Run(tc.endpoint, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.endpoint, nil)
 			req.Header.Set("x-tenant-id", "tenant-a")
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusOK {
-				t.Fatalf("expected 200 degraded read, got %d body=%s", rec.Code, rec.Body.String())
+			if rec.Code != tc.status {
+				t.Fatalf("expected %d, got %d body=%s", tc.status, rec.Code, rec.Body.String())
 			}
 			var envelope Envelope
 			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if !envelope.OK || envelope.Status != "degraded" {
+			if tc.status == http.StatusOK && (!envelope.OK || envelope.Status != "degraded") {
 				t.Fatalf("expected degraded ok envelope, got %#v", envelope)
+			}
+			if tc.status == http.StatusServiceUnavailable && (envelope.OK || envelope.Error == nil || envelope.Error.Code != "billing_status_unavailable") {
+				t.Fatalf("expected fail-closed entitlement envelope, got %#v", envelope)
 			}
 		})
 	}
