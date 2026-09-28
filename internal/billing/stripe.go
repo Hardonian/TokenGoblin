@@ -26,7 +26,10 @@ const (
 	StripeEventCheckoutCompleted   = "checkout.session.completed"
 
 	TierFree    = "free"
-	TierPremium = "premium"
+	TierPro     = "pro"
+	// TierPremium remains an alias for compatibility with existing clients.
+	TierPremium    = TierPro
+	TierEnterprise = "enterprise"
 )
 
 type VerifiedStripeEvent struct {
@@ -177,7 +180,7 @@ func applySubscriptionLifecycle(ctx context.Context, repo storage.Repository, ev
 		result.Action = "subscription_deleted"
 	} else {
 		tenant.StripeSubscriptionID = event.SubscriptionID
-		tenant.Tier, tenant.UsageLimitUSD = tierForSubscriptionStatus(event.SubscriptionStatus)
+		tenant.Tier, tenant.UsageLimitUSD = tierForVerifiedEvent(event)
 		result.Action = "subscription_" + strings.TrimPrefix(event.EventType, "customer.subscription.")
 	}
 	tenant.UpdatedAt = now.UTC()
@@ -279,12 +282,30 @@ func tierForSubscriptionStatus(status string) (string, float64) {
 	}
 }
 
+func tierForVerifiedEvent(event VerifiedStripeEvent) (string, float64) {
+	if tier, _ := tierForSubscriptionStatus(event.SubscriptionStatus); tier == TierFree {
+		return TierFree, planLimitUSD(TierFree)
+	}
+	switch strings.ToLower(strings.TrimSpace(event.Metadata["plan_tier"])) {
+	case TierEnterprise:
+		return TierEnterprise, planLimitUSD(TierEnterprise)
+	case TierPro, "premium":
+		return TierPro, planLimitUSD(TierPro)
+	default:
+		return TierPro, planLimitUSD(TierPro)
+	}
+}
+
 func planLimitUSD(tier string) float64 {
 	envName := "TG_PLAN_FREE_LIMIT_USD"
 	defaultValue := 10.0
-	if tier == TierPremium {
+	switch tier {
+	case TierPro, "premium":
 		envName = "TG_PLAN_PREMIUM_LIMIT_USD"
 		defaultValue = 100.0
+	case TierEnterprise:
+		envName = "TG_PLAN_ENTERPRISE_LIMIT_USD"
+		defaultValue = 1000.0
 	}
 	raw := strings.TrimSpace(os.Getenv(envName))
 	if raw == "" {

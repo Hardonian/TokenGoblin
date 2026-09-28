@@ -52,7 +52,8 @@ npm run dev
 
 | Variable                              | Required           | Description                                                    |
 | ------------------------------------- | ------------------ | -------------------------------------------------------------- |
-| `DATABASE_URL`                        | Optional           | SQLite path (default: `file:token_goblin.db`) or Postgres DSN  |
+| `TG_DB_PATH`                          | Optional           | SQLite path (default: `./data/tokengoblin.sqlite`)             |
+| `TG_DB_DSN`                           | Required (Prod)    | PostgreSQL DSN; production startup fails closed without it      |
 | `STRIPE_SECRET_KEY`                   | Required (Billing) | Stripe secret key for backend API calls                        |
 | `STRIPE_WEBHOOK_SECRET`               | Required (Billing) | Stripe webhook signing secret to verify Stripe events          |
 | `STRIPE_PRICE_PRO`                    | Required (Billing) | Stripe Price ID for Pro plan (backend)                         |
@@ -72,7 +73,7 @@ npm run dev
 The backend runs on port `8080` by default (can be overridden via `PORT`).
 
 - **Health/Metrics**: The backend exposes Prometheus metrics at `/metrics` which can also be used as a simple liveness probe.
-- **Database**: In production, provide `TG_DB_DSN` or `DATABASE_URL` for Postgres. If omitted, it will degrade gracefully to an ephemeral SQLite database.
+- **Database**: In production, provide `TG_DB_DSN` for Postgres. Production startup fails closed if it is omitted; local development defaults to persistent SQLite.
 - **Deprecation**: Running the backend without `TG_ENV=production` enables a demo tenant mode that bypasses API key checks. This behavior is deprecated and will be removed in v1.0.
 
 ## API Reference

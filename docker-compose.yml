@@ -6,10 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
-      - DATABASE_URL=sqlite:///data/token_goblin.db
+      - TG_DB_PATH=/data/token_goblin.db
       # Stripe (required for billing)
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
@@ -30,16 +30,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_TG_API_BASE: http://backend:8080
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - PORT=3000
       - NEXT_PUBLIC_TG_API_BASE=http://backend:8080
       - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
       - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   token-goblin-data:

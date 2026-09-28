@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=builder /token-goblin /app/token-goblin
 
 ENV PORT=8080
-ENV DATABASE_URL="file:/data/token_goblin.db"
+ENV TG_DB_PATH="/data/token_goblin.db"
 ENV TZ=UTC
 
 RUN mkdir -p /data && chown -R 1001:1001 /app /data

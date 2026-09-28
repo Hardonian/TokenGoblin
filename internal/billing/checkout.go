@@ -41,6 +41,21 @@ func stripeBaseURL() string {
 	return "https://api.stripe.com/v1"
 }
 
+func planForPriceID(priceID string) (string, error) {
+	priceID = strings.TrimSpace(priceID)
+	switch priceID {
+	case strings.TrimSpace(os.Getenv("STRIPE_PRICE_PRO")):
+		if priceID != "" {
+			return TierPro, nil
+		}
+	case strings.TrimSpace(os.Getenv("STRIPE_PRICE_ENTERPRISE")):
+		if priceID != "" {
+			return TierEnterprise, nil
+		}
+	}
+	return "", fmt.Errorf("price_id is not an allowed subscription price")
+}
+
 var stripeHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func stripePost(ctx context.Context, path string, data url.Values) ([]byte, error) {
@@ -83,6 +98,10 @@ func stripePost(ctx context.Context, path string, data url.Values) ([]byte, erro
 // CreateCheckoutSession creates a Stripe Checkout Session for the tenant and
 // returns the hosted checkout URL and session ID.
 func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantID, successURL, cancelURL, priceID string) (string, string, error) {
+	planTier, err := planForPriceID(priceID)
+	if err != nil {
+		return "", "", err
+	}
 	tenant, err := repo.GetTenant(ctx, tenantID)
 	if err != nil {
 		return "", "", fmt.Errorf("get tenant: %w", err)
@@ -127,8 +146,10 @@ func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantI
 		"line_items[0][price]":                   {priceID},
 		"line_items[0][quantity]":                {"1"},
 		"metadata[tenant_id]":                    {tenantID},
+		"metadata[plan_tier]":                    {planTier},
 		"client_reference_id":                    {tenantID},
 		"subscription_data[metadata][tenant_id]": {tenantID},
+		"subscription_data[metadata][plan_tier]": {planTier},
 	}
 
 	sessionResp, err := stripePost(ctx, "/checkout/sessions", vals)

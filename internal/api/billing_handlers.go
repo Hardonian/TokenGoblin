@@ -61,7 +61,11 @@ func (h *BillingHandler) HandleCreateCheckout(w http.ResponseWriter, r *http.Req
 
 	checkoutURL, sessionID, err := billing.CreateCheckoutSession(r.Context(), h.Repo, tenantID, req.SuccessURL, req.CancelURL, req.PriceID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, Envelope{
+		status := http.StatusInternalServerError
+		if err.Error() == "price_id is not an allowed subscription price" {
+			status = http.StatusBadRequest
+		}
+		writeJSON(w, status, Envelope{
 			OK:     false,
 			Status: "error",
 			Error:  issue("checkout_failed", err.Error()),
