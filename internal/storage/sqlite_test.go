@@ -142,3 +142,51 @@ func TestSQLiteColumnExists_SQLInjection(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid table name")
 }
+
+func TestSQLiteFounderModePersistence(t *testing.T) {
+	ctx := context.Background()
+	repo, err := OpenSQLite(ctx, filepath.Join(t.TempDir(), "founder.sqlite"))
+	require.NoError(t, err)
+	defer func() { require.NoError(t, repo.Close()) }()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	require.NoError(t, repo.UpsertTenant(ctx, domain.Tenant{
+		TenantID: "tenant-a", Name: "Tenant A", Tier: "free", CreatedAt: now, UpdatedAt: now,
+	}))
+	budgetUSD := 25.0
+	latency := 1500
+	successRate := 0.98
+	require.NoError(t, repo.UpsertAgent(ctx, domain.Agent{
+		AgentID: "agent-a", TenantID: "tenant-a", Name: "Reviewer",
+		AgentType: domain.WorkerTypeAgent, Framework: domain.AgentFrameworkCustom,
+		Status: domain.AgentStatusActive, BudgetUSD: &budgetUSD, SLALatencyMs: &latency,
+		SLASuccessRate: &successRate, CreatedAt: now, UpdatedAt: now,
+	}))
+	require.NoError(t, repo.UpsertGovernancePolicy(ctx, domain.GovernancePolicy{
+		PolicyID: "policy-a", TenantID: "tenant-a", Name: "Monthly ceiling",
+		Type: domain.PolicyBudgetLimit, ConfigJSON: `{"limit_usd":25}`, IsActive: true,
+		CreatedAt: now, UpdatedAt: now,
+	}))
+	require.NoError(t, repo.UpsertBudget(ctx, domain.Budget{
+		BudgetID: "budget-a", TenantID: "tenant-a", Name: "Default", Type: "monthly",
+		ScopeType: domain.BudgetScopeTenant, LimitUSD: 25, AlertThresholdPct: 80,
+		PeriodStart: now, PeriodEnd: now.AddDate(0, 1, 0), IsActive: true,
+		CreatedAt: now, Status: domain.BudgetStatusHealthy,
+	}))
+
+	agents, err := repo.ListAgents(ctx, "tenant-a")
+	require.NoError(t, err)
+	require.Len(t, agents, 1)
+	assert.Equal(t, "Reviewer", agents[0].Name)
+	assert.Equal(t, budgetUSD, *agents[0].BudgetUSD)
+
+	policies, err := repo.ListGovernancePolicies(ctx, "tenant-a")
+	require.NoError(t, err)
+	require.Len(t, policies, 1)
+	assert.True(t, policies[0].IsActive)
+
+	budgets, err := repo.ListBudgets(ctx, "tenant-a")
+	require.NoError(t, err)
+	require.Len(t, budgets, 1)
+	assert.Equal(t, 25.0, budgets[0].LimitUSD)
+}

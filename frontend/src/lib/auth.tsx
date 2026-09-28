@@ -26,24 +26,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const storedTenant = localStorage.getItem("tg_tenant_id");
-    const storedKey = localStorage.getItem("tg_api_key");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (storedTenant) setTenantId(storedTenant);
-    if (storedKey) setApiKey(storedKey);
-    setIsLoading(false);
+    let active = true;
+    void fetch("/api/tenant/session", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (!active || !payload?.data?.authenticated) return;
+        setTenantId(payload.data.tenant_id);
+        setApiKey("http-only-session");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const login = (key: string, tenant: string) => {
-    localStorage.setItem("tg_api_key", key);
-    localStorage.setItem("tg_tenant_id", tenant);
-    setApiKey(key);
+  const login = (_key: string, tenant: string) => {
+    setApiKey("http-only-session");
     setTenantId(tenant);
   };
 
   const logout = () => {
-    localStorage.removeItem("tg_api_key");
-    localStorage.removeItem("tg_tenant_id");
+    void fetch("/api/tenant/logout", { method: "POST" });
     setApiKey(null);
     setTenantId(null);
     router.push("/login");
@@ -62,28 +67,19 @@ export function useAuth() {
 
 // Global fetcher to be used with SWR
 export const authFetcher = async (url: string) => {
-  const token = localStorage.getItem("tg_api_key");
-  const tenant = localStorage.getItem("tg_tenant_id");
-  
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  if (tenant) {
-    headers["x-tenant-id"] = tenant;
-  }
-
-  const res = await fetch(url, { headers });
-  const json = await res.json();
+  const res = await fetch(url, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const json = await res.json().catch(() => null);
   
   if (res.status === 401) {
     // Optionally trigger a logout or redirect here if unauthorized
     throw new Error("Unauthorized");
   }
   
-  if (!json.ok) throw new Error(json.error?.message || "Failed to fetch");
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error?.message || `Request failed (${res.status})`);
+  }
   return json.data;
 };

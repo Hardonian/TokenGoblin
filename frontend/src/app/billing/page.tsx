@@ -34,12 +34,7 @@ function BillingInner() {
     
     setError(null);
     try {
-      const res = await fetch("/api/billing/status", {
-        headers: {
-          "x-tenant-id": effectiveTenant,
-          "Authorization": `Bearer ${apiKey}`
-        }
-      });
+      const res = await fetch("/api/billing/status", { cache: "no-store" });
       const payload = await res.json();
       if (!res.ok || !payload.ok) {
         throw new Error(payload.error?.message || "Billing status failed");
@@ -90,11 +85,7 @@ function BillingInner() {
     try {
       const res = await fetch("/api/billing/portal", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-tenant-id": effectiveTenant,
-          "Authorization": `Bearer ${apiKey}`
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ return_url: `${window.location.origin}/billing` }),
       });
       const payload = await res.json();

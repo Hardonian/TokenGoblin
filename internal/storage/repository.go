@@ -27,7 +27,7 @@ type Repository interface {
 	GetAPIKey(ctx context.Context, keyID string) (*domain.APIKey, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, keyID string) error
 	ListAPIKeys(ctx context.Context, tenantID string) ([]domain.APIKey, error)
-	RevokeAPIKey(ctx context.Context, keyID string, tenantID string) error
+	RevokeAPIKey(ctx context.Context, tenantID string, keyID string) error
 	UpsertTenantMember(ctx context.Context, member domain.TenantMember) error
 	ListTenantMembers(ctx context.Context, tenantID string) ([]domain.TenantMember, error)
 	SaveAuditEvent(ctx context.Context, event domain.AuditEvent) error
@@ -209,53 +209,53 @@ func (r *UnavailableRepository) ListTokenEventsBefore(context.Context, string, t
 }
 
 func (r *UnavailableRepository) ListAnomalySignals(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) Close() error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) UpsertTuningProfile(ctx context.Context, p domain.TuningProfile) error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
-	return nil, r.Cause
+	return nil, r.err()
 }
 
 func (r *UnavailableRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
-	return r.Cause
+	return r.err()
 }
 
 func (r *UnavailableRepository) Ping(ctx context.Context) error {
-	return r.Cause
+	return r.err()
 }

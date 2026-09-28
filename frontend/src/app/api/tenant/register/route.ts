@@ -15,14 +15,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { tenant_id, name } = body;
 
-    if (!tenant_id || !name) {
+    if (typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
         {
           ok: false,
           status: "error",
           error: {
             code: "invalid_request",
-            message: "tenant_id and name are required.",
+            message: "name is required.",
           },
         },
         { status: 400 }
@@ -37,9 +37,11 @@ export async function POST(request: Request) {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          tenant_id,
-          name,
+          tenant_id: typeof tenant_id === "string" ? tenant_id.trim() : "",
+          name: name.trim(),
         }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       }
     );
 
@@ -59,11 +61,21 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       status: "success",
       data: payload.data,
     });
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    };
+    response.cookies.set("tg_api_key", payload.data.api_key, cookieOptions);
+    response.cookies.set("tg_tenant_id", payload.data.tenant_id, cookieOptions);
+    return response;
   } catch (error) {
     return NextResponse.json(
       {
@@ -71,10 +83,7 @@ export async function POST(request: Request) {
         status: "error",
         error: {
           code: "unexpected_error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unexpected error",
+          message: "Registration service is temporarily unavailable.",
         },
       },
       { status: 500 }

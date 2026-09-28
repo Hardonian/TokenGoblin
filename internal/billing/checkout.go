@@ -41,7 +41,9 @@ func stripeBaseURL() string {
 	return "https://api.stripe.com/v1"
 }
 
-func stripePost(path string, data url.Values) ([]byte, error) {
+var stripeHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+func stripePost(ctx context.Context, path string, data url.Values) ([]byte, error) {
 	secret := stripeSecretKey()
 	if secret == "" {
 		return nil, fmt.Errorf("STRIPE_SECRET_KEY is not set")
@@ -50,18 +52,18 @@ func stripePost(path string, data url.Values) ([]byte, error) {
 	fullURL := stripeBaseURL() + path
 	body := data.Encode()
 
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBufferString(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewBufferString(body))
 	if err != nil {
 		return nil, fmt.Errorf("create stripe request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+secret)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := stripeHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("stripe request failed: %w", err)
 	}
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	// Attempt to close the response body, log on error
 	if closeErr := resp.Body.Close(); closeErr != nil {
 		slog.Warn("failed to close response body", "error", closeErr)
@@ -78,8 +80,6 @@ func stripePost(path string, data url.Values) ([]byte, error) {
 	return respBody, nil
 }
 
-
-
 // CreateCheckoutSession creates a Stripe Checkout Session for the tenant and
 // returns the hosted checkout URL and session ID.
 func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantID, successURL, cancelURL, priceID string) (string, string, error) {
@@ -95,7 +95,7 @@ func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantI
 
 	// If the tenant doesn't have a Stripe customer ID yet, create one.
 	if customerID == "" {
-		custResp, err := stripePost("/customers", url.Values{
+		custResp, err := stripePost(ctx, "/customers", url.Values{
 			"metadata[tenant_id]": {tenantID},
 			"name":                {tenant.Name},
 		})
@@ -131,7 +131,7 @@ func CreateCheckoutSession(ctx context.Context, repo storage.Repository, tenantI
 		"subscription_data[metadata][tenant_id]": {tenantID},
 	}
 
-	sessionResp, err := stripePost("/checkout/sessions", vals)
+	sessionResp, err := stripePost(ctx, "/checkout/sessions", vals)
 	if err != nil {
 		return "", "", fmt.Errorf("create checkout session: %w", err)
 	}
@@ -169,7 +169,7 @@ func CreatePortalSession(ctx context.Context, repo storage.Repository, tenantID,
 		"return_url": {returnURL},
 	}
 
-	portalResp, err := stripePost("/billing_portal/sessions", vals)
+	portalResp, err := stripePost(ctx, "/billing_portal/sessions", vals)
 	if err != nil {
 		return "", fmt.Errorf("create portal session: %w", err)
 	}

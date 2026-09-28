@@ -77,6 +77,12 @@ func verifyPostgresRLS(ctx context.Context, pool *pgxpool.Pool) error {
 		"audit_events",
 		"recommendation_states",
 		"api_keys",
+		"agents",
+		"agent_performance_reviews",
+		"governance_policies",
+		"policy_violations",
+		"budgets",
+		"tuning_profiles",
 	}
 	var missing []string
 	for _, table := range tables {
@@ -209,8 +215,7 @@ func (r *PostgresRepository) ListPricingOverrides(ctx context.Context, tenantID 
 		SELECT provider, model_id, prompt_price_per_million, completion_price_per_million, created_at
 		FROM tenant_pricing_overrides
 		WHERE tenant_id = $1
-		ORDER BY provider, model_id
-		ORDER BY created_at DESC
+		ORDER BY provider, model_id, created_at DESC
 	`, tenantID)
 	if err != nil {
 		return nil, wrapDBErr(err)
@@ -1023,61 +1028,234 @@ func (r *PostgresRepository) GetTenantByStripeSubscriptionID(ctx context.Context
 }
 
 func (r *PostgresRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
-	return errors.New("not implemented")
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO agents (
+			tenant_id, agent_id, name, description, owner_id, agent_type, framework,
+			status, budget_usd, budget_period, sla_latency_ms, sla_success_rate,
+			created_at, updated_at, retired_at, retirement_reason
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		ON CONFLICT(tenant_id, agent_id) DO UPDATE SET
+			name = EXCLUDED.name, description = EXCLUDED.description, owner_id = EXCLUDED.owner_id,
+			agent_type = EXCLUDED.agent_type, framework = EXCLUDED.framework, status = EXCLUDED.status,
+			budget_usd = EXCLUDED.budget_usd, budget_period = EXCLUDED.budget_period,
+			sla_latency_ms = EXCLUDED.sla_latency_ms, sla_success_rate = EXCLUDED.sla_success_rate,
+			updated_at = EXCLUDED.updated_at, retired_at = EXCLUDED.retired_at,
+			retirement_reason = EXCLUDED.retirement_reason
+	`, agent.TenantID, agent.AgentID, agent.Name, nullString(agent.Description), nullString(agent.OwnerID),
+		string(agent.AgentType), nullString(string(agent.Framework)), string(agent.Status), agent.BudgetUSD,
+		nullString(agent.BudgetPeriod), agent.SLALatencyMs, agent.SLASuccessRate, agent.CreatedAt,
+		agent.UpdatedAt, agent.RetiredAt, nullString(agent.RetirementReason))
+	return wrapDBErr(err)
 }
 func (r *PostgresRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.pool.Query(ctx, `
+		SELECT agent_id, tenant_id, name, description, owner_id, agent_type, framework,
+			status, budget_usd, budget_period, sla_latency_ms, sla_success_rate,
+			created_at, updated_at, retired_at, retirement_reason
+		FROM agents WHERE tenant_id = $1 ORDER BY name, agent_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var agents []domain.Agent
+	for rows.Next() {
+		var agent domain.Agent
+		var description, ownerID, framework, budgetPeriod, retirementReason *string
+		if err := rows.Scan(&agent.AgentID, &agent.TenantID, &agent.Name, &description, &ownerID,
+			&agent.AgentType, &framework, &agent.Status, &agent.BudgetUSD, &budgetPeriod,
+			&agent.SLALatencyMs, &agent.SLASuccessRate, &agent.CreatedAt, &agent.UpdatedAt,
+			&agent.RetiredAt, &retirementReason); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if description != nil {
+			agent.Description = *description
+		}
+		if ownerID != nil {
+			agent.OwnerID = *ownerID
+		}
+		if framework != nil {
+			agent.Framework = domain.AgentFramework(*framework)
+		}
+		if budgetPeriod != nil {
+			agent.BudgetPeriod = *budgetPeriod
+		}
+		if retirementReason != nil {
+			agent.RetirementReason = *retirementReason
+		}
+		agents = append(agents, agent)
+	}
+	return agents, wrapDBErr(rows.Err())
 }
 func (r *PostgresRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
-	return errors.New("not implemented")
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO governance_policies (
+			tenant_id, policy_id, name, type, config_json, is_active, created_by, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)
+		ON CONFLICT(tenant_id, policy_id) DO UPDATE SET
+			name = EXCLUDED.name, type = EXCLUDED.type, config_json = EXCLUDED.config_json,
+			is_active = EXCLUDED.is_active, created_by = EXCLUDED.created_by,
+			updated_at = EXCLUDED.updated_at
+	`, policy.TenantID, policy.PolicyID, policy.Name, string(policy.Type), policy.ConfigJSON,
+		policy.IsActive, nullString(policy.CreatedBy), policy.CreatedAt, policy.UpdatedAt)
+	return wrapDBErr(err)
 }
 func (r *PostgresRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.pool.Query(ctx, `
+		SELECT policy_id, tenant_id, name, type, config_json::text, is_active, created_by, created_at, updated_at
+		FROM governance_policies WHERE tenant_id = $1 ORDER BY name, policy_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var policies []domain.GovernancePolicy
+	for rows.Next() {
+		var policy domain.GovernancePolicy
+		var createdBy *string
+		if err := rows.Scan(&policy.PolicyID, &policy.TenantID, &policy.Name, &policy.Type,
+			&policy.ConfigJSON, &policy.IsActive, &createdBy, &policy.CreatedAt, &policy.UpdatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if createdBy != nil {
+			policy.CreatedBy = *createdBy
+		}
+		policies = append(policies, policy)
+	}
+	return policies, wrapDBErr(rows.Err())
 }
 func (r *PostgresRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
-	return errors.New("not implemented")
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO budgets (
+			tenant_id, budget_id, name, type, scope_type, scope_id, limit_usd,
+			alert_threshold_pct, current_spend_usd, period_start, period_end,
+			is_active, utilization_pct, status, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		ON CONFLICT(tenant_id, budget_id) DO UPDATE SET
+			name = EXCLUDED.name, type = EXCLUDED.type, scope_type = EXCLUDED.scope_type,
+			scope_id = EXCLUDED.scope_id, limit_usd = EXCLUDED.limit_usd,
+			alert_threshold_pct = EXCLUDED.alert_threshold_pct,
+			current_spend_usd = EXCLUDED.current_spend_usd,
+			period_start = EXCLUDED.period_start, period_end = EXCLUDED.period_end,
+			is_active = EXCLUDED.is_active, utilization_pct = EXCLUDED.utilization_pct,
+			status = EXCLUDED.status
+	`, budget.TenantID, budget.BudgetID, budget.Name, budget.Type, string(budget.ScopeType),
+		nullString(budget.ScopeID), budget.LimitUSD, budget.AlertThresholdPct, budget.CurrentSpendUSD,
+		budget.PeriodStart, budget.PeriodEnd, budget.IsActive, budget.UtilizationPct,
+		budget.Status, budget.CreatedAt)
+	return wrapDBErr(err)
 }
 func (r *PostgresRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.pool.Query(ctx, `
+		SELECT budget_id, tenant_id, name, type, scope_type, scope_id, limit_usd,
+			alert_threshold_pct, current_spend_usd, period_start, period_end,
+			is_active, utilization_pct, status, created_at
+		FROM budgets WHERE tenant_id = $1 ORDER BY period_start DESC, budget_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	var budgets []domain.Budget
+	for rows.Next() {
+		var budget domain.Budget
+		var scopeID *string
+		if err := rows.Scan(&budget.BudgetID, &budget.TenantID, &budget.Name, &budget.Type,
+			&budget.ScopeType, &scopeID, &budget.LimitUSD, &budget.AlertThresholdPct,
+			&budget.CurrentSpendUSD, &budget.PeriodStart, &budget.PeriodEnd, &budget.IsActive,
+			&budget.UtilizationPct, &budget.Status, &budget.CreatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		if scopeID != nil {
+			budget.ScopeID = *scopeID
+		}
+		budgets = append(budgets, budget)
+	}
+	return budgets, wrapDBErr(rows.Err())
 }
 
 func (r *PostgresRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
-	return nil, errors.New("not implemented in postgres")
+	var profile domain.TuningProfile
+	var ignoredKeywords string
+	err := r.pool.QueryRow(ctx, `
+		SELECT tenant_id, aggressiveness, ignored_keywords, updated_at
+		FROM tuning_profiles WHERE tenant_id = $1
+	`, tenantID).Scan(&profile.TenantID, &profile.Aggressiveness, &ignoredKeywords, &profile.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	if ignoredKeywords != "" {
+		if err := json.Unmarshal([]byte(ignoredKeywords), &profile.IgnoredKeywords); err != nil {
+			return nil, wrapDBErr(err)
+		}
+	}
+	return &profile, nil
 }
 
 func (r *PostgresRepository) UpsertTuningProfile(ctx context.Context, profile domain.TuningProfile) error {
-	return errors.New("not implemented in postgres")
+	keywords, err := json.Marshal(profile.IgnoredKeywords)
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO tuning_profiles (tenant_id, aggressiveness, ignored_keywords, updated_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT(tenant_id) DO UPDATE SET
+			aggressiveness = EXCLUDED.aggressiveness,
+			ignored_keywords = EXCLUDED.ignored_keywords,
+			updated_at = EXCLUDED.updated_at
+	`, profile.TenantID, profile.Aggressiveness, string(keywords), profile.UpdatedAt)
+	return wrapDBErr(err)
 }
 
 func (r *PostgresRepository) GetUnexportedEvents(ctx context.Context, limit int) ([]domain.TokenEvent, error) {
-	return nil, errors.New("not implemented in postgres")
+	if limit <= 0 || limit > 1000 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, tokenEventSelectPostgres+`
+		WHERE is_exported = FALSE
+		ORDER BY occurred_at ASC, tenant_id, event_id
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer rows.Close()
+	return scanTokenEventsPostgres(rows)
 }
 
 func (r *PostgresRepository) MarkEventsExported(ctx context.Context, eventIDs []string) error {
-	return errors.New("not implemented in postgres")
+	if len(eventIDs) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `UPDATE token_usage_events SET is_exported = TRUE WHERE event_id = ANY($1)`, eventIDs)
+	return wrapDBErr(err)
 }
 
 func (r *PostgresRepository) SaveAnomalySignalBatch(ctx context.Context, signals []domain.AnomalySignal) error {
-    if len(signals) == 0 {
-        return nil
-    }
+	if len(signals) == 0 {
+		return nil
+	}
 
-    tx, err := r.pool.Begin(ctx)
-    if err != nil {
-        return wrapDBErr(err)
-    }
-    defer tx.Rollback(ctx)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer tx.Rollback(ctx)
 
-    // Using pgx.Batch
-    batch := &pgx.Batch{}
+	// Using pgx.Batch
+	batch := &pgx.Batch{}
 
-    for _, signal := range signals {
-        detailsJSON, err := marshalNullable(signal.Details)
-        if err != nil {
-            return err
-        }
+	for _, signal := range signals {
+		detailsJSON, err := marshalNullable(signal.Details)
+		if err != nil {
+			return err
+		}
 
-        batch.Queue(`
+		batch.Queue(`
             INSERT INTO anomaly_signals (
                 tenant_id, anomaly_id, event_id, worker_id, detected_at, severity,
                 type, description, observed_value, threshold_value, details_json, created_at
@@ -1092,25 +1270,25 @@ func (r *PostgresRepository) SaveAnomalySignalBatch(ctx context.Context, signals
                 details_json = EXCLUDED.details_json,
                 created_at = EXCLUDED.created_at
         `,
-            signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
-            signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
-            signal.ObservedValue, signal.ThresholdValue, detailsJSON,
-            time.Now().UTC(),
-        )
-    }
+			signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
+			signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
+			signal.ObservedValue, signal.ThresholdValue, detailsJSON,
+			time.Now().UTC(),
+		)
+	}
 
-    br := tx.SendBatch(ctx, batch)
-    defer br.Close()
+	br := tx.SendBatch(ctx, batch)
+	defer br.Close()
 
-    for i := 0; i < len(signals); i++ {
-        if _, err := br.Exec(); err != nil {
-            return wrapDBErr(err)
-        }
-    }
+	for i := 0; i < len(signals); i++ {
+		if _, err := br.Exec(); err != nil {
+			return wrapDBErr(err)
+		}
+	}
 
-    if err := br.Close(); err != nil {
-        return wrapDBErr(err)
-    }
+	if err := br.Close(); err != nil {
+		return wrapDBErr(err)
+	}
 
-    return tx.Commit(ctx)
+	return tx.Commit(ctx)
 }

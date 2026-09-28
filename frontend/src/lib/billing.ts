@@ -1,5 +1,3 @@
-import { apiBase } from "@/lib/api";
-
 export type PricePlan = {
   id: string;
   label: string;
@@ -55,11 +53,10 @@ export async function createCheckoutSession(params: {
   successUrl: string;
   cancelUrl: string;
 }) {
-  const res = await fetch(`${apiBase}/api/billing/checkout`, {
+  const res = await fetch("/api/billing/checkout", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-tenant-id": params.tenantId,
     },
     body: JSON.stringify({
       price_id: params.priceId,
@@ -80,11 +77,10 @@ export async function createBillingPortalSession(params: {
   tenantId: string;
   returnUrl: string;
 }) {
-  const res = await fetch(`${apiBase}/api/billing/portal`, {
+  const res = await fetch("/api/billing/portal", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-tenant-id": params.tenantId,
     },
     body: JSON.stringify({
       return_url: params.returnUrl,
@@ -100,11 +96,7 @@ export async function createBillingPortalSession(params: {
 }
 
 export async function getBillingStatus(tenantId: string) {
-  const res = await fetch(`${apiBase}/api/billing/status`, {
-    headers: {
-      "x-tenant-id": tenantId,
-    },
-  });
+  const res = await fetch("/api/billing/status", { cache: "no-store" });
 
   const payload = await res.json();
   if (!res.ok || !payload?.ok) {
@@ -114,14 +106,13 @@ export async function getBillingStatus(tenantId: string) {
   return payload.data;
 }
 
-export async function registerTenant(tenantID: string, name: string) {
-  const resolvedApiBase = (apiBase || window.location.origin).replace(/\/$/, "");
-  const res = await fetch(`${resolvedApiBase}/api/tenant/register`, {
+export async function registerTenant(name: string) {
+  const res = await fetch("/api/tenant/register", {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ tenant_id: tenantID, name }),
+    body: JSON.stringify({ name }),
   });
 
   const payload = await res.json();

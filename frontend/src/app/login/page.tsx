@@ -19,11 +19,11 @@ export default function LoginPage() {
 
     try {
       const res = await fetch("/api/tenant/login", {
-        method: "GET",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        }
+        },
+        body: JSON.stringify({ api_key: apiKey }),
       });
 
       const data = await res.json();
@@ -87,7 +87,7 @@ export default function LoginPage() {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   className="w-full bg-[#000000] border border-[#333333] focus:border-[#ffb000] rounded px-3 py-2 text-[#e5e5e5] font-mono text-sm outline-none transition-colors"
-                  placeholder="tg_..."
+                  placeholder="key_….tg_…"
                   required
                 />
               </div>

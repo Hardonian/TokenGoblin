@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerTenant } from "@/lib/billing";
 import { useAuth } from "@/lib/auth";
@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [tenantId, setTenantId] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +23,6 @@ export default function SignupPage() {
     created_at: string;
   } | null>(null);
 
-  useEffect(() => {
-    // We handle redirect in handleSubmit now
-  }, [result, router]);
-
   const { login } = useAuth();
   
   async function handleSubmit(e: React.FormEvent) {
@@ -35,7 +30,7 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await registerTenant(tenantId, name);
+      const data = await registerTenant(name);
       setResult(data);
       // Automatically log them in since we got the api_key back
       if (data.api_key && data.tenant_id) {
@@ -70,22 +65,6 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">
-                [ Tenant ID ]
-              </label>
-              <input
-                value={tenantId}
-                onChange={(e) =>
-                  setTenantId(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
-                  )
-                }
-                placeholder="company-id"
-                className="h-10 w-full border border-[#333] bg-black px-3 text-sm text-[#ffb000] outline-none transition focus:border-[#ffb000]"
-              />
-              <p className="mt-2 text-[10px] text-zinc-600 uppercase tracking-widest">{/* Lowercase letters, numbers, hyphens */}</p>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-2">
                 [ Organization ]
               </label>
               <input
@@ -109,7 +88,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading || !tenantId || !name || !!result}
+              disabled={loading || !name.trim() || !!result}
               className="mt-4 h-10 w-full bg-[#ffb000] text-xs font-bold uppercase tracking-widest text-black transition hover:bg-[#ff8c00] disabled:opacity-50"
             >
               {loading ? "[ Executing... ]" : "[ Allocate ]"}

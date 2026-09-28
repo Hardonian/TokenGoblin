@@ -1,140 +1,86 @@
 import { POST } from "../route";
 
-// Mock NextResponse
-jest.mock("next/server", () => {
-  return {
-    NextResponse: {
-      json: jest.fn((body, init) => {
-        return {
-          status: init?.status || 200,
-          json: async () => body,
-        };
-      }),
-    },
-  };
-});
+jest.mock("next/server", () => ({
+  NextResponse: {
+    json: jest.fn((body, init) => ({
+      status: init?.status ?? 200,
+      json: async () => body,
+      cookies: { set: jest.fn() },
+    })),
+  },
+}));
 
-// We need to mock fetch
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-describe("POST /api/tenant/register", () => {
-  let mockRequest: Request;
+function request(body: unknown): Request {
+  return {
+    json: async () => body,
+  } as unknown as Request;
+}
 
+describe("POST /api/tenant/register", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("returns 400 if tenant_id or name is missing", async () => {
-    mockRequest = {
-      json: async () => ({}),
-    } as Request;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.ok).toBe(false);
-    expect(json.error.code).toBe("invalid_request");
+  it("rejects a missing organization name", async () => {
+    const response = await POST(request({}));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: { code: "invalid_request" },
+    });
   });
 
-  it("returns 400 if tenant_id is missing", async () => {
-    mockRequest = {
-      json: async () => ({ name: "test name" }),
-    } as Request;
+  it("accepts registration without a caller-selected tenant id", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        data: { tenant_id: "generated-id", api_key: "key_1.tg_secret" },
+      }),
+    });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(400);
+    const response = await POST(request({ name: "Acme" }));
+    expect(response.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/tenant/register"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ tenant_id: "", name: "Acme" }),
+      }),
+    );
+    expect(response.cookies.set).toHaveBeenCalledTimes(2);
   });
 
-  it("returns 400 if name is missing", async () => {
-    mockRequest = {
-      json: async () => ({ tenant_id: "test-tenant-id" }),
-    } as Request;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 502 if upstream registration fails (status not ok, payload ok is undefined)", async () => {
-    mockRequest = {
-      json: async () => ({ tenant_id: "t1", name: "n1" }),
-    } as Request;
-
+  it("maps an upstream failure to a gateway error", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
-      json: async () => ({}),
+      json: async () => ({ error: { message: "Registration unavailable" } }),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(502);
-    const json = await res.json();
-    expect(json.error.code).toBe("registration_failed");
-    expect(json.error.message).toBe("Registration failed");
-  });
-
-  it("returns 502 if upstream registration fails (status ok, payload ok is false)", async () => {
-    mockRequest = {
-      json: async () => ({ tenant_id: "t1", name: "n1" }),
-    } as Request;
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: false, error: { message: "Internal Error" } }),
+    const response = await POST(request({ name: "Acme" }));
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "registration_failed", message: "Registration unavailable" },
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(502);
-    const json = await res.json();
-    expect(json.error.code).toBe("registration_failed");
-    expect(json.error.message).toBe("Internal Error");
   });
 
-  it("returns 500 if an unexpected error occurs", async () => {
-    mockRequest = {
-      json: async () => { throw new Error("JSON parse error") },
-    } as Request;
+  it("does not expose parser or infrastructure errors", async () => {
+    const malformed = {
+      json: async () => {
+        throw new Error("sensitive parser detail");
+      },
+    } as unknown as Request;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error.code).toBe("unexpected_error");
-    expect(json.error.message).toBe("JSON parse error");
-  });
-
-  it("returns 500 if a non-error object is thrown", async () => {
-    mockRequest = {
-      json: async () => { throw "A string error" },
-    } as Request;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error.code).toBe("unexpected_error");
-    expect(json.error.message).toBe("Unexpected error");
-  });
-
-  it("returns 200 on success", async () => {
-    mockRequest = {
-      json: async () => ({ tenant_id: "t1", name: "n1" }),
-    } as Request;
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, data: { id: "t1" } }),
+    const response = await POST(malformed);
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "unexpected_error",
+        message: "Registration service is temporarily unavailable.",
+      },
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res: any = await POST(mockRequest);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.ok).toBe(true);
-    expect(json.data.id).toBe("t1");
   });
 });

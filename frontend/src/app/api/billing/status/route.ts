@@ -1,43 +1,40 @@
 import { NextResponse } from "next/server";
+import {
+  getBackendAuthHeaders,
+  getServerApiBase,
+  readUpstreamJSON,
+  upstreamStatus,
+} from "@/lib/server-api";
 
 export const dynamic = "force-dynamic";
 
-function getApiBase() {
-  return (
-    process.env.TG_API_BASE ||
-    process.env.NEXT_PUBLIC_TG_API_BASE ||
-    "http://localhost:8080"
-  ).replace(/\/$/, "");
-}
-
-export async function GET(request: Request) {
-  const tenantId = new URL(request.url).searchParams.get("tenant_id");
-
-  if (!tenantId) {
+export async function GET() {
+  const { headers, tenantID } = await getBackendAuthHeaders();
+  if (!tenantID || !headers.has("authorization")) {
     return NextResponse.json(
       {
         ok: false,
         status: "error",
         error: {
-          code: "invalid_request",
-          message: "tenant_id query parameter is required.",
+          code: "unauthorized",
+          message: "Sign in to view billing status.",
         },
       },
-      { status: 400 }
+      { status: 401 }
     );
   }
 
   try {
     const upstream = await fetch(
-      `${getApiBase()}/api/billing/status?tenant_id=${encodeURIComponent(tenantId)}`,
+      `${getServerApiBase()}/api/billing/status`,
       {
-        headers: {
-          "x-tenant-id": tenantId,
-        },
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       }
     );
 
-    const payload = await upstream.json();
+    const payload = (await readUpstreamJSON(upstream)) as { ok?: boolean; data?: unknown; error?: { message?: string } } | null;
 
     if (!upstream.ok || !payload?.ok) {
       return NextResponse.json(
@@ -49,7 +46,7 @@ export async function GET(request: Request) {
             message: payload?.error?.message || "Billing status failed",
           },
         },
-        { status: 502 }
+        { status: upstreamStatus(upstream.status) }
       );
     }
 
@@ -65,13 +62,10 @@ export async function GET(request: Request) {
         status: "error",
         error: {
           code: "unexpected_error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unexpected error",
+          message: "Billing service is temporarily unavailable.",
         },
       },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }

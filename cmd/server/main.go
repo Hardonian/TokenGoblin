@@ -60,7 +60,8 @@ func main() {
 		}()
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	if err := config.ValidateServerEnv(); err != nil {
 		slog.Error("unsafe production configuration", "error", err)
@@ -136,23 +137,28 @@ func main() {
 	slog.Info("TokenGoblin execution layer starting", "addr", addr)
 
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    api.MaxHeaderBytes,
 	}
 
+	serverErrors := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("server failed to start", "error", err)
-			os.Exit(1)
+			serverErrors <- err
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
+	select {
+	case err := <-serverErrors:
+		slog.Error("server failed", "error", err)
+		return
+	case <-ctx.Done():
+	}
 
 	slog.Info("shutting down gracefully...")
 
@@ -161,7 +167,7 @@ func main() {
 
 	if err := server.Shutdown(ctxShutdown); err != nil {
 		slog.Error("server shutdown failed", "error", err)
-		os.Exit(1)
+		_ = server.Close()
 	}
 
 	slog.Info("server exited gracefully")

@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.26.x'
+  NODE_VERSION: '22'
 
 jobs:
   build-and-test:
@@ -27,8 +28,11 @@ jobs:
       - name: Verify go.mod
         run: go mod verify
 
-      - name: Run go fmt
-        run: gofmt -l -e .
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          unformatted="$(git ls-files '*.go' | xargs gofmt -l)"
+          test -z "$unformatted" || { printf 'Unformatted Go files:\n%s\n' "$unformatted"; exit 1; }
 
       - name: Run go vet
         run: go vet ./...
@@ -57,27 +61,27 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install pnpm
-        run: npm install -g pnpm@9
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Run lint
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Run typecheck
-        run: pnpm run typecheck
+        run: npm run typecheck
 
       - name: Run tests
-        run: pnpm test --if-present
+        run: npm run test:ci
 
       - name: Build Next.js
-        run: pnpm build
+        run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
   docker:
     needs: [build-and-test, frontend]

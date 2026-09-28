@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { apiBase, Envelope } from "@/lib/api";
+import { getServerApiBase, readUpstreamJSON } from "@/lib/server-api";
+import type { Envelope } from "@/lib/api";
 
 export async function POST(request: Request) {
   try {
     const { api_key } = await request.json();
 
-    if (!api_key) {
+    if (typeof api_key !== "string" || !api_key.trim()) {
       return NextResponse.json(
         { ok: false, status: "error", error: { message: "api_key is required" } },
         { status: 400 }
@@ -13,16 +14,19 @@ export async function POST(request: Request) {
     }
 
     // Call backend to verify the API key
-    const res = await fetch(`${apiBase}/api/tenant/login`, {
+    const normalizedKey = api_key.trim();
+    const res = await fetch(`${getServerApiBase()}/api/tenant/login`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${api_key}`,
+        Authorization: `Bearer ${normalizedKey}`,
       },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
 
-    const data: Envelope<{ tenant_id: string }> = await res.json();
+    const data = (await readUpstreamJSON(res)) as Envelope<{ tenant_id: string }> | null;
 
-    if (!data.ok || !data.data?.tenant_id) {
+    if (!res.ok || !data?.ok || !data.data?.tenant_id) {
       return NextResponse.json(
         { ok: false, status: "error", error: { message: "Invalid API key" } },
         { status: 401 }
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
     });
 
     // Set cookie for Next.js session
-    response.cookies.set("tg_api_key", api_key, {
+    response.cookies.set("tg_api_key", normalizedKey, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
 
     // Also set tenant_id cookie for frontend components to easily know the tenant
     response.cookies.set("tg_tenant_id", data.data.tenant_id, {
-      httpOnly: false, // Accessible to JS if needed
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
@@ -54,10 +58,14 @@ export async function POST(request: Request) {
     });
 
     return response;
-  } catch (err) {
+  } catch {
     return NextResponse.json(
-      { ok: false, status: "error", error: { message: (err as Error).message } },
-      { status: 500 }
+      {
+        ok: false,
+        status: "error",
+        error: { message: "Authentication service is temporarily unavailable" },
+      },
+      { status: 502 }
     );
   }
 }

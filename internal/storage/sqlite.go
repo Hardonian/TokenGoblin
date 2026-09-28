@@ -396,7 +396,6 @@ func (r *SQLiteRepository) migrate(ctx context.Context) error {
 	return nil
 }
 
-
 func isValidSQLIdentifier(s string) bool {
 	if s == "" {
 		return false
@@ -1462,22 +1461,161 @@ func (r *SQLiteRepository) DeleteOldEvents(ctx context.Context, retentionDays in
 }
 
 func (r *SQLiteRepository) UpsertAgent(ctx context.Context, agent domain.Agent) error {
-	return errors.New("not implemented")
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO agents (
+			tenant_id, agent_id, name, description, owner_id, agent_type, framework,
+			status, budget_usd, budget_period, sla_latency_ms, sla_success_rate,
+			created_at, updated_at, retired_at, retirement_reason
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, agent_id) DO UPDATE SET
+			name = excluded.name, description = excluded.description,
+			owner_id = excluded.owner_id, agent_type = excluded.agent_type,
+			framework = excluded.framework, status = excluded.status,
+			budget_usd = excluded.budget_usd, budget_period = excluded.budget_period,
+			sla_latency_ms = excluded.sla_latency_ms, sla_success_rate = excluded.sla_success_rate,
+			updated_at = excluded.updated_at, retired_at = excluded.retired_at,
+			retirement_reason = excluded.retirement_reason
+	`, agent.TenantID, agent.AgentID, agent.Name, nullString(agent.Description),
+		nullString(agent.OwnerID), string(agent.AgentType), nullString(string(agent.Framework)),
+		string(agent.Status), agent.BudgetUSD, nullString(agent.BudgetPeriod), agent.SLALatencyMs,
+		agent.SLASuccessRate, formatTime(agent.CreatedAt), formatTime(agent.UpdatedAt),
+		timePtrString(agent.RetiredAt), nullString(agent.RetirementReason))
+	return wrapDBErr(err)
 }
 func (r *SQLiteRepository) ListAgents(ctx context.Context, tenantID string) ([]domain.Agent, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT agent_id, tenant_id, name, description, owner_id, agent_type, framework,
+			status, budget_usd, budget_period, sla_latency_ms, sla_success_rate,
+			created_at, updated_at, retired_at, retirement_reason
+		FROM agents WHERE tenant_id = ? ORDER BY name, agent_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var agents []domain.Agent
+	for rows.Next() {
+		var agent domain.Agent
+		var description, ownerID, framework, budgetPeriod, retiredAt, retirementReason sql.NullString
+		var budget, successRate sql.NullFloat64
+		var latency sql.NullInt64
+		var createdAt, updatedAt string
+		if err := rows.Scan(&agent.AgentID, &agent.TenantID, &agent.Name, &description, &ownerID,
+			&agent.AgentType, &framework, &agent.Status, &budget, &budgetPeriod, &latency,
+			&successRate, &createdAt, &updatedAt, &retiredAt, &retirementReason); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		agent.Description, agent.OwnerID = description.String, ownerID.String
+		agent.Framework = domain.AgentFramework(framework.String)
+		agent.BudgetPeriod, agent.RetirementReason = budgetPeriod.String, retirementReason.String
+		agent.CreatedAt, agent.UpdatedAt = parseTime(createdAt), parseTime(updatedAt)
+		if budget.Valid {
+			value := budget.Float64
+			agent.BudgetUSD = &value
+		}
+		if latency.Valid {
+			value := int(latency.Int64)
+			agent.SLALatencyMs = &value
+		}
+		if successRate.Valid {
+			value := successRate.Float64
+			agent.SLASuccessRate = &value
+		}
+		if retiredAt.Valid {
+			value := parseTime(retiredAt.String)
+			agent.RetiredAt = &value
+		}
+		agents = append(agents, agent)
+	}
+	return agents, wrapDBErr(rows.Err())
 }
 func (r *SQLiteRepository) UpsertGovernancePolicy(ctx context.Context, policy domain.GovernancePolicy) error {
-	return errors.New("not implemented")
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO governance_policies (
+			tenant_id, policy_id, name, type, config_json, is_active, created_by, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, policy_id) DO UPDATE SET
+			name = excluded.name, type = excluded.type, config_json = excluded.config_json,
+			is_active = excluded.is_active, created_by = excluded.created_by,
+			updated_at = excluded.updated_at
+	`, policy.TenantID, policy.PolicyID, policy.Name, string(policy.Type), policy.ConfigJSON,
+		boolInt(policy.IsActive), nullString(policy.CreatedBy), formatTime(policy.CreatedAt), formatTime(policy.UpdatedAt))
+	return wrapDBErr(err)
 }
 func (r *SQLiteRepository) ListGovernancePolicies(ctx context.Context, tenantID string) ([]domain.GovernancePolicy, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT policy_id, tenant_id, name, type, config_json, is_active, created_by, created_at, updated_at
+		FROM governance_policies WHERE tenant_id = ? ORDER BY name, policy_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var policies []domain.GovernancePolicy
+	for rows.Next() {
+		var policy domain.GovernancePolicy
+		var active int
+		var createdBy sql.NullString
+		var createdAt, updatedAt string
+		if err := rows.Scan(&policy.PolicyID, &policy.TenantID, &policy.Name, &policy.Type,
+			&policy.ConfigJSON, &active, &createdBy, &createdAt, &updatedAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		policy.IsActive, policy.CreatedBy = active != 0, createdBy.String
+		policy.CreatedAt, policy.UpdatedAt = parseTime(createdAt), parseTime(updatedAt)
+		policies = append(policies, policy)
+	}
+	return policies, wrapDBErr(rows.Err())
 }
 func (r *SQLiteRepository) UpsertBudget(ctx context.Context, budget domain.Budget) error {
-	return errors.New("not implemented")
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO budgets (
+			tenant_id, budget_id, name, type, scope_type, scope_id, limit_usd,
+			alert_threshold_pct, current_spend_usd, period_start, period_end,
+			is_active, utilization_pct, status, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(tenant_id, budget_id) DO UPDATE SET
+			name = excluded.name, type = excluded.type, scope_type = excluded.scope_type,
+			scope_id = excluded.scope_id, limit_usd = excluded.limit_usd,
+			alert_threshold_pct = excluded.alert_threshold_pct,
+			current_spend_usd = excluded.current_spend_usd,
+			period_start = excluded.period_start, period_end = excluded.period_end,
+			is_active = excluded.is_active, utilization_pct = excluded.utilization_pct,
+			status = excluded.status
+	`, budget.TenantID, budget.BudgetID, budget.Name, budget.Type, string(budget.ScopeType),
+		nullString(budget.ScopeID), budget.LimitUSD, budget.AlertThresholdPct, budget.CurrentSpendUSD,
+		formatTime(budget.PeriodStart), formatTime(budget.PeriodEnd), boolInt(budget.IsActive),
+		budget.UtilizationPct, budget.Status, formatTime(budget.CreatedAt))
+	return wrapDBErr(err)
 }
 func (r *SQLiteRepository) ListBudgets(ctx context.Context, tenantID string) ([]domain.Budget, error) {
-	return nil, errors.New("not implemented")
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT budget_id, tenant_id, name, type, scope_type, scope_id, limit_usd,
+			alert_threshold_pct, current_spend_usd, period_start, period_end,
+			is_active, utilization_pct, status, created_at
+		FROM budgets WHERE tenant_id = ? ORDER BY period_start DESC, budget_id
+	`, tenantID)
+	if err != nil {
+		return nil, wrapDBErr(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var budgets []domain.Budget
+	for rows.Next() {
+		var budget domain.Budget
+		var scopeID sql.NullString
+		var periodStart, periodEnd, createdAt string
+		var active int
+		if err := rows.Scan(&budget.BudgetID, &budget.TenantID, &budget.Name, &budget.Type,
+			&budget.ScopeType, &scopeID, &budget.LimitUSD, &budget.AlertThresholdPct,
+			&budget.CurrentSpendUSD, &periodStart, &periodEnd, &active, &budget.UtilizationPct,
+			&budget.Status, &createdAt); err != nil {
+			return nil, wrapDBErr(err)
+		}
+		budget.ScopeID, budget.IsActive = scopeID.String, active != 0
+		budget.PeriodStart, budget.PeriodEnd, budget.CreatedAt = parseTime(periodStart), parseTime(periodEnd), parseTime(createdAt)
+		budgets = append(budgets, budget)
+	}
+	return budgets, wrapDBErr(rows.Err())
 }
 
 func (s *SQLiteRepository) GetTuningProfile(ctx context.Context, tenantID string) (*domain.TuningProfile, error) {
@@ -1603,17 +1741,17 @@ func (s *SQLiteRepository) MarkEventsExported(ctx context.Context, eventIDs []st
 }
 
 func (r *SQLiteRepository) SaveAnomalySignalBatch(ctx context.Context, signals []domain.AnomalySignal) error {
-    if len(signals) == 0 {
-        return nil
-    }
+	if len(signals) == 0 {
+		return nil
+	}
 
-    tx, err := r.db.BeginTx(ctx, nil)
-    if err != nil {
-        return wrapDBErr(err)
-    }
-    defer rollback(tx)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer rollback(tx)
 
-    stmt, err := tx.PrepareContext(ctx, `
+	stmt, err := tx.PrepareContext(ctx, `
         INSERT INTO anomaly_signals (
             tenant_id, anomaly_id, event_id, worker_id, detected_at, severity,
             type, description, observed_value, threshold_value, details_json, created_at
@@ -1628,27 +1766,27 @@ func (r *SQLiteRepository) SaveAnomalySignalBatch(ctx context.Context, signals [
             details_json = excluded.details_json,
             created_at = excluded.created_at
     `)
-    if err != nil {
-        return wrapDBErr(err)
-    }
-    defer stmt.Close()
+	if err != nil {
+		return wrapDBErr(err)
+	}
+	defer stmt.Close()
 
-    for _, signal := range signals {
-        detailsJSON, err := marshalNullable(signal.Details)
-        if err != nil {
-            return err
-        }
+	for _, signal := range signals {
+		detailsJSON, err := marshalNullable(signal.Details)
+		if err != nil {
+			return err
+		}
 
-        _, err = stmt.ExecContext(ctx,
-            signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
-            signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
-            signal.ObservedValue, signal.ThresholdValue, detailsJSON,
-            time.Now().UTC(),
-        )
-        if err != nil {
-            return wrapDBErr(err)
-        }
-    }
+		_, err = stmt.ExecContext(ctx,
+			signal.TenantID, signal.AnomalyID, nullString(signal.EventID), nullString(signal.WorkerID),
+			signal.DetectedAt.UTC(), string(signal.Severity), string(signal.Type), signal.Description,
+			signal.ObservedValue, signal.ThresholdValue, detailsJSON,
+			time.Now().UTC(),
+		)
+		if err != nil {
+			return wrapDBErr(err)
+		}
+	}
 
-    return tx.Commit()
+	return tx.Commit()
 }
