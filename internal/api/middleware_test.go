@@ -95,3 +95,15 @@ func TestCORSMiddleware(t *testing.T) {
 		})
 	}
 }
+
+func TestGetIPOnlyTrustsForwardedHeadersWhenConfigured(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "192.0.2.10:4321"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 192.0.2.1")
+
+	t.Setenv("TG_TRUST_PROXY", "false")
+	assert.Equal(t, "192.0.2.10", getIP(req))
+
+	t.Setenv("TG_TRUST_PROXY", "true")
+	assert.Equal(t, "203.0.113.9", getIP(req))
+}

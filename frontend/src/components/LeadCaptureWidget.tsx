@@ -6,12 +6,28 @@ import { motion } from "framer-motion";
 export function LeadCaptureWidget() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "lead", email }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error?.message || "Unable to submit your request.");
+      }
       setSubmitted(true);
-      // In a real app, this would POST to an API
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to submit your request.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -34,7 +50,8 @@ export function LeadCaptureWidget() {
               <p className="font-bold tracking-widest uppercase text-sm">Success! A Goblin will contact you shortly.</p>
             </motion.div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex gap-2 w-full">
+            <form onSubmit={handleSubmit} className="w-full">
+              <div className="flex gap-2">
               <input
                 type="email"
                 required
@@ -47,10 +64,13 @@ export function LeadCaptureWidget() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                className="h-12 px-6 bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold uppercase tracking-widest text-xs transition-colors"
+                disabled={loading}
+                className="h-12 px-6 bg-[#ffb000] hover:bg-[#ff8c00] text-black font-bold uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
               >
-                Claim Audit
+                {loading ? "Sending…" : "Claim Audit"}
               </motion.button>
+              </div>
+              {error ? <p className="mt-2 text-xs text-red-400" role="alert">{error}</p> : null}
             </form>
           )}
         </div>

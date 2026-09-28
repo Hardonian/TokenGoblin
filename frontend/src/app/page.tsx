@@ -81,6 +81,10 @@ type TokenEvent = {
   occurred_at: string;
 };
 
+type BillingStatus = {
+  tier: string;
+};
+
 // ------------------------------------------------------------------
 // Fetcher
 // ------------------------------------------------------------------
@@ -94,16 +98,14 @@ export default function CommandCenter() {
   const { tenantId, isLoading: authLoading } = useAuth();
   const [toast, ] = useState<string | null>(null);
   
-  // Real check for enterprise tier (we will add logic later, defaulting to true for now so we can see the data)
-  const isPro = true;
-
-
-
+  const { data: billingStatus } = useSWR<BillingStatus>(tenantId ? "/api/billing/status" : null, authFetcher);
+  const isPro = billingStatus?.tier === "pro" || billingStatus?.tier === "premium" || billingStatus?.tier === "enterprise";
+  const paidTenantKey = tenantId && isPro;
   const { data: scorecard, mutate: mutSC } = useSWR<ExecutiveScorecard>(tenantId ? "/v2/executive/scorecard" : null, authFetcher);
-  const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>(tenantId ? "/v2/forecasts/spend" : null, authFetcher);
-  const { data: clData, mutate: mutCL } = useSWR<{ cost_leaks: CostLeak[] }>(tenantId ? "/v2/intelligence/cost-leaks" : null, authFetcher);
-  const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>(tenantId ? "/v2/intelligence/zombie-agents" : null, authFetcher);
-  const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>(tenantId ? "/v2/intelligence/prompt-graveyard" : null, authFetcher);
+  const { data: forecast, mutate: mutFC } = useSWR<SpendForecast>(paidTenantKey ? "/v2/forecasts/spend" : null, authFetcher);
+  const { data: clData, mutate: mutCL } = useSWR<{ cost_leaks: CostLeak[] }>(paidTenantKey ? "/v2/intelligence/cost-leaks" : null, authFetcher);
+  const { data: zaData, mutate: mutZA } = useSWR<{ zombie_agents: ZombieAgent[] }>(paidTenantKey ? "/v2/intelligence/zombie-agents" : null, authFetcher);
+  const { data: graveyard, mutate: mutGY } = useSWR<PromptGraveyardResult>(paidTenantKey ? "/v2/intelligence/prompt-graveyard" : null, authFetcher);
   const { data: mdData, mutate: mutMD } = useSWR<{ models: ModelStats[] }>(tenantId ? "/v2/analytics/models" : null, authFetcher);
   const { data: eventsData, mutate: mutEvents } = useSWR<{ events: TokenEvent[] }>(tenantId ? "/api/dashboard/events" : null, authFetcher, { refreshInterval: 5000 });
 
@@ -111,7 +113,7 @@ export default function CommandCenter() {
   const zombieAgents = zaData?.zombie_agents || [];
   const models = mdData?.models || [];
   const events = eventsData?.events || [];
-  const loading = authLoading || (!scorecard && !forecast && !clData && !zaData && !graveyard && !mdData && !eventsData);
+  const loading = authLoading || Boolean(tenantId && (!billingStatus || !scorecard || !mdData || !eventsData));
 
   const loadAll = () => {
     mutSC();

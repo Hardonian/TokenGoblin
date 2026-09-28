@@ -269,6 +269,34 @@ func TestTierForSubscriptionStatus(t *testing.T) {
 	}
 }
 
+func TestPlanForPriceIDAllowlist(t *testing.T) {
+	t.Setenv("STRIPE_PRICE_PRO", "price_pro")
+	t.Setenv("STRIPE_PRICE_ENTERPRISE", "price_enterprise")
+
+	tier, err := planForPriceID("price_pro")
+	if err != nil || tier != TierPro {
+		t.Fatalf("expected pro price to resolve, tier=%q err=%v", tier, err)
+	}
+	tier, err = planForPriceID("price_enterprise")
+	if err != nil || tier != TierEnterprise {
+		t.Fatalf("expected enterprise price to resolve, tier=%q err=%v", tier, err)
+	}
+	if _, err := planForPriceID("price_attacker_controlled"); err == nil {
+		t.Fatal("expected arbitrary Stripe price to be rejected")
+	}
+}
+
+func TestTierForVerifiedEventUsesCheckoutPlanMetadata(t *testing.T) {
+	t.Setenv("TG_PLAN_ENTERPRISE_LIMIT_USD", "750")
+	tier, limit := tierForVerifiedEvent(VerifiedStripeEvent{
+		SubscriptionStatus: "active",
+		Metadata:           map[string]string{"plan_tier": TierEnterprise},
+	})
+	if tier != TierEnterprise || limit != 750 {
+		t.Fatalf("expected enterprise tier and limit, got %q %.2f", tier, limit)
+	}
+}
+
 func TestNormalizeVerifiedEvent(t *testing.T) {
 	event := VerifiedStripeEvent{
 		EventID:            "  evt_123  ",

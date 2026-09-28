@@ -54,6 +54,7 @@ npm run dev
 | ------------------------------------- | ------------------ | -------------------------------------------------------------- |
 | `TG_DB_PATH`                          | Optional           | SQLite path (default: `./data/tokengoblin.sqlite`)             |
 | `TG_DB_DSN`                           | Required (Prod)    | PostgreSQL DSN; production startup fails closed without it      |
+| `TG_TRUST_PROXY`                      | Optional           | Trust proxy IP headers only behind a sanitizing reverse proxy   |
 | `STRIPE_SECRET_KEY`                   | Required (Billing) | Stripe secret key for backend API calls                        |
 | `STRIPE_WEBHOOK_SECRET`               | Required (Billing) | Stripe webhook signing secret to verify Stripe events          |
 | `STRIPE_PRICE_PRO`                    | Required (Billing) | Stripe Price ID for Pro plan (backend)                         |

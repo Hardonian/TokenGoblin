@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -129,6 +130,36 @@ func RequireRole(allowed ...string) func(http.Handler) http.Handler {
 				Status: "error",
 				Error:  issue("forbidden", "This API key role cannot perform the requested action."),
 			})
+		})
+	}
+}
+
+func RequireTier(repo storage.Repository, allowed ...string) func(http.Handler) http.Handler {
+	allowedTiers := make(map[string]struct{}, len(allowed))
+	for _, tier := range allowed {
+		allowedTiers[strings.ToLower(strings.TrimSpace(tier))] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tenantID := getTenantID(r)
+			tenant, err := repo.GetTenant(r.Context(), tenantID)
+			if err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, Envelope{
+					OK: false, Status: "error", Error: issue("billing_status_unavailable", "Plan entitlement could not be verified."),
+				})
+				return
+			}
+			if tenant == nil {
+				writeAuthError(w, "tenant_not_found", "Authenticated tenant was not found.")
+				return
+			}
+			if _, ok := allowedTiers[strings.ToLower(strings.TrimSpace(tenant.Tier))]; !ok {
+				writeJSON(w, http.StatusForbidden, Envelope{
+					OK: false, Status: "error", Error: issue("upgrade_required", "This feature requires a paid plan."),
+				})
+				return
+			}
+			next.ServeHTTP(w, r)
 		})
 	}
 }
@@ -290,18 +321,21 @@ func IPRateLimitMiddleware(limiter *moat.RateLimiter, next http.Handler) http.Ha
 }
 
 func getIP(r *http.Request) string {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip = r.Header.Get("X-Real-IP")
-	}
-	if ip == "" {
-		ip = r.RemoteAddr
+	ip := r.RemoteAddr
+	trustProxy := strings.EqualFold(strings.TrimSpace(os.Getenv("TG_TRUST_PROXY")), "true") || strings.TrimSpace(os.Getenv("TG_TRUST_PROXY")) == "1"
+	if trustProxy {
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			ip = forwarded
+		} else if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+			ip = realIP
+		}
 	}
 	if idx := strings.IndexByte(ip, ','); idx >= 0 {
 		ip = ip[:idx]
 	}
-	if idx := strings.LastIndexByte(ip, ':'); idx >= 0 {
-		ip = ip[:idx]
+	ip = strings.TrimSpace(ip)
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		return host
 	}
-	return strings.TrimSpace(ip)
+	return ip
 }

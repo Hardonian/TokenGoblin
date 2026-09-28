@@ -120,12 +120,11 @@ Implemented:
 Partially implemented:
 
 - Quota checks use tenant usage limits, but full plan gating/admin UI is not present.
-- Stripe checkout linking supports tenant metadata/client reference IDs, but hosted checkout and billing portal creation are not implemented.
+- Stripe hosted checkout and billing portal creation are implemented with a server-side price allowlist; production still requires live Price IDs and webhook configuration.
 - RLS policies are present for Supabase/Postgres; direct client sessions must set `app.tenant_id` or use server-side/service-role access.
 - Tenant members are persisted, but external identity-provider sync and SSO login are not configured.
 
 Planned:
 
-- Stripe checkout and billing portal creation.
 - SSO admin surfaces and identity-provider group sync.
 - Recurring review runs and scheduled report delivery.

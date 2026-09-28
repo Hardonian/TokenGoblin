@@ -25,8 +25,8 @@ const (
 	StripeEventSubscriptionDeleted = "customer.subscription.deleted"
 	StripeEventCheckoutCompleted   = "checkout.session.completed"
 
-	TierFree    = "free"
-	TierPro     = "pro"
+	TierFree = "free"
+	TierPro  = "pro"
 	// TierPremium remains an alias for compatibility with existing clients.
 	TierPremium    = TierPro
 	TierEnterprise = "enterprise"

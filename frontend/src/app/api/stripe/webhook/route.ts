@@ -95,14 +95,33 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const verifiedEvent = normalizeStripeEvent(event);
-  const upstream = await fetch(`${apiBase}/internal/billing/stripe-event`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${internalSecret}`,
-    },
-    body: JSON.stringify(verifiedEvent),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${apiBase}/internal/billing/stripe-event`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${internalSecret}`,
+      },
+      body: JSON.stringify(verifiedEvent),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return json(
+      {
+        ok: false,
+        status: "error",
+        event_id: event.id,
+        event_type: event.type,
+        error: {
+          code: "billing_lifecycle_unavailable",
+          message: "Verified Stripe event could not reach billing lifecycle processing.",
+        },
+      },
+      503,
+    );
+  }
 
   let upstreamBody: unknown = null;
   try {
@@ -143,15 +162,14 @@ function verifyStripeSignature(
   header: string,
   secret: string,
 ): boolean {
-  const parts = Object.fromEntries(
-    header.split(",").map((part) => {
-      const [key, value] = part.split("=", 2);
-      return [key, value];
-    }),
-  );
-  const timestamp = parts.t;
-  const v1 = parts.v1;
-  if (!timestamp || !v1) {
+  let timestamp = "";
+  const signatures: string[] = [];
+  for (const part of header.split(",")) {
+    const [rawKey, value] = part.trim().split("=", 2);
+    if (rawKey === "t") timestamp = value ?? "";
+    if (rawKey === "v1" && value) signatures.push(value);
+  }
+  if (!timestamp || signatures.length === 0) {
     return false;
   }
   const issuedAt = Number(timestamp);
@@ -169,14 +187,21 @@ function verifyStripeSignature(
     .update(payload, "utf8")
     .digest("hex");
 
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(expected, "hex"),
-      Buffer.from(v1, "hex"),
-    );
-  } catch {
-    return false;
+  for (const signature of signatures) {
+    try {
+      if (
+        crypto.timingSafeEqual(
+          Buffer.from(expected, "hex"),
+          Buffer.from(signature, "hex"),
+        )
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
   }
+  return false;
 }
 
 function json(body: StripeWebhookAck, status = 200): Response {

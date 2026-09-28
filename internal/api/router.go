@@ -75,6 +75,9 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	wrapAnalyst := func(h http.HandlerFunc) http.Handler {
 		return AuthMiddleware(repo, RequireRole("admin", "analyst")(h))
 	}
+	wrapPaid := func(h http.HandlerFunc) http.Handler {
+		return AuthMiddleware(repo, RequireTier(repo, "pro", "premium", "enterprise")(h))
+	}
 
 	mux.Handle("/v1/completions", wrap(handler.HandleTaskCompletion))
 	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
@@ -136,17 +139,17 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 
 	// Intelligence Engine endpoints
 	mux.Handle("/v2/intelligence/waste", wrap(v2.HandleWasteReport))
-	mux.Handle("/v2/intelligence/prompt-graveyard", AuthMiddleware(repo, http.HandlerFunc(v2.HandlePromptGraveyard)))
-	mux.Handle("/v2/intelligence/zombie-agents", AuthMiddleware(repo, http.HandlerFunc(v2.HandleZombieAgents)))
-	mux.Handle("/v2/intelligence/duplicates", AuthMiddleware(repo, http.HandlerFunc(v2.HandleDuplicates)))
-	mux.Handle("/v2/intelligence/cost-leaks", AuthMiddleware(repo, http.HandlerFunc(v2.HandleCostLeaks)))
-	mux.Handle("/v2/intelligence/refine", AuthMiddleware(repo, http.HandlerFunc(v2.HandleRefinePrompt)))
+	mux.Handle("/v2/intelligence/prompt-graveyard", wrapPaid(v2.HandlePromptGraveyard))
+	mux.Handle("/v2/intelligence/zombie-agents", wrapPaid(v2.HandleZombieAgents))
+	mux.Handle("/v2/intelligence/duplicates", wrapPaid(v2.HandleDuplicates))
+	mux.Handle("/v2/intelligence/cost-leaks", wrapPaid(v2.HandleCostLeaks))
+	mux.Handle("/v2/intelligence/refine", wrapPaid(v2.HandleRefinePrompt))
 	mux.Handle("/v2/intelligence/hallucination-map", wrap(v2.HandleHallucinationMap))
 	mux.Handle("/v2/intelligence/insights", wrap(v2.HandleScholarInsights))
 	mux.Handle("/api/admin/scholar/train", wrapAdmin(v2.HandleScholarTrain))
 
 	// Forecasting Engine endpoints
-	mux.Handle("/v2/forecasts/spend", wrap(v2.HandleSpendForecast))
+	mux.Handle("/v2/forecasts/spend", wrapPaid(v2.HandleSpendForecast))
 
 	// Executive endpoints
 	mux.Handle("/v2/executive/scorecard", wrap(v2.HandleExecutiveScorecard))

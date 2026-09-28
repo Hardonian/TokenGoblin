@@ -6,6 +6,25 @@ import { GoblinMascot } from "./GoblinMascot";
 
 export function SupportChat() {
   const [isOpen, setIsOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function submitMessage(event: React.FormEvent) {
+    event.preventDefault();
+    setStatus("sending");
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "support", message }),
+      });
+      if (!response.ok) throw new Error("delivery failed");
+      setMessage("");
+      setStatus("sent");
+    } catch {
+      setStatus("error");
+    }
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
@@ -29,15 +48,29 @@ export function SupportChat() {
               <div className="bg-[#1a1a1a] p-3 rounded-r-lg rounded-bl-lg border border-[#333] w-10/12 self-start">
                 <p>Hehehe... Need help uncovering cost leaks, or just wanna hoard tokens?</p>
               </div>
-              <div className="bg-var(--color-accent-goblin-strong) text-white p-3 rounded-l-lg rounded-br-lg w-10/12 self-end">
-                <p>How do I upgrade to Enterprise?</p>
-              </div>
               <div className="bg-[#1a1a1a] p-3 rounded-r-lg rounded-bl-lg border border-[#333] w-10/12 self-start">
-                <p>Easy! Head over to the <a href="/billing" className="text-[#ffb000] underline">Billing</a> section and click Upgrade.</p>
+                <p>Send a message below and the support team will follow up through the configured support channel.</p>
               </div>
+              {status === "sent" ? <p className="text-xs text-green-400" role="status">Message delivered.</p> : null}
+              {status === "error" ? <p className="text-xs text-red-400" role="alert">Delivery failed. Please try again.</p> : null}
             </div>
             <div className="p-3 bg-[#111] border-t border-[#333]">
-              <input type="text" placeholder="Ask the goblin..." className="w-full bg-black border border-[#333] p-2 text-xs text-white outline-none focus:border-[#ffb000]" />
+              <form onSubmit={submitMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  minLength={3}
+                  maxLength={2000}
+                  required
+                  placeholder="Ask the goblin..."
+                  aria-label="Support message"
+                  className="min-w-0 flex-1 bg-black border border-[#333] p-2 text-xs text-white outline-none focus:border-[#ffb000]"
+                />
+                <button type="submit" disabled={status === "sending"} className="border border-[#ffb000] px-3 text-xs text-[#ffb000] disabled:opacity-50">
+                  Send
+                </button>
+              </form>
             </div>
           </motion.div>
         )}

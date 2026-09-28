@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/api"
-	"github.com/Hardonian/TokenGoblin/internal/billing"
 	"github.com/Hardonian/TokenGoblin/internal/config"
 	"github.com/Hardonian/TokenGoblin/internal/cost"
 	"github.com/Hardonian/TokenGoblin/internal/ingestion"
@@ -109,29 +108,27 @@ func main() {
 	ingestionService := ingestion.NewService(repo, registry)
 	ingestionService.StartWorker(ctx)
 
-	// Start Billing Syncer
-	stripeSyncer := billing.NewStripeSyncer(repo, logger)
-	go stripeSyncer.Start(ctx)
-
 	// Start Retention Worker (30 days retention default for MVP)
 	retentionWorker := ingestion.NewRetentionWorker(repo, logger, 30)
 	go retentionWorker.Start(ctx)
 
 	// Start Intelligence Workers
-	dataLakeExporter := intelligence.NewDataLakeExporter(repo, "")
-	dataLakeExporter.Start()
-	defer dataLakeExporter.Stop()
-
-	autoTuner := intelligence.NewAutoTuner(repo)
-	autoTuner.Start()
-	defer autoTuner.Stop()
+	if dataLakeDir := os.Getenv("TG_DATALAKE_DIR"); dataLakeDir != "" {
+		dataLakeExporter := intelligence.NewDataLakeExporter(repo, dataLakeDir)
+		dataLakeExporter.Start()
+		defer dataLakeExporter.Stop()
+	}
 
 	rateLimiter := moat.NewRateLimiter(redisClient)
 	mux := api.NewRouter(ingestionService, repo, rateLimiter)
 
 	addr := os.Getenv("TG_ADDR")
 	if addr == "" {
-		addr = ":8080"
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		addr = ":" + port
 	}
 
 	slog.Info("TokenGoblin execution layer starting", "addr", addr)

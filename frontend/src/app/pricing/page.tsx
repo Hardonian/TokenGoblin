@@ -62,7 +62,6 @@ const plans = [
 export default function PricingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-    const [annual, setAnnual] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const initializedPlanRef = useRef<string | null>(null);
@@ -130,14 +129,6 @@ export default function PricingPage() {
     }
   }, [searchParams, handleStart]);
   function renderPlan(plan: typeof plans[number]) {
-    let price = plan.price;
-
-    if (plan.id === "pro" && annual) {
-      price = "$23";
-    } else if (plan.id === "enterprise" && annual) {
-      price = "$79";
-    }
-
     const buttonLabel =
       plan.id === "free"
         ? "[ Allocate Free ]"
@@ -170,10 +161,10 @@ export default function PricingPage() {
           </p>
           <div className="flex items-baseline gap-2">
             <span className={`text-4xl font-bold tracking-tight ${plan.highlighted ? "text-[#ffb000]" : "text-white"}`}>
-              {price}
+              {plan.price}
             </span>
             <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
-              /{annual && plan.id !== "free" ? "mo, billed annually" : plan.period}
+              /{plan.period}
             </span>
           </div>
           {plan.id !== "free" && (
@@ -230,29 +221,6 @@ export default function PricingPage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 flex max-w-sm items-center justify-center gap-1 border border-[#333] bg-black p-1">
-            <button
-              onClick={() => setAnnual(false)}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
-                !annual
-                  ? "bg-[#ffb000] text-black"
-                  : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              [ Monthly ]
-            </button>
-            <button
-              onClick={() => setAnnual(true)}
-              className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
-                annual
-                  ? "bg-[#ffb000] text-black"
-                  : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              [ Annual ]
-              <span className="block text-[8px] text-zinc-500">save 20%</span>
-            </button>
-          </div>
         </div>
       </section>
 

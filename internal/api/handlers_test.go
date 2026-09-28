@@ -420,7 +420,7 @@ func TestVerifiedStripeEventRouteAppliesBillingLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get tenant: %v", err)
 	}
-	if updated.Tier != "premium" || updated.UsageLimitUSD != 100 || updated.StripeSubscriptionID != "sub_stripe_abc" {
+	if updated.Tier != "pro" || updated.UsageLimitUSD != 100 || updated.StripeSubscriptionID != "sub_stripe_abc" {
 		t.Fatalf("billing lifecycle not applied: %+v", updated)
 	}
 }
