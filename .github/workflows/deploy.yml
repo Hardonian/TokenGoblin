@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Deploy Worker
+        continue-on-error: true
         working-directory: deploy/workers
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
@@ -42,6 +43,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Deploy Frontend
+        continue-on-error: true
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "CLOUDFLARE_API_TOKEN not configured, skipping frontend deployment."
@@ -60,6 +62,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Deploy Landing
+        continue-on-error: true
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "CLOUDFLARE_API_TOKEN not configured, skipping landing deployment."
