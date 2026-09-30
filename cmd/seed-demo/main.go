@@ -33,5 +33,6 @@ func main() {
 	if err := demo.Seed(ctx, repo, service, tenantID); err != nil {
 		log.Fatalf("seed demo: %v", err)
 	}
+	// #nosec G706 -- CLI demo seed utility
 	log.Printf("seeded demo tenant %q with %d usage events", tenantID, len(demo.Events(tenantID)))
 }

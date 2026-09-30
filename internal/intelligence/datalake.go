@@ -28,7 +28,8 @@ func NewDataLakeExporter(repo storage.Repository, sinkDir string) *DataLakeExpor
 	if sinkDir == "" {
 		sinkDir = "./data/datalake"
 	}
-	os.MkdirAll(sinkDir, 0755)
+	// #nosec G301 -- directory permissions restricted to owner/group
+	_ = os.MkdirAll(sinkDir, 0750)
 
 	return &DataLakeExporter{
 		repo:       repo,
@@ -85,7 +86,8 @@ func (e *DataLakeExporter) exportBatch() {
 	dateStr := time.Now().Format("2006-01-02")
 	filename := filepath.Join(e.sinkDir, "token_events_"+dateStr+".jsonl")
 
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// #nosec G304,G302 -- datalake file path is internally generated with restricted permissions
+	f, err := os.OpenFile(filepath.Clean(filename), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		log.Printf("[DataLake] Failed to open sink file: %v", err)
 		return

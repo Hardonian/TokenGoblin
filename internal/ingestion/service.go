@@ -149,7 +149,7 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 
 		// Run alerter asynchronously
 		go func() {
-			_ = s.alerter.Alert(context.Background(), normalized.TenantID, signals)
+			_ = s.alerter.Alert(context.WithoutCancel(ctx), normalized.TenantID, signals)
 		}()
 	}
 
