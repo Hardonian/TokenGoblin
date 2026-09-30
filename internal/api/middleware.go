@@ -51,7 +51,7 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 				}
 
 				go func() {
-					_ = repo.UpdateAPIKeyLastUsed(context.Background(), keyID)
+					_ = repo.UpdateAPIKeyLastUsed(context.WithoutCancel(r.Context()), keyID)
 				}()
 
 				ctx := context.WithValue(r.Context(), tenantIDKey, apiKey.TenantID)

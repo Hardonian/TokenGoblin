@@ -34,7 +34,8 @@ func OpenSQLite(ctx context.Context, dbPath string) (*SQLiteRepository, error) {
 		dbPath = defaultDBPath
 	}
 	if dbPath != ":memory:" {
-		if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		// #nosec G703,G301 -- database path is configured by operator
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
 			return nil, fmt.Errorf("%w: create database directory: %v", ErrUnavailable, err)
 		}
 	}
@@ -1177,6 +1178,7 @@ func (r *SQLiteRepository) ListOutputAnalysesByWorker(ctx context.Context, tenan
 	return scanOutputAnalyses(rows)
 }
 
+// #nosec G101 -- SQL query constant for token events, not a credential
 const tokenEventSelect = `
 	SELECT tenant_id, event_id, worker_id, worker_name, job_id, session_id, run_id,
 		provider, model_id, prompt_tokens, completion_tokens, cached_tokens,
@@ -1729,6 +1731,7 @@ func (s *SQLiteRepository) MarkEventsExported(ctx context.Context, eventIDs []st
 
 	// Simple IN clause construction
 	placeholders := strings.Repeat("?,", len(eventIDs)-1) + "?"
+	// #nosec G201 -- placeholders constructed solely with '?'
 	query := fmt.Sprintf("UPDATE token_usage_events SET is_exported = TRUE WHERE event_id IN (%s)", placeholders)
 
 	args := make([]interface{}, len(eventIDs))
