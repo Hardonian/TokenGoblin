@@ -12,6 +12,17 @@ updates:
       npm_and_yarn:
         patterns:
           - "*"
+    ignore:
+      # typescript-eslint hard-rejects TS 7.0 and throws at lint time
+      # (typescript-eslint/typescript-eslint#10940). Revisit when it
+      # supports TS >= 7.1.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # eslint-plugin-react (via eslint-config-next) tops out at eslint ^9.7
+      # and crashes on the removed context.getFilename() API under eslint 10.
+      # Revisit when eslint-plugin-react supports eslint 10.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   # NPM dependencies - TypeScript SDK
   - package-ecosystem: "npm"
