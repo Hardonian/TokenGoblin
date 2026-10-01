@@ -34,6 +34,13 @@ async function ensureSchema(env) {
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS burnrate_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    company TEXT,
+    source TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run();
 }
 
 async function createUsage(request, env) {
@@ -66,6 +73,33 @@ async function listAlerts(env) {
   return json({ service: SERVICE, alerts: result.results || [] });
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function createBurnrateLead(request, env) {
+  await ensureSchema(env);
+  const body = await parseJSON(request);
+  // Honeypot: bots fill every field; humans never see it.
+  if (typeof body.company === 'string' && body.company.trim() !== '') {
+    return json({ ok: true, status: 'accepted' }, 202);
+  }
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
+  const company = typeof body.company_note === 'string' ? body.company_note.trim().slice(0, 200) : null;
+  const source = typeof body.source === 'string' ? body.source.trim().slice(0, 64) : 'burnrate-landing';
+  if (!EMAIL_RE.test(email)) {
+    return error('Enter a valid email address.', 422);
+  }
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO burnrate_leads (email, company, source) VALUES (?, ?, ?)'
+  ).bind(email, company, source).run();
+  return json({ ok: true, status: 'accepted' }, 202);
+}
+
+async function burnrateLeadCount(env) {
+  await ensureSchema(env);
+  const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM burnrate_leads').first();
+  return json({ service: SERVICE, count: Number(row.count) || 0 });
+}
+
 async function handleCron(event, env) {
   await ensureSchema(env);
   const alerts = await env.DB.prepare("SELECT * FROM spend_alerts WHERE status = 'active'").all();
@@ -92,6 +126,8 @@ async function route(request, env) {
   if (url.pathname === '/api/v1/usage' && request.method === 'POST') return createUsage(request, env);
   if (url.pathname === '/api/v1/usage' && request.method === 'GET') return usageSummary(env);
   if (url.pathname === '/api/v1/alerts' && request.method === 'GET') return listAlerts(env);
+  if (url.pathname === '/burnrate/leads' && request.method === 'POST') return createBurnrateLead(request, env);
+  if (url.pathname === '/burnrate/leads/count' && request.method === 'GET') return burnrateLeadCount(env);
   return error('Not found', 404);
 }
 

@@ -12,6 +12,9 @@ binding = "DB"
 database_name = "token_goblin"
 database_id = "b3498282-4c1a-43cc-9500-c4af38bd0071"
 
-[[routes]]
-pattern = "tokengoblin.example.com"
-custom_domain = true
+# Custom domain route: uncomment and set your real domain once its DNS
+# is attached to this Cloudflare account. The placeholder below used to
+# be enabled and broke `wrangler deploy` (example.com is not ours).
+# [[routes]]
+# pattern = "tokengoblin.example.com"
+# custom_domain = true

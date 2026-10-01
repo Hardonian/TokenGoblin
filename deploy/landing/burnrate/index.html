@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BurnRate — Know your runway, always</title>
+  <meta name="description" content="Real-time SaaS burn rate monitoring. Connect Stripe, see your exact runway, and get Slack or Discord alerts the moment burn changes.">
+  <style>
+    :root{--bg:#0b0f1a;--card:#141b2e;--text:#f2f5ff;--dim:#96a3c7;--accent:#ff6b4a;--accent2:#ffb347;--border:#24304d;--green:#23c483;--red:#ff5d5d}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;background:linear-gradient(180deg,#0b0f1a,#121a30);color:var(--text)}
+    .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+    nav{display:flex;justify-content:space-between;align-items:center;padding:6px 0 22px}
+    nav .brand{font-weight:900;font-size:19px;letter-spacing:-.02em}
+    nav .brand span{color:var(--accent)}
+    nav a{color:var(--dim);text-decoration:none;font-size:14px;font-weight:600}
+    nav a:hover{color:var(--text)}
+    .kicker{color:var(--accent2);font-size:12px;text-transform:uppercase;letter-spacing:.09em;font-weight:800}
+    h1{font-size:clamp(38px,6vw,62px);line-height:1.03;margin:10px 0 14px;letter-spacing:-.02em}
+    .hero p{font-size:20px;color:var(--dim);max-width:760px;line-height:1.55}
+    .btn{display:inline-block;text-decoration:none;padding:15px 22px;border-radius:12px;font-weight:800;font-size:15px;border:0;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff}
+    .btn.primary:hover{background:#ff815f}
+    .btn.secondary{border:1px solid var(--border);color:var(--text);background:transparent}
+    .buttons{display:flex;gap:13px;flex-wrap:wrap;margin:26px 0 10px}
+    .counter{font-size:13px;color:var(--dim)}
+    .counter b{color:var(--green)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:26px 0}
+    .card{background:rgba(20,27,46,.92);border:1px solid var(--border);border-radius:18px;padding:22px}
+    .card h3{margin:2px 0 8px;font-size:17px}
+    .card p{margin:0;color:var(--dim);font-size:14.5px;line-height:1.55}
+    .icon{font-size:22px}
+    .pain{border-left:3px solid var(--red);background:rgba(255,93,93,.07);padding:18px 20px;border-radius:0 14px 14px 0;margin:26px 0}
+    .pain p{margin:0;color:var(--text);font-size:17px;line-height:1.6}
+    h2{font-size:28px;margin:52px 0 6px;letter-spacing:-.01em}
+    .sub{color:var(--dim);margin:0 0 8px;font-size:16px}
+    .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:22px 0}
+    .step{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px}
+    .step .num{width:30px;height:30px;border-radius:999px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;margin-bottom:12px}
+    .pricing{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:22px 0}
+    .tier{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:26px;display:flex;flex-direction:column}
+    .tier.pop{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+    .tier .badge{align-self:flex-start;padding:5px 10px;border-radius:999px;background:rgba(255,107,74,.16);color:var(--accent2);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    .tier .price{font-size:38px;font-weight:900;margin:12px 0 2px}
+    .tier .price small{font-size:14px;color:var(--dim);font-weight:600}
+    .tier ul{padding-left:18px;color:var(--dim);font-size:14.5px;line-height:1.9;flex:1}
+    .compare{width:100%;border-collapse:collapse;margin:22px 0;font-size:15px}
+    .compare th,.compare td{border:1px solid var(--border);padding:13px 15px;text-align:left}
+    .compare th{background:var(--card);font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim)}
+    .compare td:first-child{font-weight:800}
+    .good{color:var(--green);font-weight:800}
+    .cta{background:linear-gradient(135deg,#1b2440,#241a34);border:1px solid var(--border);border-radius:22px;padding:38px 30px;margin:46px 0 0;text-align:center}
+    .cta h2{margin:0 0 8px}
+    .form{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:22px auto 0;max-width:560px}
+    .form input[type=email]{flex:1;min-width:240px;padding:14px 16px;border-radius:12px;border:1px solid var(--border);background:#0d1322;color:var(--text);font-size:15px}
+    .form input[type=email]:focus{outline:2px solid var(--accent);border-color:transparent}
+    .hp{position:absolute;left:-9999px;opacity:0;height:0;width:0}
+    .form-note{font-size:12.5px;color:var(--dim);margin-top:12px}
+    .success{display:none;color:var(--green);font-weight:800;font-size:17px;margin-top:18px}
+    footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--border);color:var(--dim);font-size:13.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    footer a{color:var(--dim)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <div class="brand">Burn<span>Rate</span></div>
+      <a href="https://tokengoblin-landing.pages.dev">by TokenGoblin →</a>
+    </nav>
+
+    <section class="hero">
+      <div class="kicker">Real-time runway monitoring for SaaS founders</div>
+      <h1>Know your runway, always.</h1>
+      <p>You track burn in a spreadsheet you update weekly. By the time you realize you have 4 months of runway instead of 6, the good options are gone. BurnRate connects to Stripe and tells you exactly where you stand — every single day.</p>
+      <div class="buttons">
+        <a class="btn primary" href="#early-access">Get early access</a>
+        <a class="btn secondary" href="#pricing">See pricing</a>
+      </div>
+      <div class="counter"><b id="waitlist-count">—</b> founders already on the waitlist · Founder pricing locked for life</div>
+    </section>
+
+    <div class="pain">
+      <p>“We thought we had 6 months. We had 4.” Every founder knows the spreadsheet is stale. BurnRate replaces the spreadsheet with a live number — and pings you in Slack the moment it moves.</p>
+    </div>
+
+    <h2>How it works</h2>
+    <p class="sub">Three minutes to set up. Then you never think about it again.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><h3>Connect Stripe</h3><p>One-click OAuth. We pull MRR, expenses, and cash balance automatically. Read-only access.</p></div>
+      <div class="step"><div class="num">2</div><h3>See your runway</h3><p>Runway = cash ÷ monthly burn, computed live. One screen: runway, burn rate, MRR.</p></div>
+      <div class="step"><div class="num">3</div><h3>Get alerts</h3><p>Slack or Discord pings when burn jumps &gt;10%, runway drops under 3 months, or anything changes. Plus a daily digest.</p></div>
+    </div>
+
+    <h2>Everything you need. Nothing you don’t.</h2>
+    <div class="grid">
+      <div class="card"><div class="icon">📉</div><h3>Live runway</h3><p>Months of runway, recalculated the second money moves — not when someone remembers to open Excel.</p></div>
+      <div class="card"><div class="icon">🔔</div><h3>Burn-change alerts</h3><p>Slack and Discord webhooks. Burn up &gt;10%? Runway under 3 months? You hear it immediately.</p></div>
+      <div class="card"><div class="icon">📊</div><h3>MRR, expenses, cash</h3><p>The three numbers that matter, on one dashboard. No 47-chart analytics suite.</p></div>
+      <div class="card"><div class="icon">📬</div><h3>Daily digest</h3><p>One message every morning: runway, burn, MRR, change since yesterday.</p></div>
+      <div class="card"><div class="icon">👥</div><h3>Team access</h3><p>Your co-founder and finance lead see the same live numbers. No more “which spreadsheet is current?”</p></div>
+      <div class="card"><div class="icon">🔌</div><h3>Stripe + Paddle</h3><p>Connect the processor you already use. Multiple accounts on Pro.</p></div>
+    </div>
+
+    <h2>Honest comparison</h2>
+    <table class="compare">
+      <tr><th></th><th>BurnRate</th><th>Runway ($49/mo)</th><th>Baremetrics ($59/mo)</th><th>Spreadsheets</th></tr>
+      <tr><td>Price</td><td class="good">Free → $19/mo</td><td>$49/mo</td><td>$59/mo</td><td>Free</td></tr>
+      <tr><td>Real-time</td><td class="good">Yes</td><td>Yes</td><td>Yes</td><td>No — stale</td></tr>
+      <tr><td>Alerts</td><td class="good">Slack / Discord</td><td>Email</td><td>Email</td><td>None</td></tr>
+      <tr><td>Setup time</td><td class="good">3 minutes</td><td>Afternoon</td><td>Day</td><td>Ongoing manual work</td></tr>
+      <tr><td>Complexity</td><td class="good">One screen</td><td>Over-engineered</td><td>Too many features</td><td>Error-prone</td></tr>
+    </table>
+
+    <h2 id="pricing">Pricing</h2>
+    <p class="sub">Early-access founders lock these prices for life.</p>
+    <div class="pricing">
+      <div class="tier">
+        <div class="price">$0<small>/mo</small></div>
+        <div class="badge">Free</div>
+        <ul>
+          <li>1 Stripe account</li>
+          <li>Basic runway dashboard</li>
+          <li>Daily email digest</li>
+        </ul>
+      </div>
+      <div class="tier pop">
+        <div class="badge">Most popular</div>
+        <div class="price">$19<small>/mo</small></div>
+        <div class="badge">Pro</div>
+        <ul>
+          <li>Everything in Free</li>
+          <li>Slack / Discord alerts</li>
+          <li>Burn-change + runway alerts</li>
+          <li>Multiple accounts</li>
+          <li>Team access</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="price">$49<small>/mo</small></div>
+        <div class="badge">Scale</div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>API access</li>
+          <li>Custom integrations</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="cta" id="early-access">
+      <h2>Stop guessing your runway.</h2>
+      <p class="sub">Join the waitlist. We onboard the first 50 founders personally.</p>
+      <form class="form" id="lead-form" novalidate>
+        <input type="email" id="lead-email" placeholder="you@yourstartup.com" required aria-label="Email address">
+        <input class="hp" type="text" id="lead-company" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" placeholder="Company">
+        <button class="btn primary" type="submit" id="lead-submit">Get early access</button>
+      </form>
+      <div class="form-note">No spam. One email when your invite is ready. Unsubscribe forever in one click.</div>
+      <div class="success" id="lead-success">You’re on the list. We’ll be in touch within 48 hours.</div>
+    </div>
+
+    <footer>
+      <div>© 2026 BurnRate — a TokenGoblin product.</div>
+      <div><a href="https://tokengoblin-landing.pages.dev">TokenGoblin</a> · <a href="https://github.com/Hardonian/TokenGoblin">GitHub</a></div>
+    </footer>
+  </div>
+
+  <script>
+    const API = "https://tokengoblin-api.scottrmhardie.workers.dev";
+
+    async function loadCount() {
+      try {
+        const res = await fetch(API + "/burnrate/leads/count");
+        const data = await res.json();
+        if (typeof data.count === "number") {
+          document.getElementById("waitlist-count").textContent = data.count;
+        }
+      } catch (e) { /* counter is non-essential */ }
+    }
+
+    document.getElementById("lead-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const emailInput = document.getElementById("lead-email");
+      const button = document.getElementById("lead-submit");
+      const email = emailInput.value.trim();
+      if (!email) { emailInput.focus(); return; }
+      button.disabled = true;
+      button.textContent = "Sending…";
+      try {
+        const res = await fetch(API + "/burnrate/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            company: document.getElementById("lead-company").value,
+            source: "burnrate-landing"
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data && data.error ? data.error : "Request failed");
+        document.getElementById("lead-form").style.display = "none";
+        document.getElementById("lead-success").style.display = "block";
+        loadCount();
+      } catch (err) {
+        button.disabled = false;
+        button.textContent = "Get early access";
+        alert(err.message || "Something went wrong. Please try again.");
+      }
+    });
+
+    loadCount();
+  </script>
+</body>
+</html>
