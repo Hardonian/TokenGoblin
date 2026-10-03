@@ -43,3 +43,7 @@ htmlcov/
 
 # Cleanup additions
 .turbo
+
+# Wrangler build cache
+.wrangler/
+deploy/workers/.wrangler/
