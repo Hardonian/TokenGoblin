@@ -109,20 +109,24 @@ jobs:
           cache: npm
           cache-dependency-path: sdks/typescript/package-lock.json
 
-      - name: Build and audit TypeScript SDK
+      - name: Build and test TypeScript SDK
         working-directory: sdks/typescript
         run: |
           npm ci
           npm audit --audit-level=high
           npm run build
+          npm test
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
-      - name: Compile Python SDK
-        run: python -m compileall -q sdks/python/token_goblin
+      - name: Compile and test Python SDK
+        run: |
+          python -m compileall -q sdks/python/token_goblin
+          pip install requests
+          PYTHONPATH=sdks/python python -m unittest discover -s sdks/python/tests
 
   docker:
     needs: [build-and-test, frontend]

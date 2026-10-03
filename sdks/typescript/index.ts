@@ -11,7 +11,7 @@ export class TokenGoblinClient {
 
   constructor(options: TokenGoblinOptions = {}) {
     this.apiKey = options.apiKey || process.env.TOKEN_GOBLIN_API_KEY || "";
-    this.baseUrl = (options.baseUrl || "http://localhost:8080").replace(/\/$/, "");
+    this.baseUrl = (options.baseUrl || "http://localhost:8080").replace(/\/+$/, "");
     this.timeoutMs = options.timeoutMs ?? 10_000;
 
     if (!this.apiKey) {
