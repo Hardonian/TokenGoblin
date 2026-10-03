@@ -64,11 +64,12 @@ func mapAccumulatorToFingerprint(tenantID string, acc *promptAccumulator) domain
 
 	wasteReason := ""
 	if isWasteful {
-		if acceptanceRate == 0 {
+		switch {
+		case acceptanceRate == 0:
 			wasteReason = "zero_acceptance"
-		} else if acceptanceRate < 0.1 {
+		case acceptanceRate < 0.1:
 			wasteReason = "near_zero_acceptance"
-		} else {
+		default:
 			wasteReason = "low_acceptance_high_cost"
 		}
 	}
@@ -98,7 +99,7 @@ func (e *Engine) BuildFingerprints(tenantID string, events []domain.TokenEvent) 
 
 	for i := range events {
 		ev := &events[i]
-		if ev.PromptExcerpt == "" {
+		if strings.TrimSpace(ev.PromptExcerpt) == "" {
 			continue
 		}
 		hash := HashPrompt(ev.PromptExcerpt)
@@ -378,15 +379,14 @@ func (e *Engine) detectContextPadding(events []domain.TokenEvent) []domain.CostL
 func (e *Engine) detectCacheMisses(events []domain.TokenEvent) []domain.CostLeak {
 	var leaks []domain.CostLeak
 	type cacheStats struct {
-		totalEvents      int
-		uncachedEvents   int
-		totalCost        float64
-		potentialSavings float64
+		totalEvents    int
+		uncachedEvents int
+		totalCost      float64
 	}
 	cacheBuckets := make(map[string]*cacheStats)
 	for i := range events {
 		ev := &events[i]
-		if ev.PromptExcerpt == "" {
+		if strings.TrimSpace(ev.PromptExcerpt) == "" {
 			continue
 		}
 		hash := HashPrompt(ev.PromptExcerpt)
@@ -436,7 +436,7 @@ func (e *Engine) detectPromptSlop(events []domain.TokenEvent) []domain.CostLeak 
 
 	for i := range events {
 		ev := &events[i]
-		if ev.PromptExcerpt == "" {
+		if strings.TrimSpace(ev.PromptExcerpt) == "" {
 			continue
 		}
 

@@ -8,6 +8,7 @@ import { SettingsModal } from "./SettingsModal";
 const navLinks = [
   { href: "/", label: "Dashboard" },
   { href: "/pricing", label: "Plans" },
+  { href: "/audit", label: "Spend Audit" },
   { href: "/billing", label: "Billing" },
   { href: "/intelligence", label: "Intelligence" },
   { href: "/executive", label: "Executive" },

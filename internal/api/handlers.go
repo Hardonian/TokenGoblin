@@ -851,6 +851,24 @@ func (h *IngestionHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Re
 		}
 		verifiedEvent.TenantID = session.ClientReferenceID
 		verifiedEvent.Metadata = session.Metadata
+	} else if strings.HasPrefix(string(event.Type), "invoice.") {
+		var inv stripe.Invoice
+		if err := json.Unmarshal(event.Data.Raw, &inv); err != nil {
+			writeJSON(w, http.StatusInternalServerError, Envelope{OK: false, Status: "error", Error: issue("internal_error", "failed to parse invoice data")})
+			return
+		}
+		if inv.Customer != nil {
+			verifiedEvent.CustomerID = inv.Customer.ID
+		}
+		if inv.Subscription != nil {
+			verifiedEvent.SubscriptionID = inv.Subscription.ID
+		}
+		if string(event.Type) == "invoice.payment_failed" {
+			verifiedEvent.SubscriptionStatus = "past_due"
+		} else {
+			verifiedEvent.SubscriptionStatus = "active"
+		}
+		verifiedEvent.Metadata = inv.Metadata
 	}
 
 	_, err = billing.ProcessVerifiedStripeEvent(r.Context(), h.Repo, verifiedEvent, time.Now().UTC())

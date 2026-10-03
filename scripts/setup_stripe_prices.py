@@ -94,8 +94,43 @@ def create_webhook_endpoint(url, secret_key=None):
     return None
 
 def main():
+    dry_run = "--dry-run" in sys.argv
     secret_key = os.getenv('STRIPE_SECRET_KEY')
     
+    if dry_run:
+        print("=" * 60)
+        print("TokenGoblin Stripe Price Setup (DRY RUN)")
+        print("=" * 60)
+        print("\n[DRY RUN] Simulating product and price creation without contacting Stripe...")
+        pro_product_id = "prod_dryrun_pro_tokengoblin"
+        pro_price_id = "price_dryrun_pro_2900"
+        ent_product_id = "prod_dryrun_ent_tokengoblin"
+        ent_price_id = "price_dryrun_ent_9900"
+        webhook_secret = "whsec_dryrun_mock_secret"
+        print(f"  [OK] Pro Product (dry-run): {pro_product_id}")
+        print(f"  [OK] Pro Price ($29/mo, dry-run): {pro_price_id}")
+        print(f"  [OK] Enterprise Product (dry-run): {ent_product_id}")
+        print(f"  [OK] Enterprise Price ($99/mo, dry-run): {ent_price_id}")
+        print(f"  [OK] Webhook Endpoint (dry-run): {webhook_secret}")
+        print("\n" + "=" * 60)
+        print("DRY RUN COMPLETE -- CONFIG TEMPLATE:")
+        print("=" * 60)
+        print(f"""
+# Backend (Go server / Docker / Fly.io / Railway)
+STRIPE_PRICE_PRO={pro_price_id}
+STRIPE_PRICE_ENTERPRISE={ent_price_id}
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET={webhook_secret}
+TG_INTERNAL_WEBHOOK_SECRET=$(openssl rand -hex 32)
+
+# Frontend (Vercel)
+NEXT_PUBLIC_STRIPE_PRICE_PRO={pro_price_id}
+NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE={ent_price_id}
+NEXT_PUBLIC_TG_API_BASE=https://api.yourdomain.com
+""")
+        print("[OK] Dry run finished successfully with exit 0.")
+        sys.exit(0)
+
     if not secret_key:
         print("ERROR: STRIPE_SECRET_KEY environment variable not set")
         print("Run: export STRIPE_SECRET_KEY=sk_live_xxx")
@@ -108,6 +143,12 @@ def main():
     print("TokenGoblin Stripe Price Setup")
     print("=" * 60)
     
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+
     # Create Pro product
     print("\n[1/4] Creating Pro product...")
     pro_product = create_product(
@@ -119,7 +160,7 @@ def main():
         print("Failed to create Pro product")
         sys.exit(1)
     pro_product_id = pro_product['id']
-    print(f"  ✓ Product created: {pro_product_id}")
+    print(f"  [OK] Product created: {pro_product_id}")
     
     # Create Pro price ($29/mo = 2900 cents)
     print("\n[2/4] Creating Pro price ($29/mo)...")
@@ -131,7 +172,7 @@ def main():
         print("Failed to create Pro price")
         sys.exit(1)
     pro_price_id = pro_price['id']
-    print(f"  ✓ Price created: {pro_price_id}")
+    print(f"  [OK] Price created: {pro_price_id}")
     
     # Create Enterprise product
     print("\n[3/4] Creating Enterprise product...")
@@ -144,7 +185,7 @@ def main():
         print("Failed to create Enterprise product")
         sys.exit(1)
     ent_product_id = ent_product['id']
-    print(f"  ✓ Product created: {ent_product_id}")
+    print(f"  [OK] Product created: {ent_product_id}")
     
     # Create Enterprise price ($99/mo = 9900 cents)
     print("\n[4/4] Creating Enterprise price ($99/mo)...")
@@ -156,7 +197,7 @@ def main():
         print("Failed to create Enterprise price")
         sys.exit(1)
     ent_price_id = ent_price['id']
-    print(f"  ✓ Price created: {ent_price_id}")
+    print(f"  [OK] Price created: {ent_price_id}")
     
     # Optional: Create webhook endpoint
     print("\n[Optional] Webhook endpoint...")
@@ -166,8 +207,8 @@ def main():
         wh = create_webhook_endpoint(webhook_url, secret_key)
         if wh:
             webhook_secret = wh.get('secret')
-            print(f"  ✓ Webhook created: {wh['id']}")
-            print(f"  ✓ Webhook secret: {webhook_secret}")
+            print(f"  [OK] Webhook created: {wh['id']}")
+            print(f"  [OK] Webhook secret: {webhook_secret}")
     
     # Summary
     print("\n" + "=" * 60)
@@ -189,7 +230,7 @@ NEXT_PUBLIC_TG_API_BASE=https://api.yourdomain.com
 """)
     
     # Save to file for reference
-    with open('stripe_price_ids.txt', 'w') as f:
+    with open('stripe_price_ids.txt', 'w', encoding='utf-8') as f:
         f.write(f"""TokenGoblin Stripe Price IDs
 Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -202,7 +243,7 @@ Enterprise Price: {ent_price_id} ($99/mo)
 Webhook Secret: {webhook_secret or 'N/A'}
 """)
     
-    print("\n✓ Saved to stripe_price_ids.txt")
+    print("\n[OK] Saved to stripe_price_ids.txt")
 
 if __name__ == '__main__':
     main()

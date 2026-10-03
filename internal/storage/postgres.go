@@ -141,7 +141,7 @@ func (r *PostgresRepository) GetTenant(ctx context.Context, tenantID string) (*d
 	`, tenantID).Scan(&t.TenantID, &t.Name, &t.Tier, &t.UsageLimitUSD, &stripeCust, &stripeSub, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, wrapDBErr(err)
@@ -185,7 +185,7 @@ func (r *PostgresRepository) GetPricingOverride(ctx context.Context, tenantID, p
 	`, tenantID, provider, modelID).Scan(&point.Provider, &point.ModelID, &point.InputCostPerMillion, &point.OutputCostPerMillion, &created)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, wrapDBErr(err)
@@ -267,7 +267,7 @@ func (r *PostgresRepository) GetAPIKey(ctx context.Context, keyID string) (*doma
 		WHERE key_id = $1
 	`, keyID).Scan(&key.KeyID, &key.TenantID, &key.Name, &key.KeyHash, &key.Role, &key.CreatedAt, &key.LastUsedAt, &key.IsRevoked)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, wrapDBErr(err)

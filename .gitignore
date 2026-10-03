@@ -43,3 +43,5 @@ htmlcov/
 
 # Cleanup additions
 .turbo
+bin/
+out/

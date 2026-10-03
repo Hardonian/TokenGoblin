@@ -218,10 +218,33 @@ function normalizeStripeEvent(event: { id?: string; type?: string }): VerifiedSt
     return normalizeCheckoutSessionCompleted(eventRecord, object, eventType);
   } else if (eventType.startsWith("customer.subscription.")) {
     return normalizeCustomerSubscription(eventRecord, object, eventType);
+  } else if (eventType.startsWith("invoice.")) {
+    return normalizeInvoiceEvent(eventRecord, object, eventType);
   }
 
   // Fallback for other events
   return normalizeGenericEvent(eventRecord, object, eventType);
+}
+
+function normalizeInvoiceEvent(
+  eventRecord: Record<string, unknown>,
+  object: Record<string, unknown>,
+  eventType: string
+): VerifiedStripeEvent {
+  const metadata = metadataRecord(object.metadata);
+  const status = eventType === "invoice.payment_failed" ? "past_due" : "active";
+  return {
+    event_id: asString(eventRecord.id),
+    event_type: eventType,
+    customer_id: asString(object.customer),
+    subscription_id: asString(object.subscription),
+    subscription_status: status,
+    tenant_id:
+      asString(metadata.tenant_id) ||
+      asString(metadata.tenantId) ||
+      asString(object.client_reference_id),
+    metadata,
+  };
 }
 
 function normalizeCheckoutSessionCompleted(

@@ -1,0 +1,11 @@
+model,prompt_tokens,completion_tokens,cached_tokens,cost,team,feature
+gpt-4o,2450000,420000,120000,10.32,engineering,pr-review-bot
+gpt-4o,1800000,290000,50000,7.40,engineering,test-generator
+claude-3-5-sonnet,3100000,680000,250000,19.50,product,doc-search
+claude-3-5-sonnet,1200000,190000,80000,6.45,customer-support,ticket-summarizer
+o1,450000,110000,0,13.35,data-science,sql-agent
+o1,320000,85000,0,9.90,research,complex-reasoning
+gpt-4o-mini,8500000,1200000,900000,2.00,marketing,copywriting
+gpt-4o-mini,12000000,1900000,1500000,2.94,operations,data-extraction
+claude-3-5-haiku,4500000,650000,400000,6.20,support,intent-classifier
+gemini-2.0-flash,6000000,900000,0,0.96,infra,log-anomaly-detector

@@ -36,7 +36,7 @@ func OpenSQLite(ctx context.Context, dbPath string) (*SQLiteRepository, error) {
 	if dbPath != ":memory:" {
 		// #nosec G703,G301 -- database path is configured by operator
 		if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
-			return nil, fmt.Errorf("%w: create database directory: %v", ErrUnavailable, err)
+			return nil, fmt.Errorf("%w: create database directory: %s", ErrUnavailable, err)
 		}
 	}
 
@@ -47,7 +47,7 @@ func OpenSQLite(ctx context.Context, dbPath string) (*SQLiteRepository, error) {
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("%w: open sqlite: %v", ErrUnavailable, err)
+		return nil, fmt.Errorf("%w: open sqlite: %s", ErrUnavailable, err)
 	}
 	repo := &SQLiteRepository{db: db}
 	db.SetMaxOpenConns(25)

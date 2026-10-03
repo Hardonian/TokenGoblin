@@ -20,10 +20,12 @@ import (
 )
 
 const (
-	StripeEventSubscriptionCreated = "customer.subscription.created"
-	StripeEventSubscriptionUpdated = "customer.subscription.updated"
-	StripeEventSubscriptionDeleted = "customer.subscription.deleted"
-	StripeEventCheckoutCompleted   = "checkout.session.completed"
+	StripeEventSubscriptionCreated     = "customer.subscription.created"
+	StripeEventSubscriptionUpdated     = "customer.subscription.updated"
+	StripeEventSubscriptionDeleted     = "customer.subscription.deleted"
+	StripeEventCheckoutCompleted       = "checkout.session.completed"
+	StripeEventInvoicePaymentSucceeded = "invoice.payment_succeeded"
+	StripeEventInvoicePaymentFailed    = "invoice.payment_failed"
 
 	TierFree = "free"
 	TierPro  = "pro"
@@ -150,6 +152,11 @@ func ProcessVerifiedStripeEvent(ctx context.Context, repo storage.Repository, ev
 		return applySubscriptionLifecycle(ctx, repo, event, now)
 	case StripeEventCheckoutCompleted:
 		return linkCheckoutSession(ctx, repo, event, now)
+	case StripeEventInvoicePaymentSucceeded, StripeEventInvoicePaymentFailed:
+		if event.CustomerID == "" && event.SubscriptionID == "" && event.TenantID == "" {
+			return result, StripeValidationError{Message: "invoice events require customer_id, subscription_id, or tenant_id"}
+		}
+		return applyInvoiceLifecycle(ctx, repo, event, now)
 	default:
 		return result, nil
 	}
@@ -170,6 +177,23 @@ func applySubscriptionLifecycle(ctx context.Context, repo storage.Repository, ev
 	}
 	if err := validateStripeOwnership(*tenant, event); err != nil {
 		return result, err
+	}
+
+	// Idempotency: verify if event was already recorded for this tenant
+	if auditEvents, err := repo.ListAuditEvents(ctx, tenant.TenantID, 50); err == nil {
+		targetResource := "stripe_event:" + event.EventID
+		for _, ae := range auditEvents {
+			if ae.Resource == targetResource {
+				result.Action = "already_processed"
+				result.Applied = false
+				result.TenantID = tenant.TenantID
+				result.Tier = tenant.Tier
+				result.UsageLimitUSD = tenant.UsageLimitUSD
+				result.StripeCustomerID = tenant.StripeCustomerID
+				result.StripeSubscriptionID = tenant.StripeSubscriptionID
+				return result, nil
+			}
+		}
 	}
 
 	tenant.StripeCustomerID = firstNonEmpty(tenant.StripeCustomerID, event.CustomerID)
@@ -219,6 +243,23 @@ func linkCheckoutSession(ctx context.Context, repo storage.Repository, event Ver
 		return result, err
 	}
 
+	// Idempotency: verify if event was already recorded for this tenant
+	if auditEvents, err := repo.ListAuditEvents(ctx, tenant.TenantID, 50); err == nil {
+		targetResource := "stripe_event:" + event.EventID
+		for _, ae := range auditEvents {
+			if ae.Resource == targetResource {
+				result.Action = "already_processed"
+				result.Applied = false
+				result.TenantID = tenant.TenantID
+				result.Tier = tenant.Tier
+				result.UsageLimitUSD = tenant.UsageLimitUSD
+				result.StripeCustomerID = tenant.StripeCustomerID
+				result.StripeSubscriptionID = tenant.StripeSubscriptionID
+				return result, nil
+			}
+		}
+	}
+
 	tenant.StripeCustomerID = firstNonEmpty(tenant.StripeCustomerID, event.CustomerID)
 	tenant.StripeSubscriptionID = firstNonEmpty(tenant.StripeSubscriptionID, event.SubscriptionID)
 	tenant.UpdatedAt = now.UTC()
@@ -228,6 +269,69 @@ func linkCheckoutSession(ctx context.Context, repo storage.Repository, event Ver
 	_ = repo.SaveAuditEvent(ctx, stripeAuditEvent(*tenant, event, "checkout_session_linked", now))
 
 	result.Action = "checkout_session_linked"
+	result.Applied = true
+	result.TenantID = tenant.TenantID
+	result.Tier = tenant.Tier
+	result.UsageLimitUSD = tenant.UsageLimitUSD
+	result.StripeCustomerID = tenant.StripeCustomerID
+	result.StripeSubscriptionID = tenant.StripeSubscriptionID
+	return result, nil
+}
+
+func applyInvoiceLifecycle(ctx context.Context, repo storage.Repository, event VerifiedStripeEvent, now time.Time) (StripeLifecycleResult, error) {
+	result := StripeLifecycleResult{
+		EventID:   event.EventID,
+		EventType: event.EventType,
+		Action:    "ignored_no_matching_tenant",
+	}
+	tenant, err := resolveTenant(ctx, repo, event)
+	if err != nil {
+		return result, err
+	}
+	if tenant == nil {
+		return result, nil
+	}
+	if err := validateStripeOwnership(*tenant, event); err != nil {
+		return result, err
+	}
+
+	// Idempotency
+	if auditEvents, err := repo.ListAuditEvents(ctx, tenant.TenantID, 50); err == nil {
+		targetResource := "stripe_event:" + event.EventID
+		for _, ae := range auditEvents {
+			if ae.Resource == targetResource {
+				result.Action = "already_processed"
+				result.Applied = false
+				result.TenantID = tenant.TenantID
+				result.Tier = tenant.Tier
+				result.UsageLimitUSD = tenant.UsageLimitUSD
+				result.StripeCustomerID = tenant.StripeCustomerID
+				result.StripeSubscriptionID = tenant.StripeSubscriptionID
+				return result, nil
+			}
+		}
+	}
+
+	tenant.StripeCustomerID = firstNonEmpty(tenant.StripeCustomerID, event.CustomerID)
+	tenant.StripeSubscriptionID = firstNonEmpty(tenant.StripeSubscriptionID, event.SubscriptionID)
+
+	if event.EventType == StripeEventInvoicePaymentFailed || strings.EqualFold(event.SubscriptionStatus, "past_due") {
+		tenant.Tier = TierFree
+		tenant.UsageLimitUSD = planLimitUSD(TierFree)
+		result.Action = "invoice_payment_failed_downgrade"
+	} else {
+		if tenant.Tier == TierFree {
+			tenant.Tier, tenant.UsageLimitUSD = tierForVerifiedEvent(event)
+		}
+		result.Action = "invoice_payment_succeeded"
+	}
+
+	tenant.UpdatedAt = now.UTC()
+	if err := repo.UpsertTenant(ctx, *tenant); err != nil {
+		return result, err
+	}
+	_ = repo.SaveAuditEvent(ctx, stripeAuditEvent(*tenant, event, result.Action, now))
+
 	result.Applied = true
 	result.TenantID = tenant.TenantID
 	result.Tier = tenant.Tier
