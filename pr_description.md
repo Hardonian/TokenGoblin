@@ -68,6 +68,9 @@ Target: `main`
 | Go Build | `go build ./...` | ✅ Exit 0 |
 | Go Tests | `go test -count=1 ./...` | ✅ All 18 packages pass fresh |
 | Go Code Formatting | `gofmt -l .` | ✅ 0 unformatted files |
+| Backend Probes | `go test -v ./internal/api -run "TestHealthz\|TestReadyz\|TestMetrics"` | ✅ All probes pass |
+| Python SDK Tests | `python -m unittest discover -s sdks/python/tests` | ✅ 7/7 pass (0.006s) |
+| TypeScript SDK Tests | `cd sdks/typescript && npm test` | ✅ 4/4 pass (0.11s) |
 | Frontend Typecheck | `cd frontend && npm run typecheck` | ✅ 0 errors |
 | Frontend Lint | `cd frontend && npm run lint` | ✅ 0 warnings |
 | Frontend Tests | `cd frontend && npm run test:ci` | ✅ 30/30 tests pass |
