@@ -1,22 +1,39 @@
-# Hardonian standard justfile — works for any stack.
-# Install just: pipx install rust-just
+# Hardonian standard justfile — TokenGoblin
+# Install just: pipx install rust-just or cargo install just
 
-# Detect and install deps + create .env
+# Detect and install deps
 bootstrap:
-    ./scripts/bootstrap.sh
+    go mod download
+    go mod verify
+    cd frontend && npm ci
 
-# Run the app (override per repo)
+# Run backend server locally
 dev:
-    @echo "Override 'dev' in your repo justfile"
+    go run ./cmd/server
 
-# Run tests
+# Run frontend dev server
+dev-frontend:
+    cd frontend && npm run dev
+
+# Build both backend binaries
+build:
+    go build -o token-goblin ./cmd/server
+    go build -o token-goblin-audit ./cmd/audit
+
+# Run LLM spend audit demo on sample export
+audit-demo:
+    go run ./cmd/audit --input ./examples/sample_llm_export.csv --out ./out/sample_audit
+
+# Run test suites (Go race-detector + frontend tests)
 test:
-    @echo "Override 'test' in your repo justfile"
+    go test -v -race ./...
+    cd frontend && npm run test:ci
 
-# Smoke / health check
+# Run smoke test on ingestion, storage, and anomaly pipeline
 smoke:
-    @echo "Override 'smoke' in your repo justfile"
+    go run ./cmd/smoke
 
-# Show status
+# Check health and readiness probes
 status:
-    @curl -fsS http://127.0.0.1:8000/health || echo "no health endpoint on :8000"
+    @curl -fsS http://127.0.0.1:8080/healthz || echo "Backend /healthz probe unavailable on :8080"
+    @curl -fsS http://127.0.0.1:8080/readyz || echo "Backend /readyz probe unavailable on :8080"

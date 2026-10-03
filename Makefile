@@ -1,6 +1,6 @@
 # TokenGoblin Makefile
 
-.PHONY: build test lint fmt vet coverage run docker-build docker-run clean help
+.PHONY: build audit audit-demo test lint fmt vet coverage run docker-build docker-run clean deps check frontend-install frontend-lint frontend-typecheck frontend-test frontend-build help
 
 # Go parameters
 GOCMD=go
@@ -10,11 +10,21 @@ GOTEST=$(GOCMD) test
 GOFMT=gofmt
 GOVET=$(GOCMD) vet
 BINARY_NAME=token-goblin
+AUDIT_BINARY_NAME=token-goblin-audit
 BINARY_PATH=./$(BINARY_NAME)
 
-# Build the binary
+# Build binaries
 build:
 	CGO_ENABLED=0 $(GOBUILD) -o $(BINARY_NAME) ./cmd/server
+	CGO_ENABLED=0 $(GOBUILD) -o $(AUDIT_BINARY_NAME) ./cmd/audit
+
+# Build spend audit CLI
+audit:
+	CGO_ENABLED=0 $(GOBUILD) -o $(AUDIT_BINARY_NAME) ./cmd/audit
+
+# Run audit demonstration on sample LLM usage export
+audit-demo: audit
+	./$(AUDIT_BINARY_NAME) --input ./examples/sample_llm_export.csv --out ./out/sample_audit
 
 # Run tests
 test:
@@ -54,8 +64,9 @@ docker-run:
 # Clean build artifacts
 clean:
 	$(GOCLEAN)
-	rm -f $(BINARY_NAME)
+	rm -f $(BINARY_NAME) $(AUDIT_BINARY_NAME)
 	rm -f coverage.out coverage.html
+	rm -rf out/
 
 # Download dependencies
 deps:
@@ -67,30 +78,32 @@ check: fmt vet test
 
 # Frontend commands
 frontend-install:
-	cd frontend && pnpm install --frozen-lockfile
+	cd frontend && npm ci
 
 frontend-lint:
-	cd frontend && pnpm run lint
+	cd frontend && npm run lint
 
 frontend-typecheck:
-	cd frontend && pnpm run typecheck
+	cd frontend && npm run typecheck
 
 frontend-test:
-	cd frontend && pnpm test --if-present
+	cd frontend && npm run test:ci
 
 frontend-build:
-	cd frontend && pnpm build
+	cd frontend && npm run build
 
 # Help
 help:
 	@echo "TokenGoblin Make targets:"
-	@echo "  build         - Build Go binary"
+	@echo "  build         - Build Go binaries (server and audit CLI)"
+	@echo "  audit         - Build spend audit CLI binary"
+	@echo "  audit-demo    - Run spend audit generator on sample export"
 	@echo "  test          - Run Go tests with race detector"
 	@echo "  coverage      - Run tests with coverage report"
 	@echo "  lint          - Run golangci-lint"
 	@echo "  fmt           - Format Go code"
 	@echo "  vet           - Run go vet"
-	@echo "  run           - Build and run binary"
+	@echo "  run           - Build and run server binary"
 	@echo "  docker-build  - Build Docker images"
 	@echo "  docker-run    - Run with docker-compose"
 	@echo "  clean         - Clean build artifacts"

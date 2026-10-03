@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "token-goblin"
+version = "1.0.0"
+authors = [
+  { name = "TokenGoblin Authors", email = "engineering@tokengoblin.com" },
+]
+description = "TokenGoblin Python SDK — AI spend observability & token-efficiency client"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "requests>=2.28.0",
+]
+
+[project.urls]
+"Homepage" = "https://tokengoblin.com"
+"Bug Tracker" = "https://github.com/Hardonian/TokenGoblin/issues"
+"Documentation" = "https://github.com/Hardonian/TokenGoblin#readme"

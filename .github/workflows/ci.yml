@@ -41,17 +41,27 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+          args: --timeout=5m
+
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Build binary
-        run: CGO_ENABLED=0 go build -o token-goblin ./cmd/server
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=0 go build -o token-goblin ./cmd/server
+          CGO_ENABLED=0 go build -o token-goblin-audit ./cmd/audit
 
-      - name: Upload binary artifact
+      - name: Upload binary artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: token-goblin
-          path: token-goblin
+          name: token-goblin-binaries
+          path: |
+            token-goblin
+            token-goblin-audit
           retention-days: 7
 
   frontend:
