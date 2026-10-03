@@ -1,0 +1,44 @@
+# Fly.io deployment configuration for TokenGoblin Backend
+app = "tokengoblin"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.backend"
+
+[env]
+  PORT = "8080"
+  TG_ENV = "production"
+  TG_LOG_LEVEL = "info"
+  TG_DB_PATH = "/data/token_goblin.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "5s"
+  interval = "15s"
+  method = "GET"
+  timeout = "2s"
+  path = "/healthz"
+
+[[http_service.checks]]
+  grace_period = "5s"
+  interval = "15s"
+  method = "GET"
+  timeout = "2s"
+  path = "/readyz"
+
+[mounts]
+  source = "tokengoblin_data"
+  destination = "/data"
+  initial_size = "10gb"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
