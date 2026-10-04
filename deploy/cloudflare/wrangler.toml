@@ -1,0 +1,28 @@
+# TokenGoblin — Cloudflare frontend + storage config (cost + latency).
+# The API already lives in deploy/workers/wrangler.toml (Workers + D1); this file
+# is for the FRONTEND (Pages/Worker via OpenNext) + R2 export storage.
+# See MIGRATION.md. Config only — run the wrangler commands there to provision.
+# Never commit secrets (Stripe keys, webhook secret) here.
+
+name = "tokengoblin-web"
+compatibility_date = "2026-01-01"
+main = ".open-next/worker.js"          # emitted by @opennextjs/cloudflare (Next.js SSR + API routes)
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+[vars]
+ENVIRONMENT = "production"
+# Point the browser at the existing Workers API (deploy/workers/wrangler.toml):
+NEXT_PUBLIC_TG_API_BASE = "https://tokengoblin-api.<your-subdomain>.workers.dev"
+
+# Exports / datalake -> R2 (ZERO egress). Replaces local /data/datalake or S3.
+[[r2_buckets]]
+binding = "DATALAKE"
+bucket_name = "tokengoblin-exports"
+
+# Optional edge cache for read-heavy lookups:
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "<npx wrangler kv namespace create CACHE>"
+
+# Stripe secrets (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) -> wrangler secret put, not here.
+# Keep the webhook handler reading the RAW request body for signature verification.
