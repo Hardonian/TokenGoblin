@@ -9,7 +9,8 @@
     "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --ci"
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --ci",
+    "deploy:edge": "opennextjs-cloudflare build && wrangler deploy"
   },
   "dependencies": {
     "framer-motion": "^13.4.4",
@@ -21,6 +22,7 @@
     "swr": "^2.5.1"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.8",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

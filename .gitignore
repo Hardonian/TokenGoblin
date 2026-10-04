@@ -47,3 +47,6 @@ htmlcov/
 # Wrangler build cache
 .wrangler/
 deploy/workers/.wrangler/
+
+# OpenNext build output
+.open-next/
