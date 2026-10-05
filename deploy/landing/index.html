@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TokenGoblin — AI Spend & Token-Efficiency Observability</title>
   <style>
     :root{--bg:#08101d;--card:#121c33;--text:#eef2ff;--dim:#95a5ce;--accent:#6d5efc;--border:#253356;--green:#23c483;--yellow:#f7b955}
@@ -19,7 +19,7 @@
     <section class="hero">
       <div class="kicker">AI Spend Observability</div>
       <h1>TokenGoblin — Catch the little monsters eating your AI spend</h1>
-      <p>Track, analyze, and optimize AI token spending across your autonomous agent workforce. Local-first, privacy-preserving, built for teams running production AI workloads.</p>
+      <p>Track, analyze, and optimize AI token spending across your autonomous agent workforce — and now find the agents burning money with <strong>enterprise telemetry</strong>: cost by model, ROI by feature, and zombie-agent detection on a high-volume analytics engine.</p>
       <div class="buttons">
         <a class="btn primary" href="https://tokengoblin-frontend.pages.dev">Open Dashboard</a>
         <a class="btn secondary" href="/burnrate/">BurnRate — new →</a>
@@ -32,17 +32,64 @@
         <div class="card">
           <div class="kicker">Track</div>
           <h3>Token ingestion</h3>
-          <div class="muted">Ingest token usage from OpenAI, Anthropic, local models, and custom providers via simple API.</div>
+          <div class="muted">Ingest token usage from OpenAI, Anthropic, local models, and custom providers via simple API. Quota enforcement and per-tenant isolation from day one.</div>
         </div>
         <div class="card">
           <div class="kicker">Analyze</div>
           <h3>Spend intelligence</h3>
-          <div class="muted">Break down costs by model, agent, workflow, team, and time. Spot anomalies and drift automatically.</div>
+          <div class="muted">Break down costs by model, agent, workflow, team, and time. Spot anomalies and drift automatically — every claim backed by the events that produced it.</div>
         </div>
         <div class="card">
           <div class="kicker">Optimize</div>
           <h3>Efficiency recommendations</h3>
           <div class="muted">Get actionable suggestions: model routing, prompt compression, caching, batching, and routing rules.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Enterprise telemetry <span class="badge">NEW — live in the stack</span></h2>
+      <p class="muted">The analytics tier runs on a ClickHouse mirror alongside the transactional store — built for high-volume token telemetry, without letting an analytics outage ever touch ingestion. Real endpoints, real numbers:</p>
+      <div class="grid">
+        <div class="card">
+          <div class="kicker">Find waste</div>
+          <h3>Zombie agents</h3>
+          <div class="muted">Agents that keep spending while their output gets rejected. Zero-acceptance workers with <em>unpriced</em> spend surface too — invisible cost is the worst cost.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Attribute</div>
+          <h3>Cost by model &amp; feature</h3>
+          <div class="muted">Windowed cost per model and per feature, with ROI defined as cost per accepted output — so "expensive" and "productive" stop being the same conversation.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Scale</div>
+          <h3>Analytics that can't hurt ingestion</h3>
+          <div class="muted">Events persist to the source of truth first, then mirror best-effort. Analytics degrade to a clear error — they never fabricate numbers and never block a write.</div>
+        </div>
+      </div>
+      <pre>GET /v1/analytics/cost             → windowed spend summary
+GET /v1/analytics/cost/by-model    → expensive-model $8.66 / 8 reqs vs efficient-model $0.001 / 9 reqs
+GET /v1/analytics/cost/by-feature  → research ROI $1.24 per accepted output
+GET /v1/analytics/zombie-agents    → worker-unknown: 0% acceptance · investigate</pre>
+    </section>
+
+    <section>
+      <h2>Plans</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="kicker">Free</div>
+          <h3>Track</h3>
+          <div class="muted">Token ingestion, dashboards, anomalies, cost overview. Everything you need to see the problem.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Pro</div>
+          <div class="price">Optimize</div>
+          <div class="muted">Efficiency recommendations, model routing, exportable reports, and the paid analytics surface including zombie-agent detection.</div>
+        </div>
+        <div class="card">
+          <div class="kicker">Enterprise</div>
+          <div class="price">Telemetry</div>
+          <div class="muted">High-volume analytics mirror, custom thresholds, retention controls, SSO-ready multi-tenant isolation, and priority support.</div>
         </div>
       </div>
     </section>
@@ -55,12 +102,12 @@
           <div class="muted">API + ingestion + scheduled analytics</div>
         </div>
         <div class="card">
-          <h3>Cloudflare D1</h3>
-          <div class="muted">SQLite-compatible serverless database</div>
+          <h3>Postgres / D1</h3>
+          <div class="muted">Transactional source of truth (Postgres for self-hosted, D1 at the edge), RLS-enforced tenant isolation</div>
         </div>
         <div class="card">
-          <h3>Cloudflare Pages</h3>
-          <div class="muted">Dashboard + landing page</div>
+          <h3>ClickHouse telemetry mirror</h3>
+          <div class="muted">High-volume cost analytics: rollups, ROI, zombie agents</div>
         </div>
         <div class="card">
           <h3>Go + TypeScript SDKs</h3>
@@ -74,13 +121,14 @@
       <pre>Worker: Deployed (tokengoblin-api)
 Dashboard: Pages (tokengoblin-frontend)
 Landing: Pages (tokengoblin-landing)
-D1 Database: token_goblin (configured)
+Billing: Stripe checkout + verified webhook lifecycle
+Isolation: per-tenant RLS + API-key roles
+Telemetry: ClickHouse analytics mirror (cost/ROI/zombie endpoints live)
 
 Next:
-- Complete dashboard UI (React + charts)
-- Add Stripe billing integration
-- Build team/workspace isolation
-- Add optimization recommendation engine</pre>
+- Live Stripe test-mode checkout round trip
+- Anomaly rows mirrored into the analytics engine
+- Team/workspace admin UI</pre>
     </section>
   </div>
 </body>
