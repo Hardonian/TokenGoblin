@@ -5,6 +5,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Serialize deploys: rapid pushes used to fire 3 parallel wrangler jobs each and
+# trip Cloudflare's API rate limit (code 10429), leaving the CD red.
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: false
+
 permissions:
   contents: read
   deployments: write
@@ -31,7 +37,22 @@ jobs:
             echo "CLOUDFLARE_API_TOKEN not configured, skipping worker deployment."
             exit 0
           fi
-          npx --yes "wrangler@${WRANGLER_VERSION}" deploy --minify
+          # Bounded retry for Cloudflare API rate limiting ONLY (code 10429).
+          # Any other failure surfaces immediately — failures must never be masked.
+          attempt=1
+          while true; do
+            if output=$(npx --yes "wrangler@${WRANGLER_VERSION}" deploy --minify 2>&1); then
+              echo "$output"
+              exit 0
+            fi
+            echo "$output"
+            if [ "$attempt" -ge 3 ] || ! grep -q '10429' <<<"$output"; then
+              exit 1
+            fi
+            echo "Rate limited by Cloudflare API (10429); retry ${attempt}/3 in $((20 * attempt))s"
+            sleep $((20 * attempt))
+            attempt=$((attempt + 1))
+          done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -51,7 +72,20 @@ jobs:
             echo "CLOUDFLARE_API_TOKEN not configured, skipping frontend deployment."
             exit 0
           fi
-          npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy deploy/frontend --project-name tokengoblin-frontend
+          attempt=1
+          while true; do
+            if output=$(npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy deploy/frontend --project-name tokengoblin-frontend 2>&1); then
+              echo "$output"
+              exit 0
+            fi
+            echo "$output"
+            if [ "$attempt" -ge 3 ] || ! grep -q '10429' <<<"$output"; then
+              exit 1
+            fi
+            echo "Rate limited by Cloudflare API (10429); retry ${attempt}/3 in $((20 * attempt))s"
+            sleep $((20 * attempt))
+            attempt=$((attempt + 1))
+          done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -71,7 +105,20 @@ jobs:
             echo "CLOUDFLARE_API_TOKEN not configured, skipping landing deployment."
             exit 0
           fi
-          npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy deploy/landing --project-name tokengoblin-landing
+          attempt=1
+          while true; do
+            if output=$(npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy deploy/landing --project-name tokengoblin-landing 2>&1); then
+              echo "$output"
+              exit 0
+            fi
+            echo "$output"
+            if [ "$attempt" -ge 3 ] || ! grep -q '10429' <<<"$output"; then
+              exit 1
+            fi
+            echo "Rate limited by Cloudflare API (10429); retry ${attempt}/3 in $((20 * attempt))s"
+            sleep $((20 * attempt))
+            attempt=$((attempt + 1))
+          done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
