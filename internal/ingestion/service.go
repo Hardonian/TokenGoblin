@@ -68,6 +68,9 @@ const telemetrySinkTimeout = 3 * time.Second
 // able to fail or roll back the primary write.
 type TelemetrySink interface {
 	SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error
+	// SinkAnomalySignals mirrors detected anomaly signals (best-effort, same
+	// contract as SinkTokenEvent).
+	SinkAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error
 	// DeleteTenantEvents clears a tenant's mirrored data (used when the
 	// primary store is reset for a tenant, e.g. demo reseeding) so the mirror
 	// never accumulates rows the source of truth no longer has.
@@ -218,6 +221,9 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 	if s.telemetry != nil {
 		sinkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), telemetrySinkTimeout)
 		err := s.telemetry.SinkTokenEvent(sinkCtx, normalized)
+		if err == nil && len(signals) > 0 {
+			err = s.telemetry.SinkAnomalySignals(sinkCtx, signals)
+		}
 		cancel()
 		if err != nil {
 			slog.Warn("telemetry sink write failed; primary store unaffected",

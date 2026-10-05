@@ -219,13 +219,11 @@ func zombieRecommendation(acceptanceRate, totalCost float64, totalRequests int64
 	}
 }
 
-// GetAnomalies reads the mirrored anomalies table. NOTE: the ingestion
-// pipeline does not yet mirror anomaly signals into ClickHouse, so this
-// currently returns an empty list by design — it is deliberately NOT exposed
-// as an API endpoint until the mirror writes it (never show unbacked data).
+// GetAnomalies reads the mirrored anomaly signals (populated by the ingestion
+// pipeline's secondary mirror alongside the primary anomaly store).
 func (a *Analytics) GetAnomalies(ctx context.Context, tenantID string, start, end time.Time) ([]AnomalyRecord, error) {
 	rowsAny, err := a.client.Query(ctx,
-		`SELECT id, anomaly_type, severity, description, timestamp, metric_value, threshold
+		`SELECT id, anomaly_type, severity, description, timestamp, metric_value, threshold, metadata
 		 FROM anomalies
 		 WHERE tenant_id = ? AND timestamp >= ? AND timestamp < ?
 		 ORDER BY timestamp DESC`,
@@ -244,11 +242,20 @@ func (a *Analytics) GetAnomalies(ctx context.Context, tenantID string, start, en
 	defer func() { _ = rows.Close() }()
 	var out []AnomalyRecord
 	for rows.Next() {
-		var item AnomalyRecord
-		if err := rows.Scan(&item.ID, &item.Type, &item.Severity, &item.Description, &item.Timestamp, &item.MetricValue, &item.Threshold); err != nil {
+		var (
+			item AnomalyRecord
+			meta map[string]string
+		)
+		if err := rows.Scan(&item.ID, &item.Type, &item.Severity, &item.Description, &item.Timestamp, &item.MetricValue, &item.Threshold, &meta); err != nil {
 			return nil, &QueryError{"anomalies", err}
 		}
 		item.TenantID = tenantID
+		if len(meta) > 0 {
+			item.Metadata = make(map[string]any, len(meta))
+			for k, v := range meta {
+				item.Metadata[k] = v
+			}
+		}
 		out = append(out, item)
 	}
 	return out, nil

@@ -222,6 +222,61 @@ func (s *EventSink) Close() error {
 	return s.client.Close()
 }
 
+// SinkAnomalySignals mirrors detected anomaly signals into the anomalies
+// table. Same best-effort contract as SinkTokenEvent.
+func (s *EventSink) SinkAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error {
+	if len(signals) == 0 {
+		return nil
+	}
+	rows := make([][]any, 0, len(signals))
+	for _, signal := range signals {
+		rows = append(rows, buildAnomalyRow(signal))
+	}
+	return s.client.Insert(ctx, "anomalies", anomalyColumns, rows)
+}
+
+var anomalyColumns = []string{
+	"id", "tenant_id", "anomaly_type", "severity", "description",
+	"timestamp", "metric_value", "threshold", "metadata",
+}
+
+// buildAnomalyRow maps a domain signal onto the anomalies column order.
+// EventID/WorkerID and the free-form Details land in the metadata map (the
+// schema has no dedicated columns for them).
+func buildAnomalyRow(signal domain.AnomalySignal) []any {
+	observed := 0.0
+	if signal.ObservedValue != nil {
+		observed = *signal.ObservedValue
+	}
+	threshold := 0.0
+	if signal.ThresholdValue != nil {
+		threshold = *signal.ThresholdValue
+	}
+	meta := map[string]string{}
+	if signal.EventID != "" {
+		meta["event_id"] = signal.EventID
+	}
+	if signal.WorkerID != "" {
+		meta["worker_id"] = signal.WorkerID
+	}
+	for k, v := range signal.Details {
+		if k != "" && v != nil {
+			meta[k] = fmt.Sprintf("%v", v)
+		}
+	}
+	return []any{
+		signal.AnomalyID,
+		signal.TenantID,
+		string(signal.Type),
+		string(signal.Severity),
+		signal.Description,
+		signal.DetectedAt,
+		observed,
+		threshold,
+		meta,
+	}
+}
+
 // DeleteTenantEvents clears a tenant's mirrored data. The token_events clear
 // is a lightweight delete — synchronous in visibility and REQUIRED (the API
 // and seed verification read that table). The aggregate tables are cleared
@@ -230,6 +285,9 @@ func (s *EventSink) Close() error {
 func (s *EventSink) DeleteTenantEvents(ctx context.Context, tenantID string) error {
 	if err := s.client.Execute(ctx, "DELETE FROM token_events WHERE tenant_id = ?", tenantID); err != nil {
 		return fmt.Errorf("clear clickhouse mirror token_events: %w", err)
+	}
+	if err := s.client.Execute(ctx, "DELETE FROM anomalies WHERE tenant_id = ?", tenantID); err != nil {
+		return fmt.Errorf("clear clickhouse mirror anomalies: %w", err)
 	}
 	for _, table := range []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"} {
 		if err := s.client.Execute(ctx, "ALTER TABLE "+table+" DELETE WHERE tenant_id = ?", tenantID); err != nil {

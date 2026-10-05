@@ -95,6 +95,41 @@ func TestBuildMetadataOmitsEmptyAndSurvivesDegradedCost(t *testing.T) {
 	}
 }
 
+func TestBuildAnomalyRowMapsSignal(t *testing.T) {
+	observed := 42.5
+	threshold := 10.0
+	signal := domain.AnomalySignal{
+		AnomalyID:      "anom-1",
+		TenantID:       "tenant-a",
+		EventID:        "evt-1",
+		WorkerID:       "worker-1",
+		DetectedAt:     time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC),
+		Severity:       domain.SeverityHigh,
+		Type:           domain.AnomalySpendSpike,
+		Description:    "cost spike",
+		ObservedValue:  &observed,
+		ThresholdValue: &threshold,
+		Details:        map[string]interface{}{"window": "1h"},
+	}
+	row := buildAnomalyRow(signal)
+	if len(row) != len(anomalyColumns) {
+		t.Fatalf("row has %d values for %d columns", len(row), len(anomalyColumns))
+	}
+	if row[0] != "anom-1" || row[1] != "tenant-a" {
+		t.Fatalf("identity columns wrong: %#v", row[:2])
+	}
+	if row[6] != 42.5 || row[7] != 10.0 {
+		t.Fatalf("metric/threshold columns wrong: %#v", row[6:8])
+	}
+	meta, ok := row[8].(map[string]string)
+	if !ok {
+		t.Fatalf("metadata column should be map[string]string, got %T", row[8])
+	}
+	if meta["event_id"] != "evt-1" || meta["worker_id"] != "worker-1" || meta["window"] != "1h" {
+		t.Fatalf("metadata mapping wrong: %#v", meta)
+	}
+}
+
 func TestValidIdentifier(t *testing.T) {
 	for name, want := range map[string]bool{
 		"tokengoblin":     true,

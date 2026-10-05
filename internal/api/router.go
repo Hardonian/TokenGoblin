@@ -108,6 +108,7 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 	mux.Handle("/v1/analytics/cost/by-model", wrap(analyticsHandler.HandleCostByModel))
 	mux.Handle("/v1/analytics/cost/by-feature", wrap(analyticsHandler.HandleCostByFeature))
 	mux.Handle("/v1/analytics/zombie-agents", wrapPaid(analyticsHandler.HandleZombieAgents))
+	mux.Handle("/v1/analytics/anomalies", wrap(analyticsHandler.HandleAnomalies))
 
 	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
 	mux.Handle("/v1/dashboard/workers/", wrap(handler.HandleWorkerReview))

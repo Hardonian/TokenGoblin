@@ -17,6 +17,7 @@ type AnalyticsStore interface {
 	GetCostByModel(ctx context.Context, tenantID string, start, end time.Time) ([]clickhouse.ModelCostSummary, error)
 	GetCostByFeature(ctx context.Context, tenantID string, start, end time.Time) ([]clickhouse.FeatureCostSummary, error)
 	GetZombieAgents(ctx context.Context, tenantID string, threshold float64, window time.Duration) ([]clickhouse.ZombieAgentRecord, error)
+	GetAnomalies(ctx context.Context, tenantID string, start, end time.Time) ([]clickhouse.AnomalyRecord, error)
 }
 
 // AnalyticsHandler serves cost-intelligence endpoints from the mirror. The
@@ -146,4 +147,23 @@ func (h *AnalyticsHandler) HandleZombieAgents(w http.ResponseWriter, r *http.Req
 		agents = []clickhouse.ZombieAgentRecord{}
 	}
 	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: agents})
+}
+
+// HandleAnomalies — GET /v1/analytics/anomalies (mirrored anomaly signals)
+func (h *AnalyticsHandler) HandleAnomalies(w http.ResponseWriter, r *http.Request) {
+	if h.Analytics == nil {
+		h.unavailable(w)
+		return
+	}
+	tenantID := getTenantID(r)
+	start, end := windowFromRequest(r)
+	anomalies, err := h.Analytics.GetAnomalies(r.Context(), tenantID, start, end)
+	if err != nil {
+		h.queryError(w)
+		return
+	}
+	if anomalies == nil {
+		anomalies = []clickhouse.AnomalyRecord{}
+	}
+	writeJSON(w, http.StatusOK, Envelope{OK: true, Status: "success", Data: anomalies})
 }

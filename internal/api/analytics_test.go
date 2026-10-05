@@ -49,6 +49,12 @@ func (f *fakeAnalytics) GetZombieAgents(ctx context.Context, tenantID string, th
 	return []clickhouse.ZombieAgentRecord{{AgentID: "worker-z", TenantID: tenantID, AcceptanceRate: 0, TotalCost: 4, Recommendation: "quarantine"}}, nil
 }
 
+func (f *fakeAnalytics) GetAnomalies(ctx context.Context, tenantID string, start, end time.Time) ([]clickhouse.AnomalyRecord, error) {
+	f.calls++
+	f.lastTenant = tenantID
+	return []clickhouse.AnomalyRecord{{ID: "anom-1", TenantID: tenantID, Type: "spike", Severity: "high"}}, nil
+}
+
 func analyticsTestRouter(t *testing.T, analytics AnalyticsStore, tier string) (http.Handler, func()) {
 	t.Helper()
 	repo, err := storage.OpenSQLite(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
@@ -100,7 +106,7 @@ func TestAnalyticsQueriesAreTenantScoped(t *testing.T) {
 	mux, closeRepo := analyticsTestRouter(t, fake, "free")
 	defer closeRepo()
 
-	for _, path := range []string{"/v1/analytics/cost", "/v1/analytics/cost/by-model", "/v1/analytics/cost/by-feature"} {
+	for _, path := range []string{"/v1/analytics/cost", "/v1/analytics/cost/by-model", "/v1/analytics/cost/by-feature", "/v1/analytics/anomalies"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.Header.Set("x-tenant-id", "tenant-a")
 		rec := httptest.NewRecorder()

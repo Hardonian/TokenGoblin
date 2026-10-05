@@ -15,6 +15,7 @@ import (
 type recordingSink struct {
 	mu       sync.Mutex
 	events   []domain.TokenEvent
+	signals  []domain.AnomalySignal
 	err      error
 	cleared  []string
 }
@@ -34,6 +35,13 @@ func (r *recordingSink) DeleteTenantEvents(ctx context.Context, tenantID string)
 	defer r.mu.Unlock()
 	r.cleared = append(r.cleared, tenantID)
 	r.events = nil
+	return nil
+}
+
+func (r *recordingSink) SinkAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.signals = append(r.signals, signals...)
 	return nil
 }
 
@@ -115,5 +123,47 @@ func TestTelemetrySinkFailureNeverFailsPrimaryWrites(t *testing.T) {
 	}
 	if got := sink.count(); got != 0 {
 		t.Fatalf("failed sink should have recorded 0 events, got %d", got)
+	}
+}
+
+func TestTelemetrySinkReceivesAnomalySignals(t *testing.T) {
+	ctx := context.Background()
+	repo, err := storage.OpenSQLite(ctx, filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	sink := &recordingSink{}
+	service := NewService(repo, cost.LoadRegistry(ctx, cost.RegistryConfig{})).WithTelemetrySink(sink)
+	service.StartWorker(ctx)
+
+	// Unknown pricing deterministically produces one anomaly signal — the
+	// mirror must receive the same signals the primary store persists.
+	if _, err := service.IngestTokenEvent(ctx, "tenant-anom", domain.TokenEvent{
+		EventID:          "evt-anom",
+		WorkerID:         "worker-a",
+		Provider:         "mystery",
+		ModelID:          "unknown",
+		PromptTokens:     100,
+		CompletionTokens: 50,
+	}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if err := service.WaitIdle(ctx); err != nil {
+		t.Fatalf("wait idle: %v", err)
+	}
+
+	sink.mu.Lock()
+	signals := append([]domain.AnomalySignal(nil), sink.signals...)
+	sink.mu.Unlock()
+	if len(signals) != 1 {
+		t.Fatalf("sink should have received 1 anomaly signal, got %d", len(signals))
+	}
+	if signals[0].Type != domain.AnomalyUnknownModelPricing {
+		t.Fatalf("mirrored signal type %q, want %q", signals[0].Type, domain.AnomalyUnknownModelPricing)
+	}
+	if signals[0].TenantID != "tenant-anom" {
+		t.Fatalf("mirrored signal tenant %q, want tenant-anom", signals[0].TenantID)
 	}
 }

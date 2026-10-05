@@ -72,6 +72,10 @@ func (m *mirrorSink) SinkTokenEvent(ctx context.Context, event domain.TokenEvent
 	return nil
 }
 
+func (m *mirrorSink) SinkAnomalySignals(ctx context.Context, signals []domain.AnomalySignal) error {
+	return nil
+}
+
 func (m *mirrorSink) DeleteTenantEvents(ctx context.Context, tenantID string) error {
 	m.cleared++
 	m.mirrors = 0
