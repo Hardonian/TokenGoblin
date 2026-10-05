@@ -11,8 +11,26 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// RouterOption configures optional router dependencies.
+type RouterOption func(*routerConfig)
+
+type routerConfig struct {
+	analytics AnalyticsStore
+}
+
+// WithAnalytics enables the /v1/analytics/* endpoints backed by the ClickHouse
+// telemetry mirror. Without it those routes respond 503 with an honest
+// "analytics_unavailable" — never fabricated numbers.
+func WithAnalytics(analytics AnalyticsStore) RouterOption {
+	return func(c *routerConfig) { c.analytics = analytics }
+}
+
 // NewRouter creates a new HTTP multiplexer with all routes registered.
-func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter) http.Handler {
+func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat.RateLimiter, opts ...RouterOption) http.Handler {
+	cfg := &routerConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	mux := http.NewServeMux()
 	handler := NewIngestionHandler(service, repo)
 	billingHandler := NewBillingHandler(repo)
@@ -81,6 +99,16 @@ func NewRouter(service ingestion.Service, repo storage.Repository, limiter *moat
 
 	mux.Handle("/v1/completions", wrap(handler.HandleTaskCompletion))
 	mux.Handle("/v1/dashboard/overview", wrap(handler.HandleOverview))
+
+	// Analytics (ClickHouse telemetry mirror). Cost visibility is available to
+	// any authenticated tenant; zombie agents is the tier-gated signature
+	// feature (requires pro/premium/enterprise).
+	analyticsHandler := NewAnalyticsHandler(cfg.analytics)
+	mux.Handle("/v1/analytics/cost", wrap(analyticsHandler.HandleCostSummary))
+	mux.Handle("/v1/analytics/cost/by-model", wrap(analyticsHandler.HandleCostByModel))
+	mux.Handle("/v1/analytics/cost/by-feature", wrap(analyticsHandler.HandleCostByFeature))
+	mux.Handle("/v1/analytics/zombie-agents", wrapPaid(analyticsHandler.HandleZombieAgents))
+
 	mux.Handle("/v1/dashboard/workers", wrap(handler.HandleWorkers))
 	mux.Handle("/v1/dashboard/workers/", wrap(handler.HandleWorkerReview))
 	mux.Handle("/v1/dashboard/anomalies", wrap(handler.HandleAnomalies))

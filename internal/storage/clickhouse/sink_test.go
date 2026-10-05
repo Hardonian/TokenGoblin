@@ -110,6 +110,28 @@ func TestValidIdentifier(t *testing.T) {
 	}
 }
 
+func TestZombieRecommendation(t *testing.T) {
+	cases := []struct {
+		name      string
+		rate      float64
+		cost      float64
+		requests  int64
+		wantRec   string
+		wantZombi bool
+	}{
+		{"zero acceptance with spend", 0, 4.2, 6, "quarantine", true},
+		{"zero acceptance with UNPRICED tokens", 0, 0, 6, "investigate", true},
+		{"low acceptance with spend", 0.15, 2.0, 10, "investigate", true},
+		{"nothing at all", 0, 0, 0, "", false},
+	}
+	for _, tc := range cases {
+		rec, ok := zombieRecommendation(tc.rate, tc.cost, tc.requests)
+		if ok != tc.wantZombi || rec != tc.wantRec {
+			t.Fatalf("%s: got (%q, %v), want (%q, %v)", tc.name, rec, ok, tc.wantRec, tc.wantZombi)
+		}
+	}
+}
+
 func TestEventSinkConfigFromEnvDisabledWhenUnset(t *testing.T) {
 	t.Setenv("TG_CLICKHOUSE_ADDR", "")
 	if _, ok := EventSinkConfigFromEnv(); ok {

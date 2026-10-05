@@ -19,6 +19,30 @@ func Seed(ctx context.Context, repo storage.Repository, service ingestion.Servic
 	if err := repo.DeleteTenantData(ctx, tenantID); err != nil {
 		return err
 	}
+	// DEMO-ONLY provisioning exception: for PRODUCTION tenants the billing
+	// lifecycle is the ONLY writer of `tier` (see internal/billing). The
+	// synthetic demo tenant is provisioned on enterprise so seeded demos can
+	// exercise the tier-gated analytics surfaces (e.g. zombie agents) end to
+	// end. Do not copy this pattern into product code paths.
+	if err := repo.UpsertTenant(ctx, domain.Tenant{
+		TenantID:      tenantID,
+		Name:          "Demo Tenant",
+		Tier:          "enterprise",
+		UsageLimitUSD: 10,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+	}); err != nil {
+		return fmt.Errorf("seed %s: provision demo tenant: %w", tenantID, err)
+	}
+	// Reset the telemetry mirror alongside the primary store so re-seeding can
+	// never leave (or double-count) rows the source of truth no longer has.
+	if resetter, ok := service.(interface {
+		ClearTelemetryMirror(ctx context.Context, tenantID string) error
+	}); ok {
+		if err := resetter.ClearTelemetryMirror(ctx, tenantID); err != nil {
+			return fmt.Errorf("seed %s: reset telemetry mirror: %w", tenantID, err)
+		}
+	}
 	events := Events(tenantID)
 	for _, event := range events {
 		if _, err := service.IngestTokenEvent(ctx, tenantID, event); err != nil {

@@ -62,6 +62,50 @@ func TestSeedWaitsForAsyncIngestionAndVerifiesPersistence(t *testing.T) {
 	}
 }
 
+type mirrorSink struct {
+	cleared int
+	mirrors int
+}
+
+func (m *mirrorSink) SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error {
+	m.mirrors++
+	return nil
+}
+
+func (m *mirrorSink) DeleteTenantEvents(ctx context.Context, tenantID string) error {
+	m.cleared++
+	m.mirrors = 0
+	return nil
+}
+
+func TestSeedResetsTelemetryMirror(t *testing.T) {
+	ctx := context.Background()
+	base, err := storage.OpenSQLite(ctx, filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer func() { _ = base.Close() }()
+
+	sink := &mirrorSink{}
+	service := ingestion.NewService(base, cost.LoadRegistry(ctx, cost.RegistryConfig{})).WithTelemetrySink(sink)
+	service.StartWorker(ctx)
+
+	// Re-seeding must never accumulate mirrored rows (a reseed previously
+	// doubled analytics counts because only the primary store was reset).
+	for i := 0; i < 2; i++ {
+		if err := Seed(ctx, base, service, "seed-mirror"); err != nil {
+			t.Fatalf("seed pass %d: %v", i+1, err)
+		}
+	}
+	if sink.cleared != 2 {
+		t.Fatalf("mirror should be cleared once per seed, got %d clears", sink.cleared)
+	}
+	if sink.mirrors != len(Events("seed-mirror")) {
+		t.Fatalf("mirror holds %d events after 2 seeds, want exactly one seed's worth (%d)",
+			sink.mirrors, len(Events("seed-mirror")))
+	}
+}
+
 func TestSeedFailsWhenEventsDoNotPersist(t *testing.T) {
 	ctx := context.Background()
 	base, err := storage.OpenSQLite(ctx, filepath.Join(t.TempDir(), "test.sqlite"))

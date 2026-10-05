@@ -110,10 +110,12 @@ func main() {
 
 	// Optional ClickHouse telemetry mirror (TG_CLICKHOUSE_ADDR). Secondary
 	// analytics only — a broken mirror degrades to a warning, never downtime.
+	var analytics api.AnalyticsStore
 	if sink, sinkErr := clickhouse.MaybeEventSinkFromEnv(ctx); sinkErr != nil {
 		slog.Warn("clickhouse telemetry unavailable; continuing without analytics mirror", "error", sinkErr)
 	} else if sink != nil {
 		ingestionService.WithTelemetrySink(sink)
+		analytics = sink.Analytics()
 		defer func() { _ = sink.Close() }()
 		slog.Info("clickhouse telemetry mirror enabled")
 	}
@@ -132,7 +134,7 @@ func main() {
 	}
 
 	rateLimiter := moat.NewRateLimiter(redisClient)
-	mux := api.NewRouter(ingestionService, repo, rateLimiter)
+	mux := api.NewRouter(ingestionService, repo, rateLimiter, api.WithAnalytics(analytics))
 
 	addr := os.Getenv("TG_ADDR")
 	if addr == "" {

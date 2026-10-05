@@ -222,6 +222,24 @@ func (s *EventSink) Close() error {
 	return s.client.Close()
 }
 
+// DeleteTenantEvents clears a tenant's mirrored data. The token_events clear
+// is a lightweight delete — synchronous in visibility and REQUIRED (the API
+// and seed verification read that table). The aggregate tables are cleared
+// with async mutations (lightweight DELETE is unsupported on them) as
+// best-effort hygiene only.
+func (s *EventSink) DeleteTenantEvents(ctx context.Context, tenantID string) error {
+	if err := s.client.Execute(ctx, "DELETE FROM token_events WHERE tenant_id = ?", tenantID); err != nil {
+		return fmt.Errorf("clear clickhouse mirror token_events: %w", err)
+	}
+	for _, table := range []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"} {
+		if err := s.client.Execute(ctx, "ALTER TABLE "+table+" DELETE WHERE tenant_id = ?", tenantID); err != nil {
+			// Hygiene only: an async mutation failure must not fail the reset.
+			fmt.Fprintf(os.Stderr, "clickhouse mirror hygiene: clear %s: %v\n", table, err)
+		}
+	}
+	return nil
+}
+
 // CountTokenEvents returns how many mirrored events exist for a tenant —
 // used by verification tooling to confirm what actually landed.
 func (s *EventSink) CountTokenEvents(ctx context.Context, tenantID string) (int64, error) {

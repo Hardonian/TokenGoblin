@@ -13,9 +13,10 @@ import (
 )
 
 type recordingSink struct {
-	mu     sync.Mutex
-	events []domain.TokenEvent
-	err    error
+	mu       sync.Mutex
+	events   []domain.TokenEvent
+	err      error
+	cleared  []string
 }
 
 func (r *recordingSink) SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error {
@@ -28,10 +29,24 @@ func (r *recordingSink) SinkTokenEvent(ctx context.Context, event domain.TokenEv
 	return nil
 }
 
+func (r *recordingSink) DeleteTenantEvents(ctx context.Context, tenantID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cleared = append(r.cleared, tenantID)
+	r.events = nil
+	return nil
+}
+
 func (r *recordingSink) count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.events)
+}
+
+func (r *recordingSink) clearedTenants() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.cleared...)
 }
 
 func TestTelemetrySinkReceivesPersistedEvents(t *testing.T) {

@@ -68,12 +68,26 @@ const telemetrySinkTimeout = 3 * time.Second
 // able to fail or roll back the primary write.
 type TelemetrySink interface {
 	SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error
+	// DeleteTenantEvents clears a tenant's mirrored data (used when the
+	// primary store is reset for a tenant, e.g. demo reseeding) so the mirror
+	// never accumulates rows the source of truth no longer has.
+	DeleteTenantEvents(ctx context.Context, tenantID string) error
 }
 
 // WithTelemetrySink attaches the optional secondary analytics sink. nil clears.
 func (s *ExecutionService) WithTelemetrySink(sink TelemetrySink) *ExecutionService {
 	s.telemetry = sink
 	return s
+}
+
+// ClearTelemetryMirror resets mirrored analytics data for a tenant. Callers
+// use it whenever the primary store is reset for a tenant so the mirror never
+// outlives the data it mirrors. No-op without a sink.
+func (s *ExecutionService) ClearTelemetryMirror(ctx context.Context, tenantID string) error {
+	if s.telemetry == nil {
+		return nil
+	}
+	return s.telemetry.DeleteTenantEvents(ctx, tenantID)
 }
 
 func NewService(repo storage.Repository, registry cost.Registry) *ExecutionService {
