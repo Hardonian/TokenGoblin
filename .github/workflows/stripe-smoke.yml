@@ -39,10 +39,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Install Stripe CLI (official installer)
+      - name: Install Stripe CLI (pinned release)
         run: |
-          curl -sSL https://raw.githubusercontent.com/stripe/stripe-cli/master/scripts/install.sh | sh
-          sudo install -m 755 stripe /usr/local/bin/stripe
+          curl -sSL -o /tmp/stripe.tgz "https://github.com/stripe/stripe-cli/releases/download/v1.53.0/stripe_1.53.0_linux_x86_64.tar.gz"
+          tar -xzf /tmp/stripe.tgz -C /tmp stripe
+          sudo install -m 755 /tmp/stripe /usr/local/bin/stripe
           stripe --version
 
       - name: Run checkout round trip (trigger mode)
