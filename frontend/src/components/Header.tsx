@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/pricing", label: "Plans" },
   { href: "/billing", label: "Billing" },
   { href: "/intelligence", label: "Intelligence" },
+  { href: "/telemetry", label: "Telemetry" },
   { href: "/executive", label: "Executive" },
   { href: "/forecasts", label: "Forecasts" },
   { href: "/models", label: "Models" },

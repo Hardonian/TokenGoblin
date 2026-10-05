@@ -68,7 +68,13 @@ export function useAuth() {
 // Global fetcher to be used with SWR
 export const authFetcher = async (url: string) => {
   const res = await fetch(url, {
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      // Demo-mode fallback identity. The Go API prefers real credentials
+      // (session cookie / API key) and production REJECTS this header
+      // (api_key_required), so it can never impersonate a real tenant.
+      "x-tenant-id": "demo-tenant",
+    },
     cache: "no-store",
   });
   const json = await res.json().catch(() => null);

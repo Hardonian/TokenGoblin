@@ -32,6 +32,15 @@ const (
 func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := moat.ExtractBearerToken(r.Header.Get("Authorization"))
+		if token == "" {
+			// Session fallback: the frontend keeps its session in http-only
+			// cookies (tg_api_key / tg_tenant_id, set at login). Without this,
+			// every cookie-authenticated browser request arrives here with no
+			// Authorization header and the whole dashboard reads 401.
+			if cookie, err := r.Cookie("tg_api_key"); err == nil {
+				token = strings.TrimSpace(cookie.Value)
+			}
+		}
 
 		if token != "" {
 			parts := strings.SplitN(token, ".", 2)
@@ -63,6 +72,12 @@ func AuthMiddleware(repo storage.Repository, next http.Handler) http.Handler {
 		}
 
 		tenantID := strings.TrimSpace(r.Header.Get("x-tenant-id"))
+		if tenantID == "" {
+			// Demo-mode fallback to the session cookie's tenant.
+			if cookie, err := r.Cookie("tg_tenant_id"); err == nil {
+				tenantID = strings.TrimSpace(cookie.Value)
+			}
+		}
 		if config.IsProduction() {
 			writeAuthError(w, "api_key_required", "Production routes require API key authentication.")
 			return
