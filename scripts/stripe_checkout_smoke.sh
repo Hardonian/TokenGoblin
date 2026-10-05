@@ -80,7 +80,10 @@ stripe listen --forward-to "${API_BASE}/api/v1/webhooks/stripe" >"$LISTEN_LOG" 2
 LISTEN_PID=$!
 cleanup() {
   kill "$LISTEN_PID" 2>/dev/null || true
-  [ -n "${API_PID:-}" ] && kill "$API_PID" 2>/dev/null || true
+  if [ -n "${API_PID:-}" ]; then
+    kill "$API_PID" 2>/dev/null || true
+    wait "$API_PID" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -95,7 +98,10 @@ done
 echo "-- step 1: webhook listener ready (signing secret obtained from this session, not printed)"
 
 # ---------- API under test (real binary, real DB, real raw-body verifier) ----------
+# Build first, then run the BINARY directly: `go run` would spawn a child
+# process that survives `kill $API_PID` and keeps CI steps hanging forever.
 echo "-- step 2: starting API under test on :${API_PORT}"
+go build -o /tmp/tg-stripe-smoke-server ./cmd/server
 STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
 STRIPE_WEBHOOK_SECRET="$WHSEC" \
 STRIPE_PRICE_PRO="$STRIPE_PRICE_PRO" \
@@ -103,7 +109,7 @@ STRIPE_PRICE_ENTERPRISE="${STRIPE_PRICE_ENTERPRISE:-}" \
 TG_INTERNAL_WEBHOOK_SECRET="$TG_INTERNAL_WEBHOOK_SECRET" \
 TG_DB_DSN="$TG_DB_DSN" \
 TG_ADDR=":${API_PORT}" \
-go run ./cmd/server >/tmp/tg_stripe_smoke_api.log 2>&1 &
+/tmp/tg-stripe-smoke-server >/tmp/tg_stripe_smoke_api.log 2>&1 &
 API_PID=$!
 
 for _ in $(seq 1 60); do
