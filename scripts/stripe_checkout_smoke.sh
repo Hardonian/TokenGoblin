@@ -33,11 +33,11 @@ fi
 
 die() { echo "FAIL: $*" >&2; exit 1; }
 
-[ -n "${STRIPE_SECRET_KEY:-}" ] || die "STRIPE_SECRET_KEY not set. Provide a TEST key (sk_test_...)."
+[ -n "${STRIPE_SECRET_KEY:-}" ] || die "STRIPE_SECRET_KEY not set. Provide a TEST key (sk_test_/rk_test_...)."
 case "$STRIPE_SECRET_KEY" in
-  sk_live_*) die "STRIPE_SECRET_KEY is a LIVE key. This smoke test is test-mode only — refusing." ;;
-  sk_test_*) : ;;
-  *) die "STRIPE_SECRET_KEY does not look like a Stripe key (want sk_test_...)." ;;
+  sk_test_*|rk_test_*) : ;;
+  sk_live_*|rk_live_*) die "STRIPE_SECRET_KEY is a LIVE key. This smoke test is test-mode only — refusing." ;;
+  *) die "STRIPE_SECRET_KEY does not look like a Stripe key (want sk_test_/rk_test_...)." ;;
 esac
 
 command -v stripe >/dev/null || die "stripe CLI not found. Install: https://stripe.com/docs/stripe-cli"
