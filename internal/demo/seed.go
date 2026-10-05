@@ -19,13 +19,27 @@ func Seed(ctx context.Context, repo storage.Repository, service ingestion.Servic
 	if err := repo.DeleteTenantData(ctx, tenantID); err != nil {
 		return err
 	}
-	for _, event := range Events(tenantID) {
+	events := Events(tenantID)
+	for _, event := range events {
 		if _, err := service.IngestTokenEvent(ctx, tenantID, event); err != nil {
 			return fmt.Errorf("seed %s: %w", event.EventID, err)
 		}
 	}
-	// Wait for async ingestion to process
-	time.Sleep(300 * time.Millisecond)
+	// Ingestion is asynchronous (buffered queue + background worker). Wait for
+	// the queue to drain, then VERIFY what actually landed in storage — never
+	// claim a seeded count from what was merely generated.
+	waitCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	if err := service.WaitIdle(waitCtx); err != nil {
+		return fmt.Errorf("seed %s: %w", tenantID, err)
+	}
+	persisted, err := repo.ListTokenEvents(ctx, tenantID, len(events)+1)
+	if err != nil {
+		return fmt.Errorf("seed %s: verify persisted events: %w", tenantID, err)
+	}
+	if len(persisted) != len(events) {
+		return fmt.Errorf("seed %s incomplete: persisted %d of %d events", tenantID, len(persisted), len(events))
+	}
 	return nil
 }
 

@@ -6,12 +6,18 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /token-goblin ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /token-goblin-seed ./cmd/seed-demo
 
 FROM alpine:3.19
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /token-goblin /app/token-goblin
+COPY --from=builder /token-goblin-seed /app/token-goblin-seed
+# Migrations are read from a RELATIVE path ("file://data/migrations") by the
+# Postgres repository at open time — without this copy, Postgres mode can never
+# boot inside the container even though it works from a repo checkout.
+COPY --from=builder /app/data/migrations /app/data/migrations
 
 ENV PORT=8080
 ENV TG_DB_PATH="/data/token_goblin.db"

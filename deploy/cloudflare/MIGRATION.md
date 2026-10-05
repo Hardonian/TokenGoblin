@@ -21,7 +21,7 @@ Worker routes at the edge):
 
 ```bash
 cd frontend && npm i -D @opennextjs/cloudflare
-npx opennextjs-cloudflare build && npx wrangler deploy --config deploy/cloudflare/wrangler.toml
+npx opennextjs-cloudflare build && npx wrangler deploy   # from frontend/ — wrangler.toml lives there
 # static-only fallback: npx wrangler pages deploy frontend/.next/static --project-name tokengoblin
 ```
 Keep `NEXT_PUBLIC_TG_API_BASE` pointing at the Workers API (`tokengoblin-api`). Stripe price IDs +

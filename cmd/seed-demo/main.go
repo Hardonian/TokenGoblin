@@ -34,5 +34,5 @@ func main() {
 		log.Fatalf("seed demo: %v", err)
 	}
 	// #nosec G706 -- CLI demo seed utility
-	log.Printf("seeded demo tenant %q with %d usage events", tenantID, len(demo.Events(tenantID)))
+	log.Printf("seeded demo tenant %q: %d usage events generated AND verified persisted", tenantID, len(demo.Events(tenantID)))
 }

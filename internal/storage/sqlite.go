@@ -21,7 +21,15 @@ type SQLiteRepository struct {
 	db *sql.DB
 }
 
+// OpenFromEnv opens the repository configured by the environment, shared by
+// every entrypoint (server, seed-demo, smoke). A TG_DB_DSN pointing at Postgres
+// wins; otherwise it falls back to the SQLite file at TG_DB_PATH. Keeping this
+// logic in one place is what lets seed-demo and smoke target the same database
+// as the server instead of silently seeding a local SQLite file.
 func OpenFromEnv(ctx context.Context) (Repository, error) {
+	if dsn := os.Getenv("TG_DB_DSN"); dsn != "" {
+		return OpenPostgres(ctx, dsn)
+	}
 	path := os.Getenv("TG_DB_PATH")
 	if path == "" {
 		path = defaultDBPath

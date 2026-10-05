@@ -1,4 +1,49 @@
+# TokenGoblin — full local stack.
+#
+#   Full stack (Postgres + Redis + backend + frontend):
+#       docker compose up --build
+#   One-shot demo data (seeds the SAME Postgres the server uses):
+#       docker compose --profile demo run --rm seed-demo
+#   ClickHouse telemetry (capability exists in internal/storage/clickhouse but
+#   is NOT yet wired into the server — profile kept for when it is):
+#       docker compose --profile telemetry up clickhouse
+#
+# Lightweight SQLite mode (no Postgres/Redis): unset TG_DB_DSN and set
+# TG_DB_PATH — the server falls back automatically. See internal/storage.
+#
+# Dev credentials below are intentionally non-secret. Never reuse them in
+# production; production secrets (Stripe keys etc.) come from the environment
+# or a .env file that is gitignored.
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tokengoblin
+      POSTGRES_PASSWORD: tokengoblin-dev
+      POSTGRES_DB: tokengoblin
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - token-goblin-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tokengoblin -d tokengoblin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -7,22 +52,30 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
-      - TG_DB_PATH=/data/token_goblin.db
-      # Stripe (required for billing)
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
-      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
-      # Internal webhook secret (for Stripe webhook → Go API)
+      # Postgres is the primary store; migrations run automatically at open.
+      - TG_DB_DSN=postgres://tokengoblin:tokengoblin-dev@postgres:5432/tokengoblin?sslmode=disable
+      - TG_REDIS_ADDR=redis:6379
+      - TG_DATALAKE_DIR=/data/datalake
+      # Stripe (required for billing; leave empty locally to test degraded paths)
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-}
+      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-}
+      # Internal webhook secret (for Stripe webhook -> Go API forwarding)
       - TG_INTERNAL_WEBHOOK_SECRET=${TG_INTERNAL_WEBHOOK_SECRET:-change-me-in-production}
     volumes:
       - token-goblin-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 10
 
   frontend:
     build:
@@ -35,17 +88,47 @@ services:
     environment:
       - PORT=3000
       - NEXT_PUBLIC_TG_API_BASE=http://backend:8080
-      - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO}
-      - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE}
+      - NEXT_PUBLIC_STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-}
+      - NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-}
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/login"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 10
+
+  # One-shot: seed the demo tenant into the SAME Postgres the server reads.
+  # Usage: docker compose --profile demo run --rm seed-demo
+  seed-demo:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["/app/token-goblin-seed"]
+    environment:
+      - TG_DB_DSN=postgres://tokengoblin:tokengoblin-dev@postgres:5432/tokengoblin?sslmode=disable
+      - TG_DEMO_TENANT_ID=${TG_DEMO_TENANT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # NOT yet wired into the server: the ClickHouse client in
+  # internal/storage/clickhouse is built and ready but nothing imports it yet.
+  # Provisioning it under a profile keeps the day-it-lands switch trivial
+  # without paying idle RAM today.
+  clickhouse:
+    profiles: ["telemetry"]
+    image: clickhouse/clickhouse-server:24-alpine
+    ports:
+      - "127.0.0.1:58123:8123"
+    volumes:
+      - token-goblin-chdata:/var/lib/clickhouse
+    restart: unless-stopped
 
 volumes:
   token-goblin-data:
+  token-goblin-pgdata:
+  token-goblin-chdata:

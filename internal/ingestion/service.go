@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Hardonian/TokenGoblin/internal/analysis"
@@ -24,6 +25,10 @@ var tenantIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{1,79}$`)
 type Service interface {
 	IngestTokenEvent(ctx context.Context, tenantID string, event domain.TokenEvent) (domain.IngestionResult, error)
 	IngestTokenEventBatch(ctx context.Context, tenantID string, events []domain.TokenEvent) ([]domain.IngestionResult, error)
+	// WaitIdle blocks until every event accepted by IngestTokenEvent/Batch has
+	// been fully processed (persisted or permanently failed), so short-lived
+	// tools can verify what actually landed instead of racing the queue.
+	WaitIdle(ctx context.Context) error
 	Overview(ctx context.Context, tenantID string) (domain.ProductivitySummary, error)
 	Workers(ctx context.Context, tenantID string) ([]domain.WorkerBreakdown, error)
 	Anomalies(ctx context.Context, tenantID string, limit int) ([]domain.AnomalySignal, error)
@@ -48,6 +53,7 @@ type ExecutionService struct {
 	now        func() time.Time
 	thresholds anomaly.Thresholds
 	alerter    moat.Alerter
+	inflight   sync.WaitGroup
 }
 
 func NewService(repo storage.Repository, registry cost.Registry) *ExecutionService {
@@ -84,7 +90,26 @@ func (s *ExecutionService) StartWorker(ctx context.Context) {
 	}()
 }
 
+// WaitIdle blocks until every event accepted by IngestTokenEvent/Batch has been
+// fully processed (persisted or permanently failed), or ctx expires. A short-
+// lived tool (seed-demo, smoke) MUST use this before claiming what was written:
+// the ingestion queue is asynchronous, so exiting early silently drops events.
+func (s *ExecutionService) WaitIdle(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		s.inflight.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("wait for ingestion idle: %w", ctx.Err())
+	}
+}
+
 func (s *ExecutionService) processEvent(ctx context.Context, normalized domain.TokenEvent) {
+	defer s.inflight.Done()
 	// Retry loop for DB locks/unavailability
 	for retries := 0; retries < 3; retries++ {
 		err := s.tryProcessEvent(ctx, normalized)
@@ -183,11 +208,13 @@ func (s *ExecutionService) IngestTokenEvent(ctx context.Context, tenantID string
 	costResult := s.pricing.Calculate(ctx, normalized, s.repo)
 	normalized = applyCostResult(normalized, costResult)
 
+	s.inflight.Add(1)
 	select {
 	case s.eventQueue <- normalized:
 		// Buffered successfully
 	default:
 		// Queue is full, return error
+		s.inflight.Done()
 		return domain.IngestionResult{}, errors.New("ingestion buffer full")
 	}
 
@@ -243,11 +270,13 @@ func (s *ExecutionService) IngestTokenEventBatch(ctx context.Context, tenantID s
 		normalized.CostIsDegraded = costResult.Status == cost.StatusDegraded
 		normalized.CostDegradedCode = costResult.DegradedCode
 
+		s.inflight.Add(1)
 		select {
 		case s.eventQueue <- normalized:
 			// Buffered successfully
 		default:
 			// Queue is full, return error
+			s.inflight.Done()
 			return nil, errors.New("ingestion buffer full")
 		}
 
