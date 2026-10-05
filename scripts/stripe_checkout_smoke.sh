@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Stripe TEST-MODE checkout round trip for TokenGoblin.
+# Stripe TEST-MODE checkout round trip for TokenGoblin (local or CI).
 #
 # Proves the money path end to end against real Stripe:
 #   1. checkout session creation through the live Go API (allowlist -> Stripe)
 #   2. signed webhook delivery (stripe listen -> our raw-body verifier)
-#   3. billing lifecycle application (tenant tier + subscription in Postgres)
+#   3. billing lifecycle application (tenant tier verified via /api/billing/status)
 #
 # Usage:
-#   ./scripts/stripe_checkout_smoke.sh --trigger-only   # webhook leg via stripe trigger (no browser)
+#   ./scripts/stripe_checkout_smoke.sh --trigger-only   # signed test event (no browser)
 #   ./scripts/stripe_checkout_smoke.sh                  # full: real session + waits for your test-card payment
 #
-# Requirements (put in .env, gitignored — NEVER commit):
+# Environment (locally: .env, gitignored — NEVER commit):
 #   STRIPE_SECRET_KEY=sk_test_...   (test mode ONLY; this script refuses sk_live_)
-#   STRIPE_PRICE_PRO=price_...      (see scripts/setup_stripe_prices.py)
-#   STRIPE_PRICE_ENTERPRISE=price_...
-#   TG_INTERNAL_WEBHOOK_SECRET=...  (openssl rand -hex 32)
-# The webhook signing secret is provided by the `stripe listen` session itself.
+#   STRIPE_PRICE_PRO=price_...      (optional — an ephemeral test price is created if unset)
+#   TG_INTERNAL_WEBHOOK_SECRET=...  (optional — generated if unset)
+#   TG_DB_DSN=postgres://...        (optional — defaults to the compose Postgres)
+# The webhook signing secret comes from the `stripe listen` session itself.
 set -Eeuo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,19 +33,22 @@ fi
 
 die() { echo "FAIL: $*" >&2; exit 1; }
 
-[ -n "${STRIPE_SECRET_KEY:-}" ] || die "STRIPE_SECRET_KEY not set. Put a TEST key in .env (sk_test_...)."
+[ -n "${STRIPE_SECRET_KEY:-}" ] || die "STRIPE_SECRET_KEY not set. Provide a TEST key (sk_test_...)."
 case "$STRIPE_SECRET_KEY" in
   sk_live_*) die "STRIPE_SECRET_KEY is a LIVE key. This smoke test is test-mode only — refusing." ;;
   sk_test_*) : ;;
   *) die "STRIPE_SECRET_KEY does not look like a Stripe key (want sk_test_...)." ;;
 esac
-[ -n "${STRIPE_PRICE_PRO:-}" ] || die "STRIPE_PRICE_PRO not set (see scripts/setup_stripe_prices.py)."
-[ -n "${TG_INTERNAL_WEBHOOK_SECRET:-}" ] || die "TG_INTERNAL_WEBHOOK_SECRET not set (openssl rand -hex 32)."
 
-command -v stripe >/dev/null || die "stripe CLI not found. Install: https://stripe.com/docs/stripe-cli (or: curl -sSL https://raw.githubusercontent.com/stripe/stripe-cli/master/scripts/install.sh | sh)"
+command -v stripe >/dev/null || die "stripe CLI not found. Install: https://stripe.com/docs/stripe-cli"
 command -v curl >/dev/null || die "curl not found"
 command -v go >/dev/null || die "go not found (needed to run the local API under test)"
 
+# The Stripe CLI authenticates headless with the API key (no interactive login).
+export STRIPE_API_KEY="$STRIPE_SECRET_KEY"
+
+TG_DB_DSN="${TG_DB_DSN:-postgres://tokengoblin:tokengoblin-dev@127.0.0.1:55432/tokengoblin?sslmode=disable}"
+TG_INTERNAL_WEBHOOK_SECRET="${TG_INTERNAL_WEBHOOK_SECRET:-$(openssl rand -hex 32)}"
 API_PORT=8081
 API_BASE="http://127.0.0.1:${API_PORT}"
 TENANT="stripe-smoke-$(date +%s)"
@@ -53,6 +56,23 @@ TENANT="stripe-smoke-$(date +%s)"
 echo "== Stripe checkout smoke (${MODE}) — tenant ${TENANT} =="
 echo "-- step 0: stripe CLI reachable"
 stripe --version
+
+# ---------- price (ephemeral test price if none configured) ----------
+if [ -z "${STRIPE_PRICE_PRO:-}" ]; then
+  echo "-- step 0a: creating ephemeral test price (STRIPE_PRICE_PRO unset)"
+  PRODUCT_JSON="$(curl -fsS -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/products \
+    --data-urlencode "name=TokenGoblin Smoke ${TENANT}")" || die "product creation failed"
+  PRODUCT_ID="$(printf '%s' "$PRODUCT_JSON" | grep -o '"id": *"prod_[A-Za-z0-9]*"' | head -1 | grep -o 'prod_[A-Za-z0-9]*')"
+  [ -n "$PRODUCT_ID" ] || die "no product id in: $PRODUCT_JSON"
+  PRICE_JSON="$(curl -fsS -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/prices \
+    --data-urlencode "product=${PRODUCT_ID}" \
+    --data-urlencode "unit_amount=2500" \
+    --data-urlencode "currency=usd" \
+    --data-urlencode "recurring[interval]=month")" || die "price creation failed"
+  STRIPE_PRICE_PRO="$(printf '%s' "$PRICE_JSON" | grep -o '"id": *"price_[A-Za-z0-9]*"' | head -1 | grep -o 'price_[A-Za-z0-9]*')"
+  [ -n "$STRIPE_PRICE_PRO" ] || die "no price id in: $PRICE_JSON"
+  echo "   ephemeral price: ${STRIPE_PRICE_PRO}"
+fi
 
 # ---------- webhook listener (owns the signing secret for this run) ----------
 LISTEN_LOG="$(mktemp /tmp/stripe_listen.XXXXXX.log)"
@@ -74,19 +94,19 @@ done
 [ -n "$WHSEC" ] || die "no signing secret from stripe listen: $(cat "$LISTEN_LOG")"
 echo "-- step 1: webhook listener ready (signing secret obtained from this session, not printed)"
 
-# ---------- local API under test (real binary, real Postgres, real verifier) ----------
+# ---------- API under test (real binary, real DB, real raw-body verifier) ----------
 echo "-- step 2: starting API under test on :${API_PORT}"
 STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
 STRIPE_WEBHOOK_SECRET="$WHSEC" \
-STRIPE_PRICE_PRO="${STRIPE_PRICE_PRO}" \
+STRIPE_PRICE_PRO="$STRIPE_PRICE_PRO" \
 STRIPE_PRICE_ENTERPRISE="${STRIPE_PRICE_ENTERPRISE:-}" \
 TG_INTERNAL_WEBHOOK_SECRET="$TG_INTERNAL_WEBHOOK_SECRET" \
-TG_DB_DSN="postgres://tokengoblin:tokengoblin-dev@127.0.0.1:55432/tokengoblin?sslmode=disable" \
+TG_DB_DSN="$TG_DB_DSN" \
 TG_ADDR=":${API_PORT}" \
 go run ./cmd/server >/tmp/tg_stripe_smoke_api.log 2>&1 &
 API_PID=$!
 
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   curl -fsS "${API_BASE}/healthz" >/dev/null 2>&1 && break
   kill -0 "$API_PID" 2>/dev/null || die "API exited early: $(tail -20 /tmp/tg_stripe_smoke_api.log)"
   sleep 1
@@ -111,32 +131,28 @@ if [ "$MODE" = "full" ]; then
   echo "   Test card: 4242 4242 4242 4242, any future expiry, any CVC, any ZIP."
   echo "   Waiting for the signed webhook (checkout.session.completed) ..."
   for _ in $(seq 1 240); do
-    if grep -q 'checkout.session.completed' "$LISTEN_LOG"; then
-      break
-    fi
+    grep -q 'checkout.session.completed' "$LISTEN_LOG" && break
     sleep 2
   done
 else
-  echo "-- step 4: firing signed test event through the listener"
-  stripe trigger checkout.session.completed >/dev/null 2>&1 || die "stripe trigger failed (is the CLI authenticated? stripe login)"
-  sleep 3
+  echo "-- step 4: firing signed test event through the listener, tagged with our tenant"
+  stripe trigger checkout.session.completed \
+    --add "checkout_session.metadata.tenant_id=${TENANT}" \
+    --add "checkout_session.client_reference_id=${TENANT}" \
+    >/dev/null 2>&1 || die "stripe trigger failed (is the CLI authenticated?)"
+  sleep 5
 fi
 
-# ---------- verify the lifecycle actually applied ----------
-echo "-- step 5: verifying billing lifecycle in Postgres"
-TIER="$(docker compose exec -T postgres psql -U tokengoblin -d tokengoblin -tAc \
-  "SELECT tier FROM tenants WHERE tenant_id='${TENANT}';" 2>/dev/null || true)"
-SUB="$(docker compose exec -T postgres psql -U tokengoblin -d tokengoblin -tAc \
-  "SELECT COALESCE(stripe_subscription_id,'') FROM tenants WHERE tenant_id='${TENANT}';" 2>/dev/null || true)"
-
-echo "   tier=${TIER:-<none>} subscription=${SUB:-<none>}"
-if [ -n "$TIER" ] && [ "$TENANT" != "" ]; then
-  if [ "$TIER" != "free" ]; then
-    echo "PASS: billing lifecycle applied — tenant ${TENANT} moved to tier '${TIER}' via a real Stripe-signed webhook."
-    exit 0
-  fi
+# ---------- verify the lifecycle actually applied (through the product's own API) ----------
+echo "-- step 5: verifying billing lifecycle via GET /api/billing/status"
+STATUS="$(curl -fsS -H "x-tenant-id: ${TENANT}" "${API_BASE}/api/billing/status")"
+echo "   status: ${STATUS}"
+TIER="$(printf '%s' "$STATUS" | grep -o '"tier":"[a-z]*"' | head -1 | sed 's/.*:"//;s/"//')"
+if [ -n "$TIER" ] && [ "$TIER" != "free" ]; then
+  echo "PASS: billing lifecycle applied — tenant ${TENANT} moved to tier '${TIER}' via a real Stripe-signed webhook."
+  exit 0
 fi
-echo "FAIL: webhook did not reach the billing lifecycle (tier still '${TIER:-none}')." >&2
+echo "FAIL: webhook did not reach the billing lifecycle (tier '${TIER:-none}')." >&2
 echo "   listener log: ${LISTEN_LOG}" >&2
 echo "   api log: /tmp/tg_stripe_smoke_api.log" >&2
 exit 1

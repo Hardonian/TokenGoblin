@@ -1,0 +1,52 @@
+name: Stripe Checkout Smoke (test mode)
+
+# Deliberate, manual-only: runs the REAL money path (checkout session creation,
+# Stripe-signed webhook delivery, billing lifecycle application) against the
+# STRIPE_SECRET_KEY secret. The harness refuses sk_live_ keys outright, so a
+# misconfigured secret fails safe — no live charges are possible.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.26.x'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tokengoblin
+          POSTGRES_PASSWORD: tokengoblin-dev
+          POSTGRES_DB: tokengoblin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tokengoblin -d tokengoblin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install Stripe CLI (official installer)
+        run: |
+          curl -sSL https://raw.githubusercontent.com/stripe/stripe-cli/master/scripts/install.sh | sh
+          sudo install -m 755 stripe /usr/local/bin/stripe
+          stripe --version
+
+      - name: Run checkout round trip (trigger mode)
+        run: ./scripts/stripe_checkout_smoke.sh --trigger-only
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          TG_DB_DSN: postgres://tokengoblin:tokengoblin-dev@127.0.0.1:5432/tokengoblin?sslmode=disable
