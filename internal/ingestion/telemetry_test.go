@@ -13,11 +13,11 @@ import (
 )
 
 type recordingSink struct {
-	mu       sync.Mutex
-	events   []domain.TokenEvent
-	signals  []domain.AnomalySignal
-	err      error
-	cleared  []string
+	mu      sync.Mutex
+	events  []domain.TokenEvent
+	signals []domain.AnomalySignal
+	err     error
+	cleared []string
 }
 
 func (r *recordingSink) SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error {

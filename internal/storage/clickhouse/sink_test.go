@@ -132,12 +132,12 @@ func TestBuildAnomalyRowMapsSignal(t *testing.T) {
 
 func TestValidIdentifier(t *testing.T) {
 	for name, want := range map[string]bool{
-		"tokengoblin":     true,
-		"tg_analytics_2":  true,
-		"":                false,
+		"tokengoblin":      true,
+		"tg_analytics_2":   true,
+		"":                 false,
 		"tokengoblin;drop": false,
 		"tokengoblin.test": false,
-		"db name":         false,
+		"db name":          false,
 	} {
 		if got := validIdentifier(name); got != want {
 			t.Fatalf("validIdentifier(%q) = %v, want %v", name, got, want)

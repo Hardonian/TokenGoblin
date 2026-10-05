@@ -55,6 +55,7 @@ func main() {
 			log.Fatalf("verify clickhouse mirror: %v", err)
 		}
 		if mirrored != int64(len(events)) {
+			// #nosec G706 -- CLI demo seed utility; tenantID is a local demo argument
 			log.Fatalf("clickhouse mirror incomplete: %d of %d events mirrored", mirrored, len(events))
 		}
 		// #nosec G706 -- CLI demo seed utility

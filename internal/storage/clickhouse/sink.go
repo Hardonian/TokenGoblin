@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Hardonian/TokenGoblin/internal/domain"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/Hardonian/TokenGoblin/internal/domain"
 )
 
 // EventSink mirrors token usage events into ClickHouse for high-volume
@@ -137,14 +137,26 @@ func buildEventRow(e domain.TokenEvent) []any {
 		e.WorkerID,
 		e.ModelID,
 		feature,
-		uint64(e.PromptTokens),
-		uint64(e.CompletionTokens),
-		uint64(total),
+		tokenCount(e.PromptTokens),
+		tokenCount(e.CompletionTokens),
+		tokenCount(total),
 		cost,
 		ts,
 		e.Fingerprint,
 		buildMetadata(e),
 	}
+}
+
+// tokenCount adapts a validated token count to the UInt64 columns. G115 is a
+// false positive on this conversion: the value is clamped non-negative and an
+// int's maximum always fits in uint64, so overflow is impossible — the only
+// hazard (negative wraparound) is removed by the clamp.
+// #nosec G115
+func tokenCount(v int) uint64 {
+	if v < 0 {
+		return 0
+	}
+	return uint64(v)
 }
 
 func buildMetadata(e domain.TokenEvent) map[string]string {
