@@ -17,6 +17,7 @@ import (
 	"github.com/Hardonian/TokenGoblin/internal/intelligence"
 	"github.com/Hardonian/TokenGoblin/internal/moat"
 	"github.com/Hardonian/TokenGoblin/internal/storage"
+	"github.com/Hardonian/TokenGoblin/internal/storage/clickhouse"
 	"github.com/redis/go-redis/v9"
 
 	"go.opentelemetry.io/otel"
@@ -106,6 +107,17 @@ func main() {
 
 	registry := cost.LoadRegistry(ctx, cost.ConfigFromEnv())
 	ingestionService := ingestion.NewService(repo, registry)
+
+	// Optional ClickHouse telemetry mirror (TG_CLICKHOUSE_ADDR). Secondary
+	// analytics only — a broken mirror degrades to a warning, never downtime.
+	if sink, sinkErr := clickhouse.MaybeEventSinkFromEnv(ctx); sinkErr != nil {
+		slog.Warn("clickhouse telemetry unavailable; continuing without analytics mirror", "error", sinkErr)
+	} else if sink != nil {
+		ingestionService.WithTelemetrySink(sink)
+		defer func() { _ = sink.Close() }()
+		slog.Info("clickhouse telemetry mirror enabled")
+	}
+
 	ingestionService.StartWorker(ctx)
 
 	// Start Retention Worker (30 days retention default for MVP)

@@ -43,8 +43,18 @@ func Seed(ctx context.Context, repo storage.Repository, service ingestion.Servic
 	return nil
 }
 
+// DefaultBaseTime anchors the demo event timeline one hour in the past so the
+// data behaves like live data. A fixed historical date made seeded events look
+// like ancient telemetry: any store with retention (e.g. ClickHouse
+// token_events, 90-day TTL) deletes them at merge time, and cost rollups land
+// in a closed billing month. The relative offsets between events are kept
+// identical, so structural assertions stay deterministic.
+func DefaultBaseTime() time.Time {
+	return time.Now().UTC().Truncate(time.Minute).Add(-time.Hour)
+}
+
 func Events(tenantID string) []domain.TokenEvent {
-	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+	base := DefaultBaseTime()
 	var events []domain.TokenEvent
 
 	events = append(events, efficientEvents(tenantID, base)...)

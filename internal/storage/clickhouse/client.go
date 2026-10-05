@@ -41,6 +41,7 @@ func DefaultConfig() ClickHouseConfig {
 // ClickHouseClient wraps the ClickHouse driver with connection pooling
 type ClickHouseClient struct {
 	conn   driver.Conn
+	config ClickHouseConfig
 	mu     sync.RWMutex
 	closed bool
 }
@@ -76,7 +77,8 @@ func NewClient(cfg ClickHouseConfig) (*ClickHouseClient, error) {
 	}
 
 	return &ClickHouseClient{
-		conn: conn,
+		conn:   conn,
+		config: cfg,
 	}, nil
 }
 

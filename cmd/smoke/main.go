@@ -22,7 +22,8 @@ func main() {
 	}
 	defer func() { _ = repo.Close() }()
 
-	base := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+	// Clock base must match the demo event timeline (see demo.DefaultBaseTime).
+	base := demo.DefaultBaseTime()
 	service := ingestion.NewService(repo, cost.LoadRegistry(ctx, cost.ConfigFromEnv())).WithClock(func() time.Time {
 		return base
 	})

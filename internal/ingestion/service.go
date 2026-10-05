@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -54,6 +55,25 @@ type ExecutionService struct {
 	thresholds anomaly.Thresholds
 	alerter    moat.Alerter
 	inflight   sync.WaitGroup
+	telemetry  TelemetrySink
+}
+
+// telemetrySinkTimeout bounds a single secondary-mirror write so a slow
+// analytics cluster cannot stall ingestion.
+const telemetrySinkTimeout = 3 * time.Second
+
+// TelemetrySink is an OPTIONAL secondary analytics store (e.g. ClickHouse).
+// Writes are best-effort mirrors of already-persisted primary events: a sink
+// failure is logged and dropped, never retried into the primary path and never
+// able to fail or roll back the primary write.
+type TelemetrySink interface {
+	SinkTokenEvent(ctx context.Context, event domain.TokenEvent) error
+}
+
+// WithTelemetrySink attaches the optional secondary analytics sink. nil clears.
+func (s *ExecutionService) WithTelemetrySink(sink TelemetrySink) *ExecutionService {
+	s.telemetry = sink
+	return s
 }
 
 func NewService(repo storage.Repository, registry cost.Registry) *ExecutionService {
@@ -176,6 +196,19 @@ func (s *ExecutionService) tryProcessEvent(ctx context.Context, normalized domai
 		go func() {
 			_ = s.alerter.Alert(context.WithoutCancel(ctx), normalized.TenantID, signals)
 		}()
+	}
+
+	// Optional secondary analytics mirror (e.g. ClickHouse). The primary event
+	// is fully persisted at this point, so a sink failure is logged and dropped:
+	// it must never fail the primary write or trigger the retry loop.
+	if s.telemetry != nil {
+		sinkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), telemetrySinkTimeout)
+		err := s.telemetry.SinkTokenEvent(sinkCtx, normalized)
+		cancel()
+		if err != nil {
+			slog.Warn("telemetry sink write failed; primary store unaffected",
+				"event_id", normalized.EventID, "error", err)
+		}
 	}
 
 	return nil

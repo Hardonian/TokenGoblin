@@ -63,6 +63,13 @@ services:
       - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-}
       # Internal webhook secret (for Stripe webhook -> Go API forwarding)
       - TG_INTERNAL_WEBHOOK_SECRET=${TG_INTERNAL_WEBHOOK_SECRET:-change-me-in-production}
+      # Optional ClickHouse analytics mirror (secondary; Postgres stays the
+      # source of truth). Enable the full telemetry stack with:
+      #   TG_CLICKHOUSE_ADDR=clickhouse:9000 docker compose --profile telemetry up -d
+      - TG_CLICKHOUSE_ADDR=${TG_CLICKHOUSE_ADDR:-}
+      - TG_CLICKHOUSE_DATABASE=${TG_CLICKHOUSE_DATABASE:-tokengoblin}
+      - TG_CLICKHOUSE_USER=${TG_CLICKHOUSE_USER:-default}
+      - TG_CLICKHOUSE_PASSWORD=${TG_CLICKHOUSE_PASSWORD:-}
     volumes:
       - token-goblin-data:/data
     depends_on:
@@ -113,17 +120,27 @@ services:
     environment:
       - TG_DB_DSN=postgres://tokengoblin:tokengoblin-dev@postgres:5432/tokengoblin?sslmode=disable
       - TG_DEMO_TENANT_ID=${TG_DEMO_TENANT_ID:-}
+      - TG_CLICKHOUSE_ADDR=${TG_CLICKHOUSE_ADDR:-}
+      - TG_CLICKHOUSE_DATABASE=${TG_CLICKHOUSE_DATABASE:-tokengoblin}
+      - TG_CLICKHOUSE_USER=${TG_CLICKHOUSE_USER:-default}
+      - TG_CLICKHOUSE_PASSWORD=${TG_CLICKHOUSE_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
 
-  # NOT yet wired into the server: the ClickHouse client in
-  # internal/storage/clickhouse is built and ready but nothing imports it yet.
-  # Provisioning it under a profile keeps the day-it-lands switch trivial
-  # without paying idle RAM today.
+  # ClickHouse analytics mirror. Wired as an OPTIONAL secondary sink
+  # (TG_CLICKHOUSE_ADDR=clickhouse:9000): events land in Postgres first, then
+  # mirror here best-effort. Profile-gated so it costs no idle RAM unless you
+  # enable the telemetry stack:
+  #   TG_CLICKHOUSE_ADDR=clickhouse:9000 docker compose --profile telemetry up -d
   clickhouse:
     profiles: ["telemetry"]
     image: clickhouse/clickhouse-server:24-alpine
+    environment:
+      # First-boot database creation. The app also runs CREATE DATABASE IF NOT
+      # EXISTS, so this is convenience, not a requirement.
+      CLICKHOUSE_DB: tokengoblin
+      CLICKHOUSE_USER: default
     ports:
       - "127.0.0.1:58123:8123"
     volumes:

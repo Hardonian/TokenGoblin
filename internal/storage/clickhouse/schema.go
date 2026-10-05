@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS token_events (
 ) ENGINE = MergeTree()
 PARTITION BY toDate(timestamp)
 ORDER BY (tenant_id, timestamp, model, feature)
-TTL timestamp + INTERVAL 90 DAY
+TTL toDateTime(timestamp) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- Aggregated usage table: pre-computed rollups for fast queries
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS usage_aggregates (
     unique_users    UInt64,
     granularity     String, -- 'hour', 'day', 'week', 'month'
     computed_at     DateTime64(3) DEFAULT now64()
-) ENGINE = SummingMergeTree(request_count, total_tokens, prompt_tokens, completion_tokens, cost_usd, unique_users)
+) ENGINE = SummingMergeTree()
 PARTITION BY toDate(period_start)
 ORDER BY (tenant_id, model, feature, period_start, granularity)
 TTL period_start + INTERVAL 2 YEAR
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS anomalies (
 ) ENGINE = MergeTree()
 PARTITION BY toDate(timestamp)
 ORDER BY (tenant_id, timestamp, anomaly_type)
-TTL timestamp + INTERVAL 1 YEAR
+TTL toDateTime(timestamp) + INTERVAL 1 YEAR
 SETTINGS index_granularity = 8192;
 
 -- Zombie agents table: agents with low acceptance rates
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS zombie_agents (
     resolved_by     String
 ) ENGINE = ReplacingMergeTree(detected_at)
 ORDER BY (tenant_id, agent_id)
-TTL detected_at + INTERVAL 90 DAY
+TTL toDateTime(detected_at) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- Prompt fingerprints table: for deduplication
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS prompt_fingerprints (
     status          String DEFAULT 'active' -- 'active', 'deduplicated', 'archived'
 ) ENGINE = ReplacingMergeTree(last_seen)
 ORDER BY (tenant_id, fingerprint, model)
-TTL first_seen + INTERVAL 1 YEAR
+TTL toDateTime(first_seen) + INTERVAL 1 YEAR
 SETTINGS index_granularity = 8192;
 
 -- Materialized view for hourly aggregates from raw events
