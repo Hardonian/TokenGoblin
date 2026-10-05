@@ -34,10 +34,16 @@ fi
 die() { echo "FAIL: $*" >&2; exit 1; }
 
 [ -n "${STRIPE_SECRET_KEY:-}" ] || die "STRIPE_SECRET_KEY not set. Provide a TEST key (sk_test_/rk_test_...)."
+# Pasted secrets often carry trailing newlines/spaces — normalize before matching.
+STRIPE_SECRET_KEY="$(printf '%s' "$STRIPE_SECRET_KEY" | tr -d '[:space:]')"
 case "$STRIPE_SECRET_KEY" in
   sk_test_*|rk_test_*) : ;;
   sk_live_*|rk_live_*) die "STRIPE_SECRET_KEY is a LIVE key. This smoke test is test-mode only — refusing." ;;
-  *) die "STRIPE_SECRET_KEY does not look like a Stripe key (want sk_test_/rk_test_...)." ;;
+  *)
+    # Non-secret shape diagnostics (3-char family prefix + length only).
+    echo "   key shape: prefix='${STRIPE_SECRET_KEY:0:3}...' length=${#STRIPE_SECRET_KEY}" >&2
+    die "STRIPE_SECRET_KEY does not look like a Stripe key (want sk_test_/rk_test_...)."
+    ;;
 esac
 
 command -v stripe >/dev/null || die "stripe CLI not found. Install: https://stripe.com/docs/stripe-cli"
