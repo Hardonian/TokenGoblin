@@ -48,7 +48,8 @@ jobs:
           stripe --version
 
       - name: Run checkout round trip (trigger mode)
-        run: ./scripts/stripe_checkout_smoke.sh --trigger-only
+        # Hard bound so the step always finishes and its logs stay readable.
+        run: timeout --kill-after=30 600 ./scripts/stripe_checkout_smoke.sh --trigger-only
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           TG_DB_DSN: postgres://tokengoblin:tokengoblin-dev@127.0.0.1:5432/tokengoblin?sslmode=disable

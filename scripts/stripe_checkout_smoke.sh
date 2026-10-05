@@ -60,11 +60,11 @@ stripe --version
 # ---------- price (ephemeral test price if none configured) ----------
 if [ -z "${STRIPE_PRICE_PRO:-}" ]; then
   echo "-- step 0a: creating ephemeral test price (STRIPE_PRICE_PRO unset)"
-  PRODUCT_JSON="$(curl -fsS -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/products \
+  PRODUCT_JSON="$(curl -fsS --max-time 30 -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/products \
     --data-urlencode "name=TokenGoblin Smoke ${TENANT}")" || die "product creation failed"
   PRODUCT_ID="$(printf '%s' "$PRODUCT_JSON" | grep -o '"id": *"prod_[A-Za-z0-9]*"' | head -1 | grep -o 'prod_[A-Za-z0-9]*')"
   [ -n "$PRODUCT_ID" ] || die "no product id in: $PRODUCT_JSON"
-  PRICE_JSON="$(curl -fsS -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/prices \
+  PRICE_JSON="$(curl -fsS --max-time 30 -u "${STRIPE_SECRET_KEY}:" https://api.stripe.com/v1/prices \
     --data-urlencode "product=${PRODUCT_ID}" \
     --data-urlencode "unit_amount=2500" \
     --data-urlencode "currency=usd" \
@@ -122,7 +122,7 @@ echo "   API healthy (raw-body webhook verifier active)"
 
 # ---------- checkout session through the live code path ----------
 echo "-- step 3: creating checkout session via POST /api/billing/checkout"
-CHECKOUT="$(curl -fsS -X POST "${API_BASE}/api/billing/checkout" \
+CHECKOUT="$(curl -fsS --max-time 30 -X POST "${API_BASE}/api/billing/checkout" \
   -H "x-tenant-id: ${TENANT}" -H 'content-type: application/json' \
   -d "{\"price_id\":\"${STRIPE_PRICE_PRO}\",\"success_url\":\"https://example.com/success\",\"cancel_url\":\"https://example.com/cancel\"}")"
 echo "$CHECKOUT" | grep -q '"ok":true' || die "checkout creation failed: $CHECKOUT"
@@ -142,16 +142,20 @@ if [ "$MODE" = "full" ]; then
   done
 else
   echo "-- step 4: firing signed test event through the listener, tagged with our tenant"
-  stripe trigger checkout.session.completed \
-    --add "checkout_session.metadata.tenant_id=${TENANT}" \
-    --add "checkout_session.client_reference_id=${TENANT}" \
-    >/dev/null 2>&1 || die "stripe trigger failed (is the CLI authenticated?)"
+  # Flag syntax per Stripe CLI docs: --add [resource]:[path1].[path2]=[value]
+  TRIGGER_OUT="$(timeout 120 stripe trigger checkout.session.completed \
+    --add "checkout_session:metadata.tenant_id=${TENANT}" \
+    --add "checkout_session:client_reference_id=${TENANT}" 2>&1)" || {
+      printf '%s\n' "$TRIGGER_OUT"
+      die "stripe trigger failed (is the CLI authenticated? is the key test-mode?)"
+    }
+  printf '%s\n' "$TRIGGER_OUT" | tail -5
   sleep 5
 fi
 
 # ---------- verify the lifecycle actually applied (through the product's own API) ----------
 echo "-- step 5: verifying billing lifecycle via GET /api/billing/status"
-STATUS="$(curl -fsS -H "x-tenant-id: ${TENANT}" "${API_BASE}/api/billing/status")"
+STATUS="$(curl -fsS --max-time 30 -H "x-tenant-id: ${TENANT}" "${API_BASE}/api/billing/status")"
 echo "   status: ${STATUS}"
 TIER="$(printf '%s' "$STATUS" | grep -o '"tier":"[a-z]*"' | head -1 | sed 's/.*:"//;s/"//')"
 if [ -n "$TIER" ] && [ "$TIER" != "free" ]; then
