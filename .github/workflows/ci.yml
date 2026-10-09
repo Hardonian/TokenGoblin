@@ -142,14 +142,14 @@ jobs:
       - name: Lint GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
-
       - name: Run gosec
         run: |
           go version
           go mod download
           go run github.com/securego/gosec/v2/cmd/gosec@latest -exclude=G104,G204 ./...
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
 
       - name: Check for hardcoded secrets
         uses: trufflesecurity/trufflehog@main
