@@ -146,7 +146,10 @@ jobs:
         uses: golang/govulncheck-action@v1
 
       - name: Run gosec
-        run: go run github.com/securego/gosec/v2/cmd/gosec@latest -exclude=G104,G204 ./...
+        run: |
+          go version
+          go mod download
+          go run github.com/securego/gosec/v2/cmd/gosec@latest -exclude=G104,G204 ./...
 
       - name: Check for hardcoded secrets
         uses: trufflesecurity/trufflehog@main
