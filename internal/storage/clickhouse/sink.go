@@ -2,10 +2,10 @@ package clickhouse
 
 import (
 	"context"
-	"sync"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
