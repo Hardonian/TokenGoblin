@@ -49,6 +49,11 @@ func envOr(key, fallback string) string {
 
 // InitSchema ensures the configured database exists and applies the
 // TokenGoblin DDL (idempotent: every statement is CREATE ... IF NOT EXISTS).
+// defaultSchemaStatements caches the pre-split DDL statements from SchemaDDL.
+// ClickHouse native TCP protocol (clickhouse-go/v2) executes queries individually,
+// so pre-parsing avoids redundant string splitting and heap allocations on each InitSchema call.
+var defaultSchemaStatements = splitStatements(SchemaDDL)
+
 func (s *EventSink) InitSchema(ctx context.Context) error {
 	cfg := s.client.config
 	if !validIdentifier(cfg.Database) {
@@ -57,7 +62,7 @@ func (s *EventSink) InitSchema(ctx context.Context) error {
 	if err := s.client.Execute(ctx, "CREATE DATABASE IF NOT EXISTS "+cfg.Database); err != nil {
 		return fmt.Errorf("init clickhouse database: %w", err)
 	}
-	for _, stmt := range splitStatements(SchemaDDL) {
+	for _, stmt := range defaultSchemaStatements {
 		if err := s.client.Execute(ctx, stmt); err != nil {
 			return fmt.Errorf("init clickhouse schema: %w", err)
 		}

@@ -184,3 +184,23 @@ func TestEventSinkConfigFromEnvDisabledWhenUnset(t *testing.T) {
 		t.Fatalf("default database wrong: %q", cfg.Database)
 	}
 }
+
+func BenchmarkSplitStatements(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		stmts := splitStatements(SchemaDDL)
+		if len(stmts) == 0 {
+			b.Fatal("expected non-empty statements")
+		}
+	}
+}
+
+func BenchmarkDefaultSchemaStatements(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		stmts := defaultSchemaStatements
+		if len(stmts) == 0 {
+			b.Fatal("expected non-empty statements")
+		}
+	}
+}
