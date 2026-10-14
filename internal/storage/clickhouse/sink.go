@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -306,12 +307,19 @@ func (s *EventSink) DeleteTenantEvents(ctx context.Context, tenantID string) err
 	if err := s.client.Execute(ctx, "DELETE FROM anomalies WHERE tenant_id = ?", tenantID); err != nil {
 		return fmt.Errorf("clear clickhouse mirror anomalies: %w", err)
 	}
-	for _, table := range []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"} {
-		if err := s.client.Execute(ctx, "ALTER TABLE "+table+" DELETE WHERE tenant_id = ?", tenantID); err != nil {
-			// Hygiene only: an async mutation failure must not fail the reset.
-			fmt.Fprintf(os.Stderr, "clickhouse mirror hygiene: clear %s: %v\n", table, err)
-		}
+	tables := []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"}
+	var wg sync.WaitGroup
+	wg.Add(len(tables))
+	for _, table := range tables {
+		go func(tbl string) {
+			defer wg.Done()
+			if err := s.client.Execute(ctx, "ALTER TABLE "+tbl+" DELETE WHERE tenant_id = ?", tenantID); err != nil {
+				// Hygiene only: an async mutation failure must not fail the reset.
+				fmt.Fprintf(os.Stderr, "clickhouse mirror hygiene: clear %s: %v\n", tbl, err)
+			}
+		}(table)
 	}
+	wg.Wait()
 	return nil
 }
 

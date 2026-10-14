@@ -1,15 +1,36 @@
 import "@testing-library/jest-dom";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { SWRConfig } from "swr";
 import CommandCenter from "../page";
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+jest.mock("@/lib/auth", () => ({
+  useAuth: () => ({ tenantId: "demo-tenant", apiKey: "http-only-session", isLoading: false }),
+  authFetcher: jest.requireActual("@/lib/auth").authFetcher,
+}));
 
 // Mock fetch at the global level before React/SWR initialization
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
+function renderPage() {
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
+      <CommandCenter />
+    </SWRConfig>
+  );
+}
+
 describe("CommandCenter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
       json: jest.fn().mockResolvedValue({
         ok: true,
         data: {
@@ -20,22 +41,28 @@ describe("CommandCenter", () => {
           failure_rate_pct: 0,
           avg_latency_ms: 0,
           waste_pct: 0,
+          cost_leaks: [],
+          zombie_agents: [],
+          events: [],
+          models: [],
         },
       }),
     });
   });
 
   it("renders the header correctly", async () => {
-    render(<CommandCenter />);
+    renderPage();
     expect(screen.getByText("[GOBLIN_CAVERN_OS]")).toBeInTheDocument();
     expect(screen.getByText("Chief Goblin's War Room")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
   });
 
-  // TODO: Fix SWR mock for fetch test - SWR mocking requires module-level setup
-  // it("fetches data on load", async () => {
-  //   render(<CommandCenter />);
-  //   await waitFor(() => {
-  //     expect(mockFetch).toHaveBeenCalled();
-  //   });
-  // });
+  it("fetches data on load", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
 });
