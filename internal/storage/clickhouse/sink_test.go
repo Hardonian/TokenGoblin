@@ -207,7 +207,6 @@ func BenchmarkDefaultSchemaStatements(b *testing.B) {
 	}
 }
 
-
 type mockConn struct {
 	driver.Conn
 	delay time.Duration
