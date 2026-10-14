@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -50,6 +49,11 @@ func envOr(key, fallback string) string {
 
 // InitSchema ensures the configured database exists and applies the
 // TokenGoblin DDL (idempotent: every statement is CREATE ... IF NOT EXISTS).
+// defaultSchemaStatements caches the pre-split DDL statements from SchemaDDL.
+// ClickHouse native TCP protocol (clickhouse-go/v2) executes queries individually,
+// so pre-parsing avoids redundant string splitting and heap allocations on each InitSchema call.
+var defaultSchemaStatements = splitStatements(SchemaDDL)
+
 func (s *EventSink) InitSchema(ctx context.Context) error {
 	cfg := s.client.config
 	if !validIdentifier(cfg.Database) {
@@ -58,7 +62,7 @@ func (s *EventSink) InitSchema(ctx context.Context) error {
 	if err := s.client.Execute(ctx, "CREATE DATABASE IF NOT EXISTS "+cfg.Database); err != nil {
 		return fmt.Errorf("init clickhouse database: %w", err)
 	}
-	for _, stmt := range splitStatements(SchemaDDL) {
+	for _, stmt := range defaultSchemaStatements {
 		if err := s.client.Execute(ctx, stmt); err != nil {
 			return fmt.Errorf("init clickhouse schema: %w", err)
 		}
@@ -302,19 +306,12 @@ func (s *EventSink) DeleteTenantEvents(ctx context.Context, tenantID string) err
 	if err := s.client.Execute(ctx, "DELETE FROM anomalies WHERE tenant_id = ?", tenantID); err != nil {
 		return fmt.Errorf("clear clickhouse mirror anomalies: %w", err)
 	}
-	tables := []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"}
-	var wg sync.WaitGroup
-	wg.Add(len(tables))
-	for _, table := range tables {
-		go func(tbl string) {
-			defer wg.Done()
-			if err := s.client.Execute(ctx, "ALTER TABLE "+tbl+" DELETE WHERE tenant_id = ?", tenantID); err != nil {
-				// Hygiene only: an async mutation failure must not fail the reset.
-				fmt.Fprintf(os.Stderr, "clickhouse mirror hygiene: clear %s: %v\n", tbl, err)
-			}
-		}(table)
+	for _, table := range []string{"usage_aggregates_hourly", "usage_aggregates_daily", "usage_aggregates"} {
+		if err := s.client.Execute(ctx, "ALTER TABLE "+table+" DELETE WHERE tenant_id = ?", tenantID); err != nil {
+			// Hygiene only: an async mutation failure must not fail the reset.
+			fmt.Fprintf(os.Stderr, "clickhouse mirror hygiene: clear %s: %v\n", table, err)
+		}
 	}
-	wg.Wait()
 	return nil
 }
 
