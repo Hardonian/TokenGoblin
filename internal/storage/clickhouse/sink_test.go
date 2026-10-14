@@ -203,6 +203,9 @@ func BenchmarkDefaultSchemaStatements(b *testing.B) {
 		stmts := defaultSchemaStatements
 		if len(stmts) == 0 {
 			b.Fatal("expected non-empty statements")
+		}
+	}
+}
 
 
 type mockConn struct {
