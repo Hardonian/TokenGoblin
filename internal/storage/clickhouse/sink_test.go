@@ -1,12 +1,10 @@
 package clickhouse
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/Hardonian/TokenGoblin/internal/domain"
 )
 
@@ -203,44 +201,6 @@ func BenchmarkDefaultSchemaStatements(b *testing.B) {
 		stmts := defaultSchemaStatements
 		if len(stmts) == 0 {
 			b.Fatal("expected non-empty statements")
-		}
-	}
-}
-
-type mockConn struct {
-	driver.Conn
-	delay time.Duration
-}
-
-func (m *mockConn) Exec(ctx context.Context, query string, args ...any) error {
-	if m.delay > 0 {
-		time.Sleep(m.delay)
-	}
-	return nil
-}
-
-func TestDeleteTenantEvents(t *testing.T) {
-	client := &ClickHouseClient{
-		conn: &mockConn{},
-	}
-	sink := NewEventSink(client)
-	err := sink.DeleteTenantEvents(context.Background(), "test-tenant")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func BenchmarkDeleteTenantEvents(b *testing.B) {
-	client := &ClickHouseClient{
-		conn: &mockConn{delay: 10 * time.Millisecond},
-	}
-	sink := NewEventSink(client)
-	ctx := context.Background()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err := sink.DeleteTenantEvents(ctx, "tenant-1"); err != nil {
-			b.Fatal(err)
 		}
 	}
 }

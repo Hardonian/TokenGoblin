@@ -84,31 +84,16 @@ func verifyPostgresRLS(ctx context.Context, pool *pgxpool.Pool) error {
 		"budgets",
 		"tuning_profiles",
 	}
-	rows, err := pool.Query(ctx, `
-		SELECT t.tbl, COALESCE(c.relrowsecurity, false)
-		FROM UNNEST($1::text[]) AS t(tbl)
-		LEFT JOIN pg_class c ON c.oid = to_regclass(t.tbl)
-	`, tables)
-	if err != nil {
-		return fmt.Errorf("%w: verify postgres rls: %v", ErrUnavailable, err)
-	}
-	defer rows.Close()
-
 	var missing []string
-	for rows.Next() {
-		var table string
+	for _, table := range tables {
 		var enabled bool
-		if err := rows.Scan(&table, &enabled); err != nil {
-			return fmt.Errorf("%w: scan postgres rls result: %v", ErrUnavailable, err)
+		if err := pool.QueryRow(ctx, `SELECT COALESCE((SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass($1)), false)`, table).Scan(&enabled); err != nil {
+			return fmt.Errorf("%w: verify postgres rls for %s: %v", ErrUnavailable, table, err)
 		}
 		if !enabled {
 			missing = append(missing, table)
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("%w: verify postgres rls rows: %v", ErrUnavailable, err)
-	}
-
 	if len(missing) > 0 {
 		return fmt.Errorf("%w: postgres row level security is not enabled for: %s", ErrUnavailable, strings.Join(missing, ", "))
 	}

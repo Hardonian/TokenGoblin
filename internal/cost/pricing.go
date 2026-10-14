@@ -354,3 +354,17 @@ func splitKey(raw string) (string, string, bool) {
 func roundUSD(value float64) float64 {
 	return math.Round(value*100_000_000) / 100_000_000
 }
+
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
