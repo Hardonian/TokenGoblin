@@ -3,6 +3,10 @@ name: Deploy Cloudflare Worker + Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
   workflow_dispatch:
 
 # Serialize deploys: rapid pushes used to fire 3 parallel wrangler jobs each and
@@ -23,6 +27,7 @@ env:
 jobs:
   deploy-worker:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -61,6 +66,7 @@ jobs:
 
   deploy-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -96,6 +102,7 @@ jobs:
 
   deploy-landing:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
