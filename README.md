@@ -6,6 +6,16 @@
 
 Track, analyze, and optimize AI token spending across your autonomous agent workforce.
 
+[![CI](https://github.com/Hardonian/TokenGoblin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hardonian/TokenGoblin/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
+> **Portfolio signal:** TokenGoblin is the LLM-operations flagship: a Go service for token measurement, routing, spend governance, and observable workload economics.
+
+## Evidence path
+
+The fastest way to inspect the engineering is the [architecture and specification](docs/ARCHITECTURE_AND_SPEC.md), followed by the [ingestion benchmarks](internal/ingestion/benchmark_test.go) and the repository CI workflow.
+
 ## Quick Start
 
 ### Prerequisites
